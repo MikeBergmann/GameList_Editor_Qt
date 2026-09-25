@@ -45,3 +45,16 @@ These are the features I want to implement (and therefore do all this):
 
 Whether Windows stays a supported target or this is Linux-only. Unfortunately, my Mac no longer runs macOS, so there will be no macOS version.
 
+## AI usage
+
+Yes, I'll use AI. In my opinion, AI is a great tool for every developer to speed up their work and keep learning, especially if you have no colleagues, as in side projects like this.
+
+So I'll use AI for:
+
+- Translating the original French comments to English
+- Checking the grammar and spelling of my texts, because I'm not a native English speaker.
+- Helping me analyze the Delphi codebase, because the last time I programmed with Delphi was in 1996.
+- Doing code review of my work, in the absence of a human reviewer.
+- Refactoring the new code along the way, when I decide to restructure something.
+
+
