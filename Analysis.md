@@ -17,3 +17,6 @@ Some stuff to make my life easier:
 | `TIniFile` | `QSettings` |
 | `TThread` + `Synchronize` (`U_DownloadThread.pas`) | signals/slots |
 
+## Later
+
+- Gradually replace the parallel arrays with a single structured table.
