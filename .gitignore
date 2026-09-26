@@ -1,0 +1,3 @@
+# CMake / Qt6 build tree
+build/
+compile_commands.json
