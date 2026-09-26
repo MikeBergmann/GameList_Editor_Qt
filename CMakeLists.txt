@@ -18,14 +18,9 @@ find_package( GTest REQUIRED )
 
 include( GoogleTest )
 
-# core has no Qt::Widgets and no network - enforced by the link graph, not
-# just by folder layout, so nothing stops a future edit from #including a
-# QDialog into it. STATIC, and the .qrc stays off it and listed only on each
-# executable: Qt's resource initialiser gets dropped by the linker when it
-# sits in a lib that nothing explicitly references, and the .qrc then
-# resolves to nothing.
 add_library( gle_core STATIC
    src/core/Game.cpp
+   src/core/Resources.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
 target_link_libraries( gle_core PUBLIC Qt6::Core ZLIB::ZLIB )
@@ -33,6 +28,7 @@ target_link_libraries( gle_core PUBLIC Qt6::Core ZLIB::ZLIB )
 add_executable( tests
    tests/main.cpp
    tests/tst_game.cpp
+   tests/tst_resources.cpp
    Resources/assets.qrc
 )
 target_include_directories( tests PRIVATE tests )
