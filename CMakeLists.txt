@@ -12,7 +12,7 @@ set( CMAKE_AUTORCC ON )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
-find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets )
+find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml )
 find_package( ZLIB REQUIRED )
 find_package( GTest REQUIRED )
 
@@ -20,14 +20,16 @@ include( GoogleTest )
 
 add_library( gle_core STATIC
    src/core/Game.cpp
+   src/core/Gamelist.cpp
    src/core/Resources.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
-target_link_libraries( gle_core PUBLIC Qt6::Core ZLIB::ZLIB )
+target_link_libraries( gle_core PUBLIC Qt6::Core Qt6::Gui Qt6::Xml ZLIB::ZLIB )
 
 add_executable( tests
    tests/main.cpp
    tests/tst_game.cpp
+   tests/tst_gamelist.cpp
    tests/tst_resources.cpp
    Resources/assets.qrc
 )
