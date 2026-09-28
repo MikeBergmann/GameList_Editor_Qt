@@ -18,7 +18,7 @@ Some stuff to make my life easier:
 
 ## Gamelist
 
-The original code loaded and saved `gamelist.xml` several times through one shared TXMLDocument. Additionally, Widgets held the state that should have been in a model, e.g., by holding raw TGame* pointers. This was redesigned to Gamelist as the data layer for one emulator system’s gamelist.xml.
+The original code loaded and saved `gamelist.xml` several times through one shared TXMLDocument. Additionally, Widgets held the state (e.g., by holding raw TGame* pointers) that should have been in a model. This was redesigned to Gamelist as the data layer for one emulator system’s `gamelist.xml`.
 
 ## Later
 
