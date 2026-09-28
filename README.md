@@ -6,11 +6,11 @@
 
 There are a lot of great ROMs for vintage computers/consoles or for their emulators on itch.io.
 
-To manage these ROMs, I use GameList Editor (https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scaping my gamelist.xml.
+To manage these ROMs, I use [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scaping my gamelist.xml.
 
 I want to add some features, but unfortunately, it is written in Delphi (which I don't have a dev toolchain for).
 
-So this repo will hopefully become a C++/Qt6 port.
+So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Editor` (itself a fork of `NeeeeB/GameList_Editor`).
 
 ## First Step
 
