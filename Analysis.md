@@ -20,6 +20,8 @@ Some stuff to make my life easier:
 
 The original code loaded and saved `gamelist.xml` several times through one shared TXMLDocument. Additionally, Widgets held the state (e.g., by holding raw TGame* pointers) that should have been in a model. This was redesigned to Gamelist as the data layer for one emulator system’s `gamelist.xml`.
 
+The QDomDocument decision: I'm designing it to hold my gamelists, which are typically a few dozen of homebrew and legal available ROM-based games per system. Not tens of thousands and definitely not a full MAME set. So QDomDocument is fine here. Additionally, Qt dropped SAX with Qt6, and the nearest available replacement in Qt6 is QXmlStreamReader/QXmlStreamWriter, which I'm not getting warm with. Given we want to access a random game by index and edit/save that one node, QDomDocument should be the correct choice.
+
 ## Later
 
 - Gradually replace the parallel arrays with a single structured table.
