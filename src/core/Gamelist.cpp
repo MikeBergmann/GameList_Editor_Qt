@@ -196,21 +196,15 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
    FNameCounts.clear();
    FRomCounts.clear();
 
-   const auto fail = [aError]( const QString& aMessage ) {
-      if ( aError )
-         *aError = aMessage;
-      return false;
-   };
-
    QFile file( aSystem.gamelistPath );
    if ( !file.open( QIODevice::ReadOnly ) )
-      return fail( QStringLiteral( "Cannot read %1: %2" ).arg( aSystem.gamelistPath, file.errorString() ) );
+      return fail( aError, QStringLiteral( "Cannot read %1: %2" ).arg( aSystem.gamelistPath, file.errorString() ) );
 
    QString parseError;
    int line = 0;
    int column = 0;
    if ( !FDocument.setContent( &file, &parseError, &line, &column ) ) {
-      return fail( QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
+      return fail( aError, QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
                        .arg( aSystem.gamelistPath, parseError )
                        .arg( line )
                        .arg( column ) );
@@ -267,7 +261,7 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
    }
 
    if ( FGames.isEmpty() )
-      return fail( QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) );
+      return fail( aError, QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) );
 
    countDuplicates();
 
@@ -450,8 +444,8 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
       ++changed;
    }
 
-   if ( changed > 0 )
-      save( aError );
+   if ( changed > 0 && !save( aError ) )
+      return 0;
 
    return changed;
 }
