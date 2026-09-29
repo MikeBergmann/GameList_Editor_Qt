@@ -255,6 +255,9 @@ const char* const Cst_SystemKindImageNames[skCount] = {
    "other.png",                   // skOther
 };
 
+
+// Screenscraper.fr system IDs, retrieved with this URL:
+// https://www.screenscraper.fr/api2/systemesListe.php?devid=xxx&devpassword=yyy&softname=zzz&output=XML&ssid=test&sspassword=test
 const char* const Cst_SystemKindId[skCount] = {
    "3", "4", "2", "1", "75", "65", "26", "41", "42", "138", "106", "75",
    "75", "52", "10", "21", "9", "12", "75", "28", "75", "113", "113", "113",
