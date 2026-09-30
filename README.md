@@ -47,14 +47,16 @@ Whether Windows stays a supported target or this is Linux-only. Unfortunately, m
 
 ## AI usage
 
-Yes, I'll use AI. In my opinion, AI is a great tool for every developer to speed up their work and keep learning, especially if you have no colleagues, as in side projects like this.
+Yes, I used and will use AI. In my opinion, AI is a great tool for every developer to speed up their work and keep learning, especially if you have no colleagues, as in side projects like this.
 
-So I'll use AI for:
+So I used AI for:
 
 - Translating the original French comments to English
 - Checking the grammar and spelling of my texts, because I'm not a native English speaker.
 - Helping me analyze the Delphi codebase, because the last time I programmed with Delphi was in 1996.
-- Doing code review of my work, in the absence of a human reviewer.
-- Refactoring the new code along the way, when I decide to restructure something.
+- Generating all the unit-tests and test-data. Doing that manually is just tedious and nothing I do for fun in a side project.
+- Writing new code, based on my design and instructions. 
+- Converting resource tables from Delphi to C++/Qt6.
+- Doing code review and refactoring, in the absence of a human reviewer.
 
-
+This list is not final, and I will probably find more ways to use AI as I go along. Nevertheless, I will not use AI without steering and reviewing the result. I do this for fun and want to learn and understand.

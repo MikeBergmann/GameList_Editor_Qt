@@ -21,6 +21,7 @@ include( GoogleTest )
 add_library( gle_core STATIC
    src/core/Game.cpp
    src/core/Gamelist.cpp
+   src/core/GamelistModel.cpp
    src/core/Resources.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
@@ -30,6 +31,7 @@ add_executable( tests
    tests/main.cpp
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
+   tests/tst_gamelistmodel.cpp
    tests/tst_resources.cpp
    Resources/assets.qrc
 )
@@ -38,3 +40,6 @@ target_link_libraries( tests PRIVATE gle_core Qt6::Widgets GTest::gtest )
 
 enable_testing()
 gtest_discover_tests( tests )
+
+add_executable( gamelistmodel_demo demo/main.cpp )
+target_link_libraries( gamelistmodel_demo PRIVATE gle_core Qt6::Widgets )
