@@ -46,9 +46,10 @@ int main( int argc, char* argv[] )
    layout->addWidget( Lbl_Status );
 
    auto updateStatus = [&]( const QString& aError = {} ) {
-      Lbl_Status->setText( aError.isEmpty()
-                              ? QString( "%1 / %2 games" ).arg( proxy.rowCount() ).arg( model.rowCount() )
-                              : aError );
+      Lbl_Status->setText(
+         aError.isEmpty()
+            ? QString( "%1 / %2 games" ).arg( proxy.rowCount() ).arg( model.rowCount() )
+            : aError );
    };
 
    QObject::connect( Cbx_Systems, &QComboBox::currentIndexChanged, [&] {

@@ -1,0 +1,77 @@
+---
+Language: Cpp
+Standard: c++17
+BasedOnStyle: LLVM
+
+ColumnLimit: 100
+IndentWidth: 3
+ContinuationIndentWidth: 3
+AccessModifierOffset: -3
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: true
+MaxEmptyLinesToKeep: 1
+
+# Allman for types and functions, attached for everything inside a body.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: false
+  AfterControlStatement: Never
+  AfterCaseLabel: false
+  BeforeElse: false
+  BeforeCatch: false
+  BeforeLambdaBody: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+# `foo( a, b )`, `if ( x )`, but `foo()`.
+SpaceBeforeParens: ControlStatements
+SpacesInParens: Custom
+SpacesInParensOptions:
+  Other: true
+  InConditionalStatements: true
+  InEmptyParentheses: false
+  InCStyleCasts: false
+SpacesInSquareBrackets: false
+SpacesInAngles: Never
+# `{ 0, 1, 2 }`, `{}`
+Cpp11BracedListStyle: false
+SpaceBeforeCpp11BracedList: false
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+SpacesBeforeTrailingComments: 2
+# The hand-aligned enum-name comments in Resources.cpp stay where they are.
+AlignTrailingComments:
+  Kind: Leave
+
+AlignAfterOpenBracket: Align
+BreakBeforeBinaryOperators: None
+AlignOperands: Align
+BinPackArguments: true
+BinPackParameters: true
+AllowAllArgumentsOnNextLine: true
+# Prefer `fail( aError, QStringLiteral( ... )` over breaking right after `fail(`.
+PenaltyBreakBeforeFirstCallParameter: 100
+
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+InsertBraces: false
+
+PackConstructorInitializers: CurrentLine
+BreakConstructorInitializers: BeforeColon
+
+# Own header first, then Qt, then everything else - each block kept as written.
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+

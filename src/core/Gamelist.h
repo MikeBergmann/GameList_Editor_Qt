@@ -59,7 +59,9 @@ public:
 
    const SystemEntry& system() const { return FSystem; }
    const QVector<Game>& games() const { return FGames; }
-   int count() const { return FGames.size(); }
+   // int, not qsizetype: indices and rows are int throughout (QAbstractItemModel's
+   // are too), and a gamelist is nowhere near INT_MAX entries.
+   int count() const { return static_cast<int>( FGames.size() ); }
    const Game& at( int aIndex ) const { return FGames.at( aIndex ); }
 
    bool save( QString* aError = nullptr );
