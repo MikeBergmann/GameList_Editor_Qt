@@ -38,6 +38,16 @@ QString physicalPath( const QString& aSystemDir, const QString& aRelative )
    return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
 }
 
+// Where a file about to be written should land. The directory follows an existing
+// "Media/" when the link says "media/", as far down as it exists. The file name
+// stays literal on purpose: resolving it could land on, and overwrite, another
+// game's differently-cased file.
+QString writeTarget( const QString& aSystemDir, const QString& aLink )
+{
+   const QFileInfo info( QDir::cleanPath( QDir( aSystemDir ).filePath( aLink ) ) );
+   return QDir( resolvePath( info.path() ) ).filePath( info.fileName() );
+}
+
 // CheckIfFileMissing. Snapshot at load: the proxy must not stat a
 // file per row on every keystroke.
 bool fileMissing( const QString& aPath )
@@ -111,7 +121,8 @@ QString resolvePath( const QString& aPath )
    // re-lists the containing directory on every component that misses,
    // so a ROM folder that is absent altogether costs one listing per game. That
    // only happens on the orphan path; cache listings per directory if it shows.
-   for ( const QString& part : parts ) {
+   for ( int index = 0; index < parts.size(); ++index ) {
+      const QString& part = parts.at( index );
       QDir dir( resolved );
       if ( QFileInfo::exists( dir.filePath( part ) ) ) {
          resolved = dir.filePath( part );
@@ -126,9 +137,11 @@ QString resolvePath( const QString& aPath )
          }
       }
 
-      // Genuinely missing: hand back the literal path so the caller reports it.
+      // Genuinely missing: keep the case found so far and the rest as written,
+      // so a file about to be created lands in the existing "Media/", not a new
+      // "media/". Still does not exist, so the caller still reports it.
       if ( match.isEmpty() )
-         return aPath;
+         return dir.filePath( parts.mid( index ).join( QLatin1Char( '/' ) ) );
 
       resolved = dir.filePath( match );
    }
@@ -385,7 +398,7 @@ bool Gamelist::applyImage( int aIndex, const QImage& aPicture, QString* aError )
 {
    Game& game = FGames[aIndex];
    const QString link = FImageFolder + game.romNameWoExt() + QLatin1String( Cst_ImageSuffixPng );
-   const QString target = QDir::cleanPath( QDir( FSystemDir ).filePath( link ) );
+   const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
       return fail( aError, QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
@@ -457,7 +470,7 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
 
    Game& game = FGames[aIndex];
    const QString link = FVideoFolder + game.romNameWoExt() + QLatin1String( Cst_VideoSuffixMp4 );
-   const QString target = QDir::cleanPath( QDir( FSystemDir ).filePath( link ) );
+   const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
       return fail( aError, QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
@@ -482,15 +495,16 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
    return save( aError );
 }
 
-bool Gamelist::linkShared( int aIndex, const QString& aLink, bool aIsImage ) const
+bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
 {
-   if ( aLink.isEmpty() )
+   if ( aPhysicalPath.isEmpty() )
       return false;
 
    for ( int index = 0; index < FGames.size(); ++index ) {
       if ( index == aIndex )
          continue;
-      if ( ( aIsImage ? FGames.at( index ).imagePath : FGames.at( index ).videoPath ) == aLink )
+      const Game& other = FGames.at( index );
+      if ( ( aIsImage ? other.physicalImagePath : other.physicalVideoPath ) == aPhysicalPath )
          return true;
    }
 
@@ -503,7 +517,6 @@ bool Gamelist::removeImage( int aIndex, QString* aError )
       return fail( aError, QStringLiteral( "No game selected." ) );
 
    Game& game = FGames[aIndex];
-   const QString link = game.imagePath;
    const QString file = game.physicalImagePath;
 
    setChildText( FNodes[aIndex], Cst_ImageLink, QString() );
@@ -516,7 +529,7 @@ bool Gamelist::removeImage( int aIndex, QString* aError )
 
    // Only once the gamelist has stopped pointing at it, and only if no other
    // game points at it either - several games can share one picture.
-   if ( !file.isEmpty() && !linkShared( aIndex, link, true ) )
+   if ( !file.isEmpty() && !fileShared( aIndex, file, true ) )
       QFile::remove( file );
 
    return true;
@@ -528,7 +541,6 @@ bool Gamelist::removeVideo( int aIndex, QString* aError )
       return fail( aError, QStringLiteral( "No game selected." ) );
 
    Game& game = FGames[aIndex];
-   const QString link = game.videoPath;
    const QString file = game.physicalVideoPath;
 
    setChildText( FNodes[aIndex], Cst_VideoLink, QString() );
@@ -539,7 +551,7 @@ bool Gamelist::removeVideo( int aIndex, QString* aError )
    if ( !save( aError ) )
       return false;
 
-   if ( !file.isEmpty() && !linkShared( aIndex, link, false ) )
+   if ( !file.isEmpty() && !fileShared( aIndex, file, false ) )
       QFile::remove( file );
 
    return true;
