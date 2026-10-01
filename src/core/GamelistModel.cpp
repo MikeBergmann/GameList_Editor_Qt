@@ -13,8 +13,8 @@ void GamelistModel::setFilter( const FilterSpec& aFilter )
 {
    // Chk_ListByRom and Chk_FullRomName change what every row reads, not which
    // rows there are - so they are a repaint, and the selection survives them.
-   const bool displayChanged = aFilter.listByRom != FFilter.listByRom ||
-                                aFilter.fullRomName != FFilter.fullRomName;
+   const bool displayChanged =
+      aFilter.listByRom != FFilter.listByRom || aFilter.fullRomName != FFilter.fullRomName;
 
    FFilter = aFilter;
 
@@ -70,8 +70,7 @@ void GamelistFilter::setSourceModel( QAbstractItemModel* aModel )
    QSortFilterProxyModel::setSourceModel( aModel );
 
    if ( auto* source = qobject_cast<GamelistModel*>( aModel ) ) {
-      connect( source, &GamelistModel::filterChanged, this,
-               [this] { invalidateRowsFilter(); } );
+      connect( source, &GamelistModel::filterChanged, this, [this] { invalidateRowsFilter(); } );
    }
 }
 

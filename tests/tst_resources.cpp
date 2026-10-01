@@ -35,8 +35,8 @@ TEST( Resources, EverySystemHasADisplayNameAndAScraperId )
 TEST( Resources, EverySystemLogoResolvesInTheQrc )
 {
    for ( int i = 0; i < skCount; ++i ) {
-      const QString logo = QLatin1String( Cst_LogoPicsFolder )
-                            + QLatin1String( Cst_SystemKindImageNames[i] );
+      const QString logo =
+         QLatin1String( Cst_LogoPicsFolder ) + QLatin1String( Cst_SystemKindImageNames[i] );
       EXPECT_TRUE( QFile::exists( logo ) ) << logo.toStdString();
    }
 }

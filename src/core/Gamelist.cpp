@@ -89,12 +89,11 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath )
    // Dirs by attribute, not by a '*.*' mask
    // Hidden folders stay out, which is what Info.Name[1] <> '.' was for.
    const QDir root( aRootPath );
-   const QStringList folders =
-      root.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
+   const QStringList folders = root.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
 
    for ( const QString& folder : folders ) {
-      const QString gamelist =
-         resolvePath( root.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
+      const QString gamelist = resolvePath(
+         root.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
       if ( !QFileInfo::exists( gamelist ) )
          continue;
 
@@ -192,8 +191,7 @@ QString displayDateToGamelist( const QString& aDate )
       case 10:  // dd/MM/yyyy
          return aDate.mid( 6, 4 ) + aDate.mid( 3, 2 ) + aDate.left( 2 ) +
                 QLatin1String( Cst_DateSuffix );
-      default:
-         return {};
+      default: return {};
    }
 }
 
@@ -211,16 +209,17 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
 
    QFile file( aSystem.gamelistPath );
    if ( !file.open( QIODevice::ReadOnly ) )
-      return fail( aError, QStringLiteral( "Cannot read %1: %2" ).arg( aSystem.gamelistPath, file.errorString() ) );
+      return fail( aError, QStringLiteral( "Cannot read %1: %2" )
+                              .arg( aSystem.gamelistPath, file.errorString() ) );
 
    QString parseError;
    int line = 0;
    int column = 0;
    if ( !FDocument.setContent( &file, &parseError, &line, &column ) ) {
       return fail( aError, QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
-                       .arg( aSystem.gamelistPath, parseError )
-                       .arg( line )
-                       .arg( column ) );
+                              .arg( aSystem.gamelistPath, parseError )
+                              .arg( line )
+                              .arg( column ) );
    }
 
    const QString systemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
@@ -228,7 +227,8 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
-   for ( QDomElement node = FDocument.documentElement().firstChildElement( QLatin1String( Cst_Game ) );
+   for ( QDomElement node =
+            FDocument.documentElement().firstChildElement( QLatin1String( Cst_Game ) );
          !node.isNull(); node = node.nextSiblingElement( QLatin1String( Cst_Game ) ) ) {
 
       if ( !node.hasChildNodes() )
@@ -353,7 +353,7 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       QDomElement node = FNodes[index];
 
       const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
-                               QString& aStored ) {
+                              QString& aStored ) {
          if ( !( aWhich & aField ) )
             return;
          setChildText( node, aName, aValue );
@@ -380,8 +380,7 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
          if ( !( aWhich & aField ) )
             return;
-         setChildText( node, aName,
-                       QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
+         setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
          aStored = aValue;
       };
 
@@ -401,7 +400,8 @@ bool Gamelist::applyImage( int aIndex, const QImage& aPicture, QString* aError )
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
-      return fail( aError, QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
+      return fail( aError,
+                   QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
 
    // The suffix picks the format, so this re-encodes to PNG the way
    // Picture.SaveToFile did
@@ -423,8 +423,8 @@ bool Gamelist::setImage( int aIndex, const QString& aSourcePath, QString* aError
 
    QImage picture;
    if ( !picture.load( aSourcePath ) ) {
-      return fail( aError,
-                   QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) );
+      return fail(
+         aError, QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) );
    }
 
    return applyImage( aIndex, picture, aError ) && save( aError );
@@ -473,7 +473,8 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
-      return fail( aError, QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
+      return fail( aError,
+                   QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
 
    // Picking the game's own video would otherwise be remove-then-copy, i.e. a
    // deletion. TFile.Copy raised instead; either way, do not lose the file.
@@ -645,18 +646,21 @@ bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) c
       }
       case 19: return aGame.players == reference.players;
       case 20: return aGame.rating == reference.rating;
-      case 21: return !aGame.rating.isEmpty() &&
-                      ratingValue( aGame.rating ) <= ratingValue( reference.rating );
-      case 22: return !aGame.rating.isEmpty() &&
-                      ratingValue( aGame.rating ) >= ratingValue( reference.rating );
+      case 21:
+         return !aGame.rating.isEmpty() &&
+                ratingValue( aGame.rating ) <= ratingValue( reference.rating );
+      case 22:
+         return !aGame.rating.isEmpty() &&
+                ratingValue( aGame.rating ) >= ratingValue( reference.rating );
       case 23: return aGame.publisher == reference.publisher;
       case 24: return aGame.developer == reference.developer;
       case 25: return aGame.genre == reference.genre;
       // Trap: AnsiSameText here was a case-insensitive compare of two paths,
       // which on Linux would call two distinct directories the same one. The
       // case is already settled against the disk by resolvePath, so compare it.
-      case 26: return QFileInfo( aGame.physicalRomPath ).path() ==
-                      QFileInfo( reference.physicalRomPath ).path();
+      case 26:
+         return QFileInfo( aGame.physicalRomPath ).path() ==
+                QFileInfo( reference.physicalRomPath ).path();
       case 27: return aGame.name == reference.name;
       case 28: return aGame.romName() == reference.romName();
       default: return false;

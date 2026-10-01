@@ -114,17 +114,22 @@ TEST( Gamelist, ReportsWhatItCannotLoad )
    Gamelist list;
    QString error;
 
-   EXPECT_FALSE( list.load( { QStringLiteral( "x" ), skOther, fixture.path( "snes/absent.xml" ) }, &error ) );
+   EXPECT_FALSE(
+      list.load( { QStringLiteral( "x" ), skOther, fixture.path( "snes/absent.xml" ) }, &error ) );
    EXPECT_FALSE( error.isEmpty() );
 
    writeFile( fixture.path( "broken/gamelist.xml" ), "<gameList><game>" );
    error.clear();
-   EXPECT_FALSE( list.load( { QStringLiteral( "broken" ), skOther, fixture.path( "broken/gamelist.xml" ) }, &error ) );
+   EXPECT_FALSE(
+      list.load( { QStringLiteral( "broken" ), skOther, fixture.path( "broken/gamelist.xml" ) },
+                 &error ) );
    EXPECT_TRUE( error.contains( QStringLiteral( "not valid XML" ) ) ) << error.toStdString();
 
    writeFile( fixture.path( "empty/gamelist.xml" ), "<gameList/>" );
    error.clear();
-   EXPECT_FALSE( list.load( { QStringLiteral( "empty" ), skOther, fixture.path( "empty/gamelist.xml" ) }, &error ) );
+   EXPECT_FALSE(
+      list.load( { QStringLiteral( "empty" ), skOther, fixture.path( "empty/gamelist.xml" ) },
+                 &error ) );
    EXPECT_TRUE( error.contains( QStringLiteral( "no game" ) ) ) << error.toStdString();
 }
 
@@ -244,9 +249,9 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
    EXPECT_TRUE( displayDateToGamelist( QString() ).isEmpty() );
 
    // What load() stores round-trips through what the save path will write.
-   for ( const QString& stored : { QStringLiteral( "19910623T000000" ),
-                                    QStringLiteral( "19910600T000000" ),
-                                    QStringLiteral( "19910000T000000" ) } ) {
+   for ( const QString& stored :
+         { QStringLiteral( "19910623T000000" ), QStringLiteral( "19910600T000000" ),
+           QStringLiteral( "19910000T000000" ) } ) {
       EXPECT_EQ( displayDateToGamelist( gamelistDateToDisplay( stored ) ), stored );
    }
 }
@@ -398,7 +403,7 @@ TEST( Gamelist, ChangeAllOnlyTouchesGamesWithNoPicture )
    // Two of the three have no picture. Btn_ChangeAll was captioned for exactly
    // this and had no such test, so it overwrote the third one's art as well.
    EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
-                                               &error ),
+                                              &error ),
               2 );
    EXPECT_TRUE( error.isEmpty() ) << error.toStdString();
 
@@ -470,8 +475,7 @@ TEST( Gamelist, SetAndRemoveVideo )
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/videos/Vanished.mp4" ) ) );
 
    // Choosing the game's own video must not be remove-then-copy onto itself.
-   ASSERT_TRUE( list.setVideo( 2, list.at( 2 ).physicalVideoPath, &error ) )
-      << error.toStdString();
+   ASSERT_TRUE( list.setVideo( 2, list.at( 2 ).physicalVideoPath, &error ) ) << error.toStdString();
    EXPECT_EQ( QFile( list.at( 2 ).physicalVideoPath ).size(), 5 );
 
    ASSERT_TRUE( list.removeVideo( 2 ) );

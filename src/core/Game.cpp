@@ -35,7 +35,8 @@ GameFieldSet changedFields( const Game& aGame, const GameFields& aValues )
 {
    GameFieldSet which;
 
-   const auto differs = [&which]( GameField aField, const QString& aStored, const QString& aValue ) {
+   const auto differs = [&which]( GameField aField, const QString& aStored,
+                                  const QString& aValue ) {
       if ( aStored != aValue )
          which |= aField;
    };
@@ -122,7 +123,7 @@ QString fileCrc32( const QString& aPath )
    for ( qint64 read = file.read( chunk.data(), chunk.size() ); read > 0;
          read = file.read( chunk.data(), chunk.size() ) ) {
       crc = crc32( crc, reinterpret_cast<const Bytef*>( chunk.constData() ),
-                    static_cast<uInt>( read ) );
+                   static_cast<uInt>( read ) );
    }
 
    if ( file.error() != QFileDevice::NoError )

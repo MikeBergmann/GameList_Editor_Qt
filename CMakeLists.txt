@@ -7,8 +7,10 @@ set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_AUTOMOC ON )
 set( CMAKE_AUTORCC ON )
 
-# For clangd: it looks for compile_commands.json next to the sources, so the
-# generated one is symlinked into the source tree below.
+if( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
+   add_compile_options( -Wall -Wextra -Wshadow -Wconversion )
+endif()
+
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.

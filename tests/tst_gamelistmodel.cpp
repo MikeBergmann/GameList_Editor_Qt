@@ -39,8 +39,8 @@ TEST( GamelistModel, ShowsEveryGameUntilAFilterSaysOtherwise )
 
    EXPECT_EQ( fixture.model.rowCount(), 3 );
    EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Sonic The Hedgehog" ),
-                                               QStringLiteral( "Sonic The Hedgehog" ),
-                                               QStringLiteral( "Vanished" ) } ) );
+                                              QStringLiteral( "Sonic The Hedgehog" ),
+                                              QStringLiteral( "Vanished" ) } ) );
 }
 
 TEST( GamelistModel, IsEmptyWithoutAGamelist )
@@ -84,15 +84,15 @@ TEST( GamelistModel, DisplayFollowsTheListByRomCheckboxes )
    FilterSpec filter;
    filter.listByRom = true;
    fixture.setFilter( filter );
-   EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Sonic.zip" ),
-                                               QStringLiteral( "Sonic.zip" ),
-                                               QStringLiteral( "Vanished.zip" ) } ) );
+   EXPECT_EQ( fixture.shown(),
+              QStringList( { QStringLiteral( "Sonic.zip" ), QStringLiteral( "Sonic.zip" ),
+                             QStringLiteral( "Vanished.zip" ) } ) );
 
    filter.fullRomName = true;
    fixture.setFilter( filter );
-   EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Sonic.zip" ),
-                                               QStringLiteral( "sub/Sonic.zip" ),
-                                               QStringLiteral( "Vanished.zip" ) } ) );
+   EXPECT_EQ( fixture.shown(),
+              QStringList( { QStringLiteral( "Sonic.zip" ), QStringLiteral( "sub/Sonic.zip" ),
+                             QStringLiteral( "Vanished.zip" ) } ) );
 }
 
 // The two rows that read "Sonic The Hedgehog" are different games, and this is

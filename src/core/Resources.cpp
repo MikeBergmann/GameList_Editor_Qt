@@ -255,9 +255,9 @@ const char* const Cst_SystemKindImageNames[skCount] = {
    "other.png",                   // skOther
 };
 
-
 // Screenscraper.fr system IDs, retrieved with this URL:
 // https://www.screenscraper.fr/api2/systemesListe.php?devid=xxx&devpassword=yyy&softname=zzz&output=XML&ssid=test&sspassword=test
+// clang-format off
 const char* const Cst_SystemKindId[skCount] = {
    "3", "4", "2", "1", "75", "65", "26", "41", "42", "138", "106", "75",
    "75", "52", "10", "21", "9", "12", "75", "28", "75", "113", "113", "113",
@@ -274,6 +274,7 @@ const char* const Cst_CountryName[cnCount] = {
    "it", "jp", "kw", "wor", "mor", "no", "nz", "oce", "nl", "pe",
    "pl", "pt", "cz", "uk", "ru", "sk", "se", "tw", "tr", "us",
 };
+// clang-format on
 
 const char* const Cst_CountryNameFull[cnCount][lnCount] = {
    { "", "", "", "", "" },
@@ -285,7 +286,8 @@ const char* const Cst_CountryNameFull[cnCount][lnCount] = {
    { "Canada", "Kanada", "Canada", "Canadá", "Canadá" },
    { "Chili", "Chile", "Chile", "Chile", "Chile" },
    { "Chine", "China", "China", "China", "China" },
-   { "Continent Américain", "Amerikanischen Kontinent", "American continent", "Continente americano", "Continente americano" },
+   { "Continent Américain", "Amerikanischen Kontinent", "American continent",
+     "Continente americano", "Continente americano" },
    { "Corée", "Korea", "Korea", "Corea", "Coreia" },
    { "Custom", "Maßgeschneidert", "Custom", "Personalizado", "Personalizadas" },
    { "Danemark", "Dänemark", "Denmark", "Dinamarca", "Dinamarca" },
@@ -318,9 +320,7 @@ const char* const Cst_CountryNameFull[cnCount][lnCount] = {
    { "USA", "USA", "USA", "EUA", "EUA" },
 };
 
-const char* const Cst_LangNameStr[lnCount] = {
-   "fr", "de", "en", "es", "pt_BR"
-};
+const char* const Cst_LangNameStr[lnCount] = { "fr", "de", "en", "es", "pt_BR" };
 
 SystemKind systemKindFromFolder( const QString& aFolderName )
 {
@@ -344,6 +344,5 @@ CountryName countryFromShortName( const QString& aShortName )
 
 LangName langFromIndex( int aNumber )
 {
-   return ( aNumber >= 0 && aNumber < lnCount ) ? static_cast<LangName>( aNumber )
-                                                : lnEnglish;
+   return ( aNumber >= 0 && aNumber < lnCount ) ? static_cast<LangName>( aNumber ) : lnEnglish;
 }
