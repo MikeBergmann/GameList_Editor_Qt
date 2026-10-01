@@ -99,8 +99,9 @@ private:
    void setChildText( QDomElement aNode, const char* aName, const QString& aText );
 
    bool applyImage( int aIndex, const QImage& aPicture, QString* aError );
-   // Whether a media link is still referenced by a game other than aIndex.
-   bool linkShared( int aIndex, const QString& aLink, bool aIsImage ) const;
+   // Whether a game other than aIndex resolves to the same file on disk. Compared
+   // by resolved path, not link text: links differing only in case are one file.
+   bool fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const;
 
    void countDuplicates();
 

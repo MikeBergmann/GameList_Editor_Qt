@@ -433,6 +433,28 @@ TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShare )
    EXPECT_TRUE( reload( fixture ).at( 0 ).imagePath.isEmpty() );
 }
 
+TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShareUnderDifferentCase )
+{
+   Fixture fixture;
+   // Two spellings of the one snes/media/images/sonic.PNG the fixture puts on disk.
+   writeFile( fixture.path( "snes/gamelist.xml" ), R"(<gameList>
+   <game><path>./a.zip</path><image>./media/images/Sonic.png</image></game>
+   <game><path>./b.zip</path><image>./media/images/sonic.png</image></game>
+</gameList>)" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_EQ( list.at( 0 ).physicalImagePath, list.at( 1 ).physicalImagePath );
+   const QString shared = list.at( 0 ).physicalImagePath;
+   ASSERT_TRUE( QFileInfo::exists( shared ) );
+
+   ASSERT_TRUE( list.removeImage( 0 ) );
+   EXPECT_TRUE( QFileInfo::exists( shared ) ) << "game 1 still links to it";
+
+   ASSERT_TRUE( list.removeImage( 1 ) );
+   EXPECT_FALSE( QFileInfo::exists( shared ) );
+}
+
 TEST( Gamelist, SetAndRemoveVideo )
 {
    Fixture fixture;
@@ -455,6 +477,49 @@ TEST( Gamelist, SetAndRemoveVideo )
    ASSERT_TRUE( list.removeVideo( 2 ) );
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/videos/Vanished.mp4" ) ) );
    EXPECT_TRUE( reload( fixture ).at( 2 ).videoPath.isEmpty() );
+}
+
+TEST( Gamelist, WritesFollowAnExistingFolderUnderDifferentCase )
+{
+   Fixture fixture;
+   // The gamelist says ./media/..., the disk says Media.
+   ASSERT_TRUE( QDir().rename( fixture.path( "snes/media" ), fixture.path( "snes/Media" ) ) );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
+   QString error;
+   ASSERT_TRUE( list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ), &error ) )
+      << error.toStdString();
+   EXPECT_EQ( list.at( 2 ).physicalVideoPath, fixture.path( "snes/Media/videos/Vanished.mp4" ) );
+   EXPECT_TRUE( QFileInfo::exists( list.at( 2 ).physicalVideoPath ) );
+
+   QImage picture( 2, 2, QImage::Format_RGB32 );
+   picture.fill( Qt::red );
+   ASSERT_TRUE( list.setImage( 2, picture, &error ) ) << error.toStdString();
+   EXPECT_EQ( list.at( 2 ).physicalImagePath, fixture.path( "snes/Media/images/Vanished.png" ) );
+
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media" ) ) ) << "no second folder";
+}
+
+TEST( Gamelist, WritesFollowAPartlyExistingFolderUnderDifferentCase )
+{
+   Fixture fixture;
+   // Media/images is there, Media/videos is not yet: the first video save.
+   ASSERT_TRUE( QDir( fixture.path( "snes/media/videos" ) ).removeRecursively() );
+   ASSERT_TRUE( QDir().rename( fixture.path( "snes/media" ), fixture.path( "snes/Media" ) ) );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
+   QString error;
+   ASSERT_TRUE( list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ), &error ) )
+      << error.toStdString();
+   EXPECT_EQ( list.at( 2 ).physicalVideoPath, fixture.path( "snes/Media/videos/Vanished.mp4" ) );
+   EXPECT_TRUE( QFileInfo::exists( list.at( 2 ).physicalVideoPath ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media" ) ) ) << "no second folder";
 }
 
 TEST( Gamelist, HashesAreComputedOnDemandAndAnOrphanHashesToNothing )
