@@ -29,8 +29,21 @@ add_library( gle_core STATIC
 target_include_directories( gle_core PUBLIC src/core )
 target_link_libraries( gle_core PUBLIC Qt6::Core Qt6::Gui Qt6::Xml ZLIB::ZLIB )
 
+add_library( gle_ui STATIC
+   src/ui/F_Main.cpp
+)
+target_include_directories( gle_ui PUBLIC src/ui )
+target_link_libraries( gle_ui PUBLIC Qt6::Widgets gle_core )
+
+add_executable( GameListEditor
+   src/main.cpp
+   Resources/assets.qrc
+)
+target_link_libraries( GameListEditor PRIVATE gle_ui )
+
 add_executable( tests
    tests/main.cpp
+   tests/tst_f_main.cpp
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
@@ -38,10 +51,7 @@ add_executable( tests
    Resources/assets.qrc
 )
 target_include_directories( tests PRIVATE tests )
-target_link_libraries( tests PRIVATE gle_core Qt6::Widgets GTest::gtest )
+target_link_libraries( tests PRIVATE gle_core gle_ui GTest::gtest )
 
 enable_testing()
 gtest_discover_tests( tests )
-
-add_executable( gamelistmodel_demo demo/main.cpp )
-target_link_libraries( gamelistmodel_demo PRIVATE gle_core Qt6::Widgets )
