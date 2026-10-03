@@ -22,6 +22,12 @@ The original code loaded and saved `gamelist.xml` several times through one shar
 
 The QDomDocument decision: I'm designing it to hold my gamelists, which are typically a few dozen of homebrew and legal available ROM-based games per system. Not tens of thousands and definitely not a full MAME set. So QDomDocument is fine here. Additionally, Qt dropped SAX with Qt6, and the nearest available replacement in Qt6 is QXmlStreamReader/QXmlStreamWriter, which I'm not getting warm with. Given we want to access a random game by index and edit/save that one node, QDomDocument should be the correct choice.
 
+I resolve media links to the actual path on disk instead of relying on the media link. This is done because:
+
+* Linux is case-sensitive, and game lists often come from Windows, which has a case-insensitive filesystem.
+* In the future, I want to support ES-DE game lists, which don’t rely on <image> links. It finds media by convention, as downloaded_media/<system>/<type>/<romname>.<ext>. This allows me to implement a better resolver
+* I plan to implement an On-Click repair of invalid media links, if possible, to rewrite the link from the resolved path.
+
 ## Later
 
 - Gradually replace the parallel arrays with a single structured table.
