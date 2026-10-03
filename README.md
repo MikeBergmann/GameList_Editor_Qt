@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml)
 
-## The Why
-
 **Qt6 Port of GameList Editor Delphi**
+
+## The Why
 
 There are a lot of great ROMs for vintage computers/consoles or for their emulators on itch.io.
 
-To manage these ROMs, I use [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scaping my gamelist.xml.
+To manage these ROMs, I use [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scraping my gamelist.xml.
 
 I want to add some features, but unfortunately, it is written in Delphi (which I don't have a dev toolchain for).
 
