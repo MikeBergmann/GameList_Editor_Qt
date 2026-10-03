@@ -1,5 +1,7 @@
 # GameList_Editor_Qt
 
+[![CI](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml)
+
 ## The Why
 
 **Qt6 Port of GameList Editor Delphi**
