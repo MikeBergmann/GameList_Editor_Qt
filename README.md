@@ -28,6 +28,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 
 These are the features I want to implement (and therefore do all this):
 
+- Manually adding new games.
 - Additional Scrapers (e.g., Launchbox)
 - Specific handling of the xml/media folders, e.g like es-de:
 ```
@@ -40,6 +41,7 @@ These are the features I want to implement (and therefore do all this):
         ├── screenshots/
         ├── videos/
 ```
+- Auto-Fix invalid media links
 - Normalize media. E.g., naming, size, etc.
 - Remove unused media
 
