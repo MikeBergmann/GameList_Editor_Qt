@@ -3,7 +3,9 @@
 #include "Gamelist.h"
 
 #include <QMainWindow>
+#include <QPixmap>
 
+class GameEditPanel;
 class GamelistFilter;
 class GamelistModel;
 class QAction;
@@ -27,6 +29,9 @@ class Frm_Editor : public QMainWindow
 public:
    explicit Frm_Editor( QWidget* aParent = nullptr );
 
+   // FormShow's tips window (F_Main 651-659). Called once the window is up,
+   // because it is modal.
+   void showTipsAtStart();
 
    // Scan aRootPath and select its first system. The folder picker is the only
    // other caller; keeping the two apart is what lets the whole scan -> load ->
@@ -35,6 +40,7 @@ public:
 
 protected:
    void closeEvent( QCloseEvent* aEvent ) override;
+   bool eventFilter( QObject* aWatched, QEvent* aEvent ) override;
 
 private:
    void buildMenu();
@@ -46,7 +52,14 @@ private:
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
    void LoadSystemLogo( SystemKind aKind );
+   void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
+
+   // Save / Discard / Cancel when the editor holds unsaved changes. False means
+   // stay put: the user cancelled, or the save failed.
+   bool confirmLeaveEdits();
+   // Puts the list back on the games the editor is showing, after a Cancel.
+   void restoreSelection( const QVector<int>& aIndices );
 
    // Cbx_FilterChange, Edt_SearchChange and both Chk_*Click were four handlers
    // that each re-ran the whole list rebuild. One spec, handed to the model.
@@ -55,6 +68,9 @@ private:
    int currentGameIndex() const;
    QVector<int> selectedGameIndexes() const;
 
+   // Btn_MoreInfosClick (3175). The panel says which game; the hash prompt is
+   // here because FAutoHash is.
+   void showMoreInfos( int aIndex );
 
    QString FRootPath;
 
@@ -71,7 +87,8 @@ private:
    Gamelist FGamelist;
    GamelistModel* FModel = nullptr;
    GamelistFilter* FProxy = nullptr;
-
+   GameEditPanel* FEditPanel = nullptr;
+   bool FRestoringSelection = false;
 
    QComboBox* Cbx_Systems = nullptr;
    QComboBox* Cbx_Filter = nullptr;
@@ -80,6 +97,7 @@ private:
    QCheckBox* Chk_FullRomName = nullptr;
    QListView* Lbx_Games = nullptr;
    QLabel* Img_System = nullptr;
+   QPixmap FSystemLogo;
    QLabel* Lbl_NbGamesFound = nullptr;
 
    QAction* Mnu_Reload = nullptr;

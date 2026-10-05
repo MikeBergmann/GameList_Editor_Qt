@@ -17,6 +17,7 @@ int main( int argc, char** argv )
 
    Frm_Editor editor;
    editor.show();
+   editor.showTipsAtStart();
 
    return app.exec();
 }
