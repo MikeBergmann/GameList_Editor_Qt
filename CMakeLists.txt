@@ -24,15 +24,22 @@ add_library( gle_core STATIC
    src/core/Game.cpp
    src/core/Gamelist.cpp
    src/core/GamelistModel.cpp
+   src/core/NameEdit.cpp
    src/core/Resources.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
 target_link_libraries( gle_core PUBLIC Qt6::Core Qt6::Gui Qt6::Xml ZLIB::ZLIB )
 
 add_library( gle_ui STATIC
+   src/ui/GameEditPanel.cpp
    src/ui/F_Main.cpp
+   src/ui/dialogs/F_About.cpp
+   src/ui/dialogs/F_AdvNameEditor.cpp
+   src/ui/dialogs/F_ConfigureNetwork.cpp
+   src/ui/dialogs/F_Help.cpp
+   src/ui/dialogs/F_MoreInfos.cpp
 )
-target_include_directories( gle_ui PUBLIC src/ui )
+target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
 target_link_libraries( gle_ui PUBLIC Qt6::Widgets gle_core )
 
 add_executable( GameListEditor
@@ -43,7 +50,10 @@ target_link_libraries( GameListEditor PRIVATE gle_ui )
 
 add_executable( tests
    tests/main.cpp
+   tests/tst_dialogs.cpp
+   tests/tst_f_advnameeditor.cpp
    tests/tst_f_main.cpp
+   tests/tst_gameeditpanel.cpp
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp

@@ -8,12 +8,16 @@
 
 #include <gtest/gtest.h>
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
 #include <QMenuBar>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QTimer>
 
 namespace {
 
@@ -32,7 +36,7 @@ TEST( MainWindow, ConstructsWithNothingLoaded )
    Frm_Editor editor;
 
    EXPECT_FALSE( editor.windowTitle().isEmpty() );
-   EXPECT_EQ( editor.menuBar()->actions().size(), 3 );
+   EXPECT_EQ( editor.menuBar()->actions().size(), 4 );
 
    // No folder chosen yet: the system and filter combos stay out of reach, as
    // BuildSystemsList's opening block did by hand.
@@ -137,5 +141,61 @@ TEST( MainWindow, SameAsSelectedFollowsTheSelection )
    EXPECT_EQ( shown( editor ).size(), 2 );
 }
 
+// The two halves of step 4.3's wiring: the editor follows the selection, and the
+// list follows a save. The Delphi had the listbox itself hold the TGame and the
+// new name written into Items[] by hand, from inside the XML write.
+TEST( MainWindow, TheEditorFollowsTheSelectionAndTheListFollowsTheEditor )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+
+   QLineEdit* name = editor.findChild<QLineEdit*>( QStringLiteral( "Edt_Name" ) );
+   ASSERT_NE( name, nullptr );
+   // The first game is selected on load, so the editor is showing it.
+   EXPECT_EQ( name->text(), QStringLiteral( "Sonic The Hedgehog" ) );
+
+   QListView* games = editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) );
+   games->setCurrentIndex( games->model()->index( 2, 0 ) );
+   EXPECT_EQ( name->text(), QStringLiteral( "Vanished" ) );
+
+   QPushButton* save = editor.findChild<QPushButton*>( QStringLiteral( "Btn_SaveChanges" ) );
+   ASSERT_FALSE( save->isEnabled() );
+
+   name->setText( QStringLiteral( "Found" ) );
+   ASSERT_TRUE( save->isEnabled() );
+   save->click();
+
+   EXPECT_EQ( shown( editor ).at( 2 ), QStringLiteral( "Found" ) );
+   EXPECT_FALSE( save->isEnabled() );
+}
+
+// Moving to another game with an unsaved edit asks first, and Cancel puts the
+// list back where it was with the edit still on screen.
+TEST( MainWindow, CancellingTheUnsavedChangesPromptKeepsTheEditAndTheSelection )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+
+   QLineEdit* name = editor.findChild<QLineEdit*>( QStringLiteral( "Edt_Name" ) );
+   QListView* games = editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) );
+   name->setText( QStringLiteral( "Edited" ) );
+
+   bool asked = false;
+   QTimer::singleShot( 0, [&asked] {
+      if ( auto* box = qobject_cast<QMessageBox*>( QApplication::activeModalWidget() ) ) {
+         asked = true;
+         box->button( QMessageBox::Cancel )->click();
+      }
+   } );
+   games->setCurrentIndex( games->model()->index( 2, 0 ) );
+
+   EXPECT_TRUE( asked );
+   EXPECT_EQ( name->text(), QStringLiteral( "Edited" ) );
+   EXPECT_EQ( games->currentIndex().row(), 0 );
+   EXPECT_TRUE( games->selectionModel()->isRowSelected( 0 ) );
+   EXPECT_FALSE( games->selectionModel()->isRowSelected( 2 ) );
+}
 
 }  // namespace

@@ -1,5 +1,10 @@
 #include "F_Main.h"
 
+#include "F_About.h"
+#include "F_ConfigureNetwork.h"
+#include "F_Help.h"
+#include "F_MoreInfos.h"
+#include "GameEditPanel.h"
 #include "GamelistModel.h"
 #include "Resources.h"
 
@@ -163,6 +168,18 @@ void Frm_Editor::buildMenu()
          LoadSystemLogo( Cbx_Systems->currentData().value<SystemEntry>().kind );
    } );
 
+   options->addSeparator();
+   QMenu* network = options->addMenu( QStringLiteral( "Network" ) );
+   network->addAction( QStringLiteral( "Configure..." ), this,
+                       [this] { Frm_Network( this ).Execute(); } );
+
+   QMenu* help = menuBar()->addMenu( QStringLiteral( "Help" ) );
+   help->addAction( QStringLiteral( "Help" ), QKeySequence::HelpContents, this, [this] {
+      // False: opening Help from the menu must not offer the opt-out, and so
+      // cannot change the setting. See Frm_Help::Execute.
+      Frm_Help( this ).Execute( FShowTips, false );
+   } );
+   help->addAction( QStringLiteral( "About" ), this, [this] { Frm_About( this ).exec(); } );
 }
 
 void Frm_Editor::buildCentralWidget()
@@ -176,6 +193,10 @@ void Frm_Editor::buildCentralWidget()
    Img_System = new QLabel( central );
    Img_System->setAlignment( Qt::AlignCenter );
    Img_System->setMinimumHeight( 70 );
+   // Ignored: the label's hints would follow the logo and the logo would size
+   // the left column. The column is sized by the controls; the logo fits it.
+   Img_System->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Fixed );
+   Img_System->installEventFilter( this );
    left->addWidget( Img_System );
 
    QFormLayout* choices = new QFormLayout;
@@ -221,6 +242,8 @@ void Frm_Editor::buildCentralWidget()
    Lbl_NbGamesFound->setObjectName( QStringLiteral( "Lbl_NbGamesFound" ) );
    left->addWidget( Lbl_NbGamesFound );
 
+   FEditPanel = new GameEditPanel( central );
+   columns->addWidget( FEditPanel, 1 );
 
    setCentralWidget( central );
 
@@ -237,6 +260,26 @@ void Frm_Editor::buildCentralWidget()
       if ( dependsOnSelection( Cbx_Filter->currentIndex() ) )
          refreshFilter();
    } );
+
+   // The editor follows the selection, and the list follows the editor: a saved
+   // name is a new row label, and a saved field can move the game out of the
+   // current filter.
+   connect( Lbx_Games->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+      if ( FRestoringSelection )
+         return;
+
+      if ( !confirmLeaveEdits() ) {
+         restoreSelection( FEditPanel->selection() );
+         return;
+      }
+
+      FEditPanel->setSelection( selectedGameIndexes() );
+   } );
+   connect( FEditPanel, &GameEditPanel::gamesChanged, this, [this] {
+      FModel->refresh();
+      updateCount();
+   } );
+   connect( FEditPanel, &GameEditPanel::moreInfosRequested, this, &Frm_Editor::showMoreInfos );
 }
 
 // Defaults live here now, as the second argument to value(): the ini that used
@@ -268,11 +311,70 @@ void Frm_Editor::SaveToIni()
    settings.setValue( QLatin1String( Cst_IniGenesisLogo ), FGenesisLogo );
 }
 
+void Frm_Editor::showTipsAtStart()
+{
+   if ( FShowTips )
+      Mnu_ShowTips->setChecked( Frm_Help( this ).Execute( true, true ) );
+}
 
 void Frm_Editor::closeEvent( QCloseEvent* aEvent )
 {
+   // FormCloseQuery (4106) never asked, so quitting mid-edit lost the edit.
+   if ( !confirmLeaveEdits() ) {
+      aEvent->ignore();
+      return;
+   }
+
    SaveToIni();
    QMainWindow::closeEvent( aEvent );
+}
+
+bool Frm_Editor::confirmLeaveEdits()
+{
+   if ( !FEditPanel->isDirty() )
+      return true;
+
+   const QMessageBox::StandardButton answer =
+      QMessageBox::question( this, QStringLiteral( "GameList Editor" ),
+                             QStringLiteral(
+                                "There are changes you have not saved yet.\nSave them first?" ),
+                             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel );
+
+   if ( answer == QMessageBox::Save )
+      return FEditPanel->save();
+
+   if ( answer == QMessageBox::Discard ) {
+      // Reloaded, so that the next caller does not ask again.
+      FEditPanel->setSelection( FEditPanel->selection() );
+      return true;
+   }
+
+   return false;
+}
+
+void Frm_Editor::restoreSelection( const QVector<int>& aIndices )
+{
+   QItemSelectionModel* model = Lbx_Games->selectionModel();
+   const auto row = [this]( int aIndex ) {
+      return FProxy->mapFromSource( FModel->index( aIndex ) );
+   };
+
+   FRestoringSelection = true;
+
+   // Current first: on a "Same ..." filter it decides which rows exist, so the
+   // selection is only mapped once the filter has followed it back.
+   model->setCurrentIndex( aIndices.isEmpty() ? QModelIndex() : row( aIndices.first() ),
+                           QItemSelectionModel::NoUpdate );
+
+   QItemSelection selection;
+   for ( int index : aIndices ) {
+      const QModelIndex proxyRow = row( index );
+      if ( proxyRow.isValid() )
+         selection.select( proxyRow, proxyRow );
+   }
+   model->select( selection, QItemSelectionModel::ClearAndSelect );
+
+   FRestoringSelection = false;
 }
 
 void Frm_Editor::BuildSystemsList( bool aReload )
@@ -292,6 +394,9 @@ void Frm_Editor::BuildSystemsList( bool aReload )
 
 void Frm_Editor::openRootFolder( const QString& aRootPath )
 {
+   if ( !confirmLeaveEdits() )
+      return;
+
    FRootPath = aRootPath;
 
    const QVector<SystemEntry> systems = scanSystems( FRootPath );
@@ -310,6 +415,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
 
    if ( !found ) {
       FModel->setGamelist( nullptr );
+      FEditPanel->setGamelist( nullptr );
       updateCount();
       QMessageBox::information(
          this, QStringLiteral( "Information" ),
@@ -323,15 +429,27 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
 
 void Frm_Editor::Cbx_SystemsChange()
 {
-   FModel->setGamelist( nullptr );
+   if ( !confirmLeaveEdits() ) {
+      // Put the combo back on the system the edit belongs to.
+      const QSignalBlocker blocked( Cbx_Systems );
+      for ( int item = 0; item < Cbx_Systems->count(); ++item ) {
+         if ( Cbx_Systems->itemData( item ).value<SystemEntry>().gamelistPath ==
+              FGamelist.system().gamelistPath )
+            Cbx_Systems->setCurrentIndex( item );
+      }
+      return;
+   }
 
-   const QVariant data = Cbx_Systems->currentData();
-   if ( !data.canConvert<SystemEntry>() ) {
+   FModel->setGamelist( nullptr );
+   FEditPanel->setGamelist( nullptr );
+
+   const QVariant systemData = Cbx_Systems->currentData();
+   if ( !systemData.canConvert<SystemEntry>() ) {
       updateCount();
       return;
    }
 
-   const SystemEntry system = data.value<SystemEntry>();
+   const SystemEntry system = systemData.value<SystemEntry>();
    LoadSystemLogo( system.kind );
 
    // 964 blanked the search box, whose OnChange then ran the whole list rebuild
@@ -349,6 +467,7 @@ void Frm_Editor::Cbx_SystemsChange()
    }
 
    FModel->setGamelist( &FGamelist );
+   FEditPanel->setGamelist( &FGamelist );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
@@ -361,14 +480,31 @@ void Frm_Editor::LoadSystemLogo( SystemKind aKind )
 
    // LoadSystemLogo had no FileExists guard and no except, so a missing logo
    // raised. QPixmap says so in its return value instead.
-   QPixmap logo;
-   if ( !logo.load( QLatin1String( Cst_LogoPicsFolder ) +
-                     QLatin1String( Cst_SystemKindImageNames[kind] ) ) ) {
+   if ( !FSystemLogo.load( QLatin1String( Cst_LogoPicsFolder ) +
+                           QLatin1String( Cst_SystemKindImageNames[kind] ) ) ) {
+      FSystemLogo = QPixmap();
       Img_System->clear();
       return;
    }
 
-   Img_System->setPixmap( logo.scaledToHeight( 64, Qt::SmoothTransformation ) );
+   scaleSystemLogo();
+}
+
+void Frm_Editor::scaleSystemLogo()
+{
+   if ( FSystemLogo.isNull() )
+      return;
+
+   Img_System->setPixmap( FSystemLogo.scaled( QSize( Img_System->width(), 64 ), Qt::KeepAspectRatio,
+                                              Qt::SmoothTransformation ) );
+}
+
+bool Frm_Editor::eventFilter( QObject* aWatched, QEvent* aEvent )
+{
+   if ( aWatched == Img_System && aEvent->type() == QEvent::Resize )
+      scaleSystemLogo();
+
+   return QMainWindow::eventFilter( aWatched, aEvent );
 }
 
 QString Frm_Editor::systemDisplayName( const SystemEntry& aSystem ) const
@@ -428,3 +564,24 @@ QVector<int> Frm_Editor::selectedGameIndexes() const
    return indexes;
 }
 
+void Frm_Editor::showMoreInfos( int aIndex )
+{
+   if ( aIndex < 0 || aIndex >= FGamelist.count() )
+      return;
+
+   const Game& game = FGamelist.at( aIndex );
+   if ( game.md5.isEmpty() || game.sha1.isEmpty() || game.crc32.isEmpty() ) {
+      const bool compute =
+         FAutoHash ||
+         QMessageBox::question(
+            this, QStringLiteral( "Information" ),
+            QStringLiteral( "The hashes of this game have not been calculated yet.\n"
+                            "On a large ROM that can take a moment. Calculate them now?" ) ) ==
+            QMessageBox::Yes;
+
+      if ( compute )
+         FGamelist.ensureHashes( aIndex );
+   }
+
+   Frm_MoreInfos( this ).Execute( FGamelist.at( aIndex ) );
+}
