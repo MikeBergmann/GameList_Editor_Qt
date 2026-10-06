@@ -45,6 +45,17 @@ These are the features I want to implement (and therefore do all this):
 - Normalize media. E.g., naming, size, etc.
 - Remove unused media
 
+## screenscraper.fr credentials
+
+Scraping needs two separate sets of credentials:
+
+- **Developer credentials** (`devid` / `devpassword`) identify *this application* to the API and grant its request allowance. They are **not** in the repository, and every build that wants to scrape needs its own. Register at [screenscraper.fr](https://www.screenscraper.fr) and ask for developer access, then pass them at configure time:
+  ```
+  cmake -B build -DGLE_SS_DEVID=yourid -DGLE_SS_DEVPWD=yourpassword
+  ```
+  or export `GLE_SS_DEVID` / `GLE_SS_DEVPWD` before running cmake. Without them the app builds and runs, but scraping reports "no developer credentials". They are baked into the binary, so don't distribute a build made with your own credentials unless you intend to share them.
+- **User credentials** (`SSUser` / `SSPwd`) are your personal screenscraper.fr account, entered in the app and stored in your ini.
+
 ## Still undecided
 
 Whether Windows stays a supported target or this is Linux-only. Unfortunately, my Mac no longer runs macOS, so there will be no macOS version.
