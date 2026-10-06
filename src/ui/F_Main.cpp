@@ -7,6 +7,7 @@
 #include "GameEditPanel.h"
 #include "GamelistModel.h"
 #include "Resources.h"
+#include "ScrapePanel.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -24,6 +25,7 @@
 #include <QMessageLogger>
 #include <QPixmap>
 #include <QSettings>
+#include <QTabWidget>
 #include <QVBoxLayout>
 
 namespace {
@@ -242,8 +244,18 @@ void Frm_Editor::buildCentralWidget()
    Lbl_NbGamesFound->setObjectName( QStringLiteral( "Lbl_NbGamesFound" ) );
    left->addWidget( Lbl_NbGamesFound );
 
-   FEditPanel = new GameEditPanel( central );
-   columns->addWidget( FEditPanel, 1 );
+   // Tbs_Main gets the editor, Tbs_Scrape gets ScrapePanel. Object names match
+   // the Delphi TTabSheets.
+   Pgc_Editor = new QTabWidget( central );
+   Pgc_Editor->setObjectName( QStringLiteral( "Pgc_Editor" ) );
+
+   FEditPanel = new GameEditPanel( Pgc_Editor );
+   Pgc_Editor->addTab( FEditPanel, QStringLiteral( "Main" ) );
+
+   FScrapePanel = new ScrapePanel( Pgc_Editor );
+   Pgc_Editor->addTab( FScrapePanel, QStringLiteral( "Scrape" ) );
+
+   columns->addWidget( Pgc_Editor, 1 );
 
    setCentralWidget( central );
 
@@ -273,13 +285,27 @@ void Frm_Editor::buildCentralWidget()
          return;
       }
 
-      FEditPanel->setSelection( selectedGameIndexes() );
+      const QVector<int> selected = selectedGameIndexes();
+      FEditPanel->setSelection( selected );
+      FScrapePanel->setSelection( selected.size() == 1 ? selected.first() : -1 );
    } );
    connect( FEditPanel, &GameEditPanel::gamesChanged, this, [this] {
       FModel->refresh();
       updateCount();
    } );
    connect( FEditPanel, &GameEditPanel::moreInfosRequested, this, &Frm_Editor::showMoreInfos );
+
+   connect( Pgc_Editor, &QTabWidget::currentChanged, this, [this]( int aIndex ) {
+      if ( Pgc_Editor->widget( aIndex ) == FScrapePanel )
+         FScrapePanel->activate();
+   } );
+
+   connect( FScrapePanel, &ScrapePanel::gamesChanged, this, [this] {
+      FModel->refresh();
+      updateCount();
+      FEditPanel->setSelection( selectedGameIndexes() );
+      Pgc_Editor->setCurrentWidget( FEditPanel );
+   } );
 }
 
 // Defaults live here now, as the second argument to value(): the ini that used
@@ -416,6 +442,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    if ( !found ) {
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
+      FScrapePanel->setGamelist( nullptr );
       updateCount();
       QMessageBox::information(
          this, QStringLiteral( "Information" ),
@@ -442,6 +469,7 @@ void Frm_Editor::Cbx_SystemsChange()
 
    FModel->setGamelist( nullptr );
    FEditPanel->setGamelist( nullptr );
+   FScrapePanel->setGamelist( nullptr );
 
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
@@ -468,6 +496,7 @@ void Frm_Editor::Cbx_SystemsChange()
 
    FModel->setGamelist( &FGamelist );
    FEditPanel->setGamelist( &FGamelist );
+   FScrapePanel->setGamelist( &FGamelist );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )

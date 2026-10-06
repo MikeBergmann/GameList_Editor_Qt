@@ -8,6 +8,7 @@
 class GameEditPanel;
 class GamelistFilter;
 class GamelistModel;
+class ScrapePanel;
 class QAction;
 class QCheckBox;
 class QComboBox;
@@ -15,6 +16,7 @@ class QLabel;
 class QLineEdit;
 class QListView;
 class QMenu;
+class QTabWidget;
 
 // The main window: menus, the system combo, the game list and the settings.
 //
@@ -88,6 +90,8 @@ private:
    GamelistModel* FModel = nullptr;
    GamelistFilter* FProxy = nullptr;
    GameEditPanel* FEditPanel = nullptr;
+   ScrapePanel* FScrapePanel = nullptr;
+   QTabWidget* Pgc_Editor = nullptr;
    bool FRestoringSelection = false;
 
    QComboBox* Cbx_Systems = nullptr;
