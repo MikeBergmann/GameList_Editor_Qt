@@ -19,18 +19,35 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 - Target: Linux Mint 22.1 (Ubuntu 24.04), Qt6.4, cmake, gcc
 - Testing: Google Test
 - First drop will contain:
-  - No video playback
   - No SSH / no Pi remote control
   - English-only UI
   - No theming (default Qt widget style only)
 
-## Features to add
+## Current Status
 
-These are the features I want to implement (and therefore do all this):
+### Implemented
 
-- Manually adding new games.
-- Additional Scrapers (e.g., Launchbox)
-- Specific handling of the xml/media folders, e.g like es-de:
+- [x] Loading and systems
+- [x] Browsing, searching and filtering the game list
+- [x] Edit a game
+- [x] Scrape using screenscraper.fr
+
+### Stubbed
+
+- [ ] Actions → System: lowercase or uppercase all text, remove region from names, delete orphans, delete duplicates, export the list to a txt file
+- [ ] Actions → Game: lowercase or uppercase all text
+- [ ] Actions → Selection: add to or remove from Hidden and Favorites, and the Advanced name editor
+
+### Features to add
+
+- [ ] Video playback
+
+- [ ] Manually adding new games.
+
+- [ ] Additional Scrapers (e.g., Launchbox)
+
+- [ ] Specific handling of the xml/media folders, e.g like es-de:
+
 ```
 ├── gamelists/
 │   └── nes/
@@ -41,15 +58,18 @@ These are the features I want to implement (and therefore do all this):
         ├── screenshots/
         ├── videos/
 ```
-- Auto-Fix invalid media links
-- Normalize media. E.g., naming, size, etc.
-- Remove unused media
+- [ ] Auto-Fix invalid media links
+
+- [ ] Normalize media. E.g., naming, size, etc.
+
+- [ ] Remove unused media
 
 ## screenscraper.fr credentials
 
 Scraping needs two separate sets of credentials:
 
 - **Developer credentials** (`devid` / `devpassword`) identify *this application* to the API and grant its request allowance. They are **not** in the repository, and every build that wants to scrape needs its own. Register at [screenscraper.fr](https://www.screenscraper.fr) and ask for developer access, then pass them at configure time:
+  
   ```
   cmake -B build -DGLE_SS_DEVID=yourid -DGLE_SS_DEVPWD=yourpassword
   ```
