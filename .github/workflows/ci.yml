@@ -10,7 +10,7 @@ jobs:
     # Ubuntu 24.04 ships Qt 6.4, which is the minimum the CMakeLists asks for.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
