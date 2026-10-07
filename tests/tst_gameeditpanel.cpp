@@ -95,6 +95,32 @@ TEST( GameEditPanel, TypingMakesItDirtyAndSavingClearsIt )
    EXPECT_EQ( saved.at( 0 ).genre, QStringLiteral( "Platformer" ) );
 }
 
+TEST( GameEditPanel, DeleteGameNeedsGodModeAndDropsUnsavedEdits )
+{
+   Panel panel;
+   panel.panel.setSelection( { 0 } );
+   EXPECT_TRUE( panel.button( "Btn_DeleteGame" )->isHidden() );
+
+   // Prompt skipped, so the click goes straight through.
+   panel.panel.setGodMode( true, true );
+   EXPECT_FALSE( panel.button( "Btn_DeleteGame" )->isHidden() );
+
+   panel.edit( "Edt_Genre" )->setText( QStringLiteral( "Platformer" ) );
+   int deleted = -1;
+   QObject::connect( &panel.panel, &GameEditPanel::gameDeleted, [&]( int aIndex ) { deleted = aIndex; } );
+
+   panel.button( "Btn_DeleteGame" )->click();
+
+   EXPECT_EQ( deleted, 0 );
+   EXPECT_EQ( panel.list.count(), 2 );
+   EXPECT_FALSE( panel.panel.isDirty() );
+   EXPECT_TRUE( panel.panel.selection().isEmpty() );
+
+   // Switching God Mode off hides the button again, and a skip never outlives it.
+   panel.panel.setGodMode( false, true );
+   EXPECT_TRUE( panel.button( "Btn_DeleteGame" )->isHidden() );
+}
+
 // A failed write must not leave the edit in the Gamelist only: the panel would
 // then compare clean against it, and closing would lose it without asking.
 TEST( GameEditPanel, AFailedSaveKeepsTheEditAndLeavesTheGamelistAlone )

@@ -79,7 +79,7 @@ private:
    bool FGodMode = false;
    bool FAutoHash = false;
    bool FDelWoPrompt = false;
-   bool FShowTips = true;
+   bool FShowTips = false;
    bool FGenesisLogo = false;
 
    // Guards the filter/selection round trip: re-filtering moves the current row,

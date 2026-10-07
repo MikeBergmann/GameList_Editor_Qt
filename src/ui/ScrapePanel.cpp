@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
@@ -18,13 +19,14 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSettings>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 namespace {
 
-constexpr int Cst_ThumbnailSize = 200;
+constexpr int Cst_ThumbnailSize = 120;
 
 }  // namespace
 
@@ -84,11 +86,16 @@ void ScrapePanel::buildLayout()
    Chk_Wheel = mediaCheck( "Chk_Wheel", QStringLiteral( "Wheel" ) );
    Chk_Video = mediaCheck( "Chk_Video", QStringLiteral( "Video" ) );
 
-   QHBoxLayout* mediaRow = new QHBoxLayout;
+   // 3x3 instead of one row: nine checkboxes in a row were wider than the
+   // panel could give them at 1024px.
+   QGridLayout* mediaRow = new QGridLayout;
+   int cell = 0;
    for ( QCheckBox* check : { Chk_Box2D, Chk_Box3D, Chk_Mix1, Chk_Mix2, Chk_Screenshot, Chk_Title,
-                              Chk_ArcadeBox, Chk_Wheel, Chk_Video } )
-      mediaRow->addWidget( check );
-   mediaRow->addStretch( 1 );
+                              Chk_ArcadeBox, Chk_Wheel, Chk_Video } ) {
+      mediaRow->addWidget( check, cell / 3, cell % 3 );
+      ++cell;
+   }
+   mediaRow->setColumnStretch( 3, 1 );
 
    Btn_Scrape = new QPushButton( QStringLiteral( "Scrape" ), this );
    Btn_Scrape->setObjectName( QStringLiteral( "Btn_Scrape" ) );
@@ -134,7 +141,8 @@ void ScrapePanel::buildLayout()
    Scl_Pictures->setWidget( picturesHost );
    Scl_Pictures->setWidgetResizable( true );
    Scl_Pictures->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
-   Scl_Pictures->setMinimumHeight( Cst_ThumbnailSize + 20 );
+   Scl_Pictures->setMinimumHeight( Cst_ThumbnailSize + 20 +
+                                   Scl_Pictures->horizontalScrollBar()->sizeHint().height() );
 
    Chk_ManualCRC = new QCheckBox( QStringLiteral( "Enter CRC32 manually" ), this );
    Chk_ManualCRC->setObjectName( QStringLiteral( "Chk_ManualCRC" ) );
@@ -143,11 +151,13 @@ void ScrapePanel::buildLayout()
    Edt_ManualCRC->setEnabled( false );
    connect( Chk_ManualCRC, &QCheckBox::toggled, Edt_ManualCRC, &QLineEdit::setEnabled );
 
-   Btn_ScrapeUpper = new QPushButton( QStringLiteral( "Convert all text to uppercase" ), this );
+   Btn_ScrapeUpper = new QPushButton( QStringLiteral( "To uppercase" ), this );
+      Btn_ScrapeUpper->setToolTip( QStringLiteral( "Convert all text to uppercase" ) );
    Btn_ScrapeUpper->setObjectName( QStringLiteral( "Btn_ScrapeUpper" ) );
    connect( Btn_ScrapeUpper, &QPushButton::clicked, this, [this] { convertCase( true ); } );
 
-   Btn_ScrapeLower = new QPushButton( QStringLiteral( "Convert all text to lowercase" ), this );
+   Btn_ScrapeLower = new QPushButton( QStringLiteral( "To lowercase" ), this );
+      Btn_ScrapeLower->setToolTip( QStringLiteral( "Convert all text to lowercase" ) );
    Btn_ScrapeLower->setObjectName( QStringLiteral( "Btn_ScrapeLower" ) );
    connect( Btn_ScrapeLower, &QPushButton::clicked, this, [this] { convertCase( false ); } );
 
@@ -171,11 +181,17 @@ void ScrapePanel::buildLayout()
 
    right->addWidget( Chk_ManualCRC );
    right->addWidget( Edt_ManualCRC );
-   right->addWidget( Btn_ScrapeUpper );
-   right->addWidget( Btn_ScrapeLower );
-   right->addWidget( Chk_ScrapePicture );
-   right->addWidget( Chk_ScrapeVideo );
-   right->addWidget( Chk_ScrapeInfos );
+
+   QHBoxLayout* caseRow = new QHBoxLayout;
+   caseRow->addWidget( Btn_ScrapeUpper );
+   caseRow->addWidget( Btn_ScrapeLower );
+   right->addLayout( caseRow );
+
+   QHBoxLayout* saveRow = new QHBoxLayout;
+   saveRow->addWidget( Chk_ScrapePicture );
+   saveRow->addWidget( Chk_ScrapeVideo );
+   saveRow->addWidget( Chk_ScrapeInfos );
+   right->addLayout( saveRow );
    right->addWidget( Btn_ScrapeSave );
 
    QHBoxLayout* columns = new QHBoxLayout;

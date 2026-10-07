@@ -75,6 +75,12 @@ public:
    bool removeImage( int aIndex, QString* aError = nullptr );
    bool removeVideo( int aIndex, QString* aError = nullptr );
 
+   // God mode's delete: drops the <game> and indices after aIndex shift down, so
+   // callers must reset their views. The ROM, picture and video go too, except
+   // any another game still points at. False, with the gamelist untouched, if the
+   // write failed; true with aError set if only some file could not be removed.
+   bool removeGame( int aIndex, QString* aError = nullptr );
+
    int setDefaultImageForMissing( const QString& aSourcePath, QString* aError = nullptr );
 
    void ensureHashes( int aIndex );

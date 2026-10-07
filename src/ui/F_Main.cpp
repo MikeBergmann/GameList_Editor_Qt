@@ -25,6 +25,7 @@
 #include <QMessageLogger>
 #include <QPixmap>
 #include <QSettings>
+#include <QSplitter>
 #include <QTabWidget>
 #include <QVBoxLayout>
 
@@ -189,8 +190,13 @@ void Frm_Editor::buildCentralWidget()
    QWidget* central = new QWidget( this );
    QHBoxLayout* columns = new QHBoxLayout( central );
 
-   QVBoxLayout* left = new QVBoxLayout;
-   columns->addLayout( left );
+   QSplitter* splitter = new QSplitter( Qt::Horizontal, central );
+   splitter->setChildrenCollapsible( false );
+   columns->addWidget( splitter );
+
+   QWidget* leftHost = new QWidget( splitter );
+   QVBoxLayout* left = new QVBoxLayout( leftHost );
+   left->setContentsMargins( 0, 0, 0, 0 );
 
    Img_System = new QLabel( central );
    Img_System->setAlignment( Qt::AlignCenter );
@@ -255,7 +261,8 @@ void Frm_Editor::buildCentralWidget()
    FScrapePanel = new ScrapePanel( Pgc_Editor );
    Pgc_Editor->addTab( FScrapePanel, QStringLiteral( "Scrape" ) );
 
-   columns->addWidget( Pgc_Editor, 1 );
+   splitter->addWidget( Pgc_Editor );
+   splitter->setStretchFactor( 1, 1 );
 
    setCentralWidget( central );
 
@@ -294,6 +301,23 @@ void Frm_Editor::buildCentralWidget()
       updateCount();
    } );
    connect( FEditPanel, &GameEditPanel::moreInfosRequested, this, &Frm_Editor::showMoreInfos );
+
+   const auto syncGodMode = [this] { FEditPanel->setGodMode( FGodMode, FDelWoPrompt ); };
+   connect( Mnu_GodMode, &QAction::toggled, this, syncGodMode );
+   connect( Mnu_DeleteWoPrompt, &QAction::toggled, this, syncGodMode );
+
+   // Rows are indices into the Gamelist, and removing one renumbered the rest:
+   // reset the model, then land on the neighbour the user was next to.
+   connect( FEditPanel, &GameEditPanel::gameDeleted, this, [this] {
+      const int row = qMax( 0, Lbx_Games->currentIndex().row() );
+
+      FModel->setGamelist( &FGamelist );
+      FScrapePanel->setGamelist( &FGamelist );
+      refreshFilter();
+
+      if ( FProxy->rowCount() > 0 )
+         Lbx_Games->setCurrentIndex( FProxy->index( qMin( row, FProxy->rowCount() - 1 ), 0 ) );
+   } );
 
    connect( Pgc_Editor, &QTabWidget::currentChanged, this, [this]( int aIndex ) {
       if ( Pgc_Editor->widget( aIndex ) == FScrapePanel )

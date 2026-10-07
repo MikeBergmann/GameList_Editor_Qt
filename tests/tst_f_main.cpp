@@ -23,7 +23,8 @@ namespace {
 
 QStringList shown( const Frm_Editor& aEditor )
 {
-   const QAbstractItemModel* model = aEditor.findChild<QListView*>()->model();
+   const QAbstractItemModel* model =
+      aEditor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) )->model();
 
    QStringList rows;
    for ( int row = 0; row < model->rowCount(); ++row )
@@ -119,7 +120,7 @@ TEST( MainWindow, SameAsSelectedFollowsTheSelection )
    Frm_Editor editor;
    editor.openRootFolder( fixture.dir.path() );
 
-   QListView* games = editor.findChild<QListView*>();
+   QListView* games = editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) );
    QComboBox* filter = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Filter" ) );
 
    // The first game is selected on load, and it is the only one in "wor".
