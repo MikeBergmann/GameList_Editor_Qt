@@ -4,6 +4,12 @@
 
 **Qt6 Port of GameList Editor Delphi**
 
+<a href="./screenshot.png">
+  <img src="./screenshot.png" alt="Screenshot of GameList_Editor_Qt" width="800">
+</a>
+
+(Cover of Yokai Ninja is AI generated)
+
 ## The Why
 
 There are a lot of great ROMs for vintage computers/consoles or for their emulators on itch.io.
