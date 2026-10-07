@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/">
+    <file>Icons/app.png</file>
     <file>DefaultPictures/default.png</file>
     <file>SystemsLogos/3do.png</file>
     <file>SystemsLogos/amiga1200.png</file>

@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -118,11 +119,12 @@ void GameEditPanel::buildLayout()
    Btn_ChangeImage =
       button( "Btn_ChangeImage", QStringLiteral( "Change Picture" ), &GameEditPanel::chooseImage );
    Btn_SetDefaultPicture =
-      button( "Btn_SetDefaultPicture", QStringLiteral( "Change Picture to default" ),
+      button( "Btn_SetDefaultPicture", QStringLiteral( "Picture to default" ),
               &GameEditPanel::setDefaultPicture );
    Btn_ChangeAll =
-      button( "Btn_ChangeAll", QStringLiteral( "Change all missing pictures to default" ),
+      button( "Btn_ChangeAll", QStringLiteral( "All missing to default" ),
               &GameEditPanel::setDefaultPictureForAll );
+   Btn_ChangeAll->setToolTip( QStringLiteral( "Change all missing pictures to default" ) );
    Btn_ChangeVideo =
       button( "Btn_ChangeVideo", QStringLiteral( "Change Video" ), &GameEditPanel::chooseVideo );
 
@@ -158,19 +160,25 @@ void GameEditPanel::buildLayout()
    connect( Btn_MoreInfos, &QPushButton::clicked, this,
             [this] { emit moreInfosRequested( FSelection.value( 0, -1 ) ); } );
 
+   Btn_DeleteGame = new QPushButton( QStringLiteral( "Delete Game" ), this );
+   Btn_DeleteGame->setObjectName( QStringLiteral( "Btn_DeleteGame" ) );
+   Btn_DeleteGame->setVisible( false );
+   connect( Btn_DeleteGame, &QPushButton::clicked, this, &GameEditPanel::deleteGame );
+
    Btn_SaveChanges = new QPushButton( QStringLiteral( "Save Changes" ), this );
    Btn_SaveChanges->setObjectName( QStringLiteral( "Btn_SaveChanges" ) );
    Btn_SaveChanges->setEnabled( false );
    connect( Btn_SaveChanges, &QPushButton::clicked, this, &GameEditPanel::save );
 
-   QVBoxLayout* media = new QVBoxLayout;
-   media->addWidget( Img_Game, 1 );
-   media->addWidget( Btn_ChangeImage );
-   media->addWidget( Btn_RemovePicture );
-   media->addWidget( Btn_SetDefaultPicture );
-   media->addWidget( Btn_ChangeAll );
-   media->addWidget( Btn_ChangeVideo );
-   media->addWidget( Btn_RemoveVideo );
+   QGridLayout* media = new QGridLayout;
+   media->addWidget( Img_Game, 0, 0, 1, 2 );
+   media->setRowStretch( 0, 1 );
+   media->addWidget( Btn_ChangeImage, 1, 0 );
+   media->addWidget( Btn_RemovePicture, 1, 1 );
+   media->addWidget( Btn_ChangeVideo, 2, 0 );
+   media->addWidget( Btn_RemoveVideo, 2, 1 );
+   media->addWidget( Btn_SetDefaultPicture, 3, 0 );
+   media->addWidget( Btn_ChangeAll, 3, 1 );
 
    QHBoxLayout* top = new QHBoxLayout;
    top->addLayout( fields, 1 );
@@ -178,6 +186,7 @@ void GameEditPanel::buildLayout()
 
    QHBoxLayout* bottom = new QHBoxLayout;
    bottom->addWidget( Btn_MoreInfos );
+   bottom->addWidget( Btn_DeleteGame );
    bottom->addStretch( 1 );
    bottom->addWidget( Btn_SaveChanges );
 
@@ -346,6 +355,7 @@ void GameEditPanel::enableComponents()
    Btn_ChangeImage->setEnabled( single );
    Btn_SetDefaultPicture->setEnabled( single );
    Btn_ChangeVideo->setEnabled( single );
+   Btn_DeleteGame->setEnabled( single );
 
    // Btn_ChangeAll is the system's, not the selection's. The Delphi only let it
    // through on filter "Missing Picture", because it had no missing test of its
@@ -405,6 +415,42 @@ void GameEditPanel::reload()
    // game, which moves the selection.
    setSelection( FSelection );
    emit gamesChanged();
+}
+
+void GameEditPanel::setGodMode( bool aEnabled, bool aSkipPrompt )
+{
+   FGodMode = aEnabled;
+   FSkipDeletePrompt = aEnabled && aSkipPrompt;
+   Btn_DeleteGame->setVisible( aEnabled );
+}
+
+void GameEditPanel::deleteGame()
+{
+   if ( !FGodMode || !FGamelist || FSelection.size() != 1 )
+      return;
+
+   const int index = FSelection.first();
+   if ( !FSkipDeletePrompt &&
+        QMessageBox::question( this, QStringLiteral( "GameList Editor" ),
+                               QStringLiteral( "Delete \"%1\"?\n"
+                                               "Its gamelist entry, picture, video and ROM file "
+                                               "are deleted from disk, unless another game uses "
+                                               "them." )
+                                  .arg( FGamelist->at( index ).name ) ) != QMessageBox::Yes )
+      return;
+
+   QString error;
+   if ( !FGamelist->removeGame( index, &error ) ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      return;
+   }
+
+   if ( !error.isEmpty() )
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+
+   // The edits were for a game that no longer exists, so they must not prompt.
+   setSelection( {} );
+   emit gameDeleted( index );
 }
 
 void GameEditPanel::report( bool aOk, const QString& aError )

@@ -460,6 +460,30 @@ TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShareUnderDifferentCase )
    EXPECT_FALSE( QFileInfo::exists( shared ) );
 }
 
+TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   QString error;
+   ASSERT_TRUE( list.removeGame( 0, &error ) ) << error.toStdString();
+
+   ASSERT_EQ( list.count(), 2 );
+   EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/sonic.PNG" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/sub/SONIC.ZIP" ) ) );
+
+   // Written through, and the node list still lines up with the games.
+   EXPECT_EQ( reload( fixture ).count(), 2 );
+   EXPECT_EQ( list.gameNode( 0 ).firstChildElement( QStringLiteral( "path" ) ).text(),
+              list.at( 0 ).romPath );
+
+   EXPECT_FALSE( list.removeGame( 2, &error ) );
+}
+
 TEST( Gamelist, SetAndRemoveVideo )
 {
    Fixture fixture;

@@ -558,6 +558,55 @@ bool Gamelist::removeVideo( int aIndex, QString* aError )
    return true;
 }
 
+bool Gamelist::removeGame( int aIndex, QString* aError )
+{
+   if ( aIndex < 0 || aIndex >= FGames.size() )
+      return fail( aError, QStringLiteral( "No game selected." ) );
+
+   QDomElement node = FNodes.at( aIndex );
+   QDomNode parent = node.parentNode();
+   const QDomNode next = node.nextSibling();
+   parent.removeChild( node );
+
+   if ( !save( aError ) ) {
+      parent.insertBefore( node, next );
+      return false;
+   }
+
+   const Game game = FGames.at( aIndex );
+   FGames.remove( aIndex );
+   FNodes.remove( aIndex );
+   countDuplicates();
+
+   // Only once the gamelist has stopped listing it, and not what another entry
+   // (a duplicate, a shared picture) still points at.
+   const auto shared = [this]( const QString& aPath, QString Game::*aMember ) {
+      for ( const Game& other : std::as_const( FGames ) ) {
+         if ( other.*aMember == aPath )
+            return true;
+      }
+      return false;
+   };
+
+   QStringList stuck;
+   const auto drop = [&]( const QString& aPath, QString Game::*aMember ) {
+      if ( aPath.isEmpty() || !QFileInfo::exists( aPath ) || shared( aPath, aMember ) )
+         return;
+      if ( !QFile::remove( aPath ) )
+         stuck << aPath;
+   };
+
+   drop( game.physicalRomPath, &Game::physicalRomPath );
+   drop( game.physicalImagePath, &Game::physicalImagePath );
+   drop( game.physicalVideoPath, &Game::physicalVideoPath );
+
+   if ( !stuck.isEmpty() && aError )
+      *aError = QStringLiteral( "Removed from the gamelist, but could not delete:\n%1" )
+                   .arg( stuck.join( QLatin1Char( '\n' ) ) );
+
+   return true;
+}
+
 void Gamelist::ensureHashes( int aIndex )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )

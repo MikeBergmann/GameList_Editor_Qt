@@ -51,6 +51,9 @@ public:
    // write failed: the Gamelist is then left as it was and the edit stays dirty.
    bool save();
 
+   // God mode shows Delete Game; aSkipPrompt drops its confirmation.
+   void setGodMode( bool aEnabled, bool aSkipPrompt );
+
 signals:
    void dirtyChanged( bool aDirty );
 
@@ -61,6 +64,10 @@ signals:
    // Btn_MoreInfos. The hash prompt reads a setting the form owns, so it stays
    // there; the panel only says which game.
    void moreInfosRequested( int aIndex );
+
+   // A game is gone from the Gamelist and every index above it moved, so the
+   // list view has to be reset, not repainted. aIndex is where it was.
+   void gameDeleted( int aIndex );
 
 protected:
    bool eventFilter( QObject* aWatched, QEvent* aEvent ) override;
@@ -80,6 +87,7 @@ private:
    void chooseVideo();
    void setDefaultPicture();
    void setDefaultPictureForAll();
+   void deleteGame();
    void report( bool aOk, const QString& aError );
 
    Gamelist* FGamelist = nullptr;
@@ -88,6 +96,8 @@ private:
    // Guards the load: filling the widgets must not look like the user typing.
    bool FIsLoading = false;
    bool FDirty = false;
+   bool FGodMode = false;
+   bool FSkipDeletePrompt = false;
 
    QLineEdit* Edt_Name = nullptr;
    QLineEdit* Edt_RomPath = nullptr;
@@ -112,5 +122,6 @@ private:
    QPushButton* Btn_ChangeVideo = nullptr;
    QPushButton* Btn_RemoveVideo = nullptr;
    QPushButton* Btn_MoreInfos = nullptr;
+   QPushButton* Btn_DeleteGame = nullptr;
    QPushButton* Btn_SaveChanges = nullptr;
 };
