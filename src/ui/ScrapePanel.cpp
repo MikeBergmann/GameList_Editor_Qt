@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGuiApplication>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -21,6 +22,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSettings>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -460,6 +462,11 @@ void ScrapePanel::save()
    if ( !FGamelist || FIndex < 0 )
       return;
 
+   // Same busy look as a scrape. report() undoes it on every way out.
+   Img_Loading->setVisible( true );
+   setEnabled( false );
+   QGuiApplication::setOverrideCursor( Qt::WaitCursor );
+
    // The video is downloaded now, not at scrape time (FVideoScrapeLink was
    // only ever a link until SaveChangesToGamelist called SaveLinkToFile) - so
    // saving needs one round trip before there is a file to hand to Gamelist.
@@ -484,7 +491,9 @@ void ScrapePanel::save()
                            } );
       FScraper.downloadToFile( FLastInfo.videoLink, temp );
    } else {
-      finishSave( QString() );
+      // Deferred one turn of the event loop so the busy state paints before
+      // the (blocking) image and XML writes start.
+      QTimer::singleShot( 0, this, [this] { finishSave( QString() ); } );
    }
 }
 
@@ -521,6 +530,10 @@ void ScrapePanel::finishSave( const QString& aVideoPath )
 
 void ScrapePanel::report( bool aOk, const QString& aError )
 {
+   QGuiApplication::restoreOverrideCursor();
+   Img_Loading->setVisible( false );
+   setEnabled( true );
+
    if ( !aOk )
       QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), aError );
 
