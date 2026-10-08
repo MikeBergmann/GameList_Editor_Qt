@@ -325,9 +325,12 @@ void Frm_Editor::buildCentralWidget()
    } );
 
    connect( FScrapePanel, &ScrapePanel::gamesChanged, this, [this] {
+      // Reload the edit panel first: refresh() can move the selection, and
+      // confirmLeaveEdits() would find the stale widgets dirty against the
+      // values just saved.
+      FEditPanel->setSelection( selectedGameIndexes() );
       FModel->refresh();
       updateCount();
-      FEditPanel->setSelection( selectedGameIndexes() );
       Pgc_Editor->setCurrentWidget( FEditPanel );
    } );
 }
