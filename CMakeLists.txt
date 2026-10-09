@@ -53,6 +53,7 @@ add_library( gle_ui STATIC
    src/ui/ScrapePanel.cpp
    src/ui/F_Main.cpp
    src/ui/dialogs/F_About.cpp
+   src/ui/dialogs/F_AddRoms.cpp
    src/ui/dialogs/F_AdvNameEditor.cpp
    src/ui/dialogs/F_ConfigureNetwork.cpp
    src/ui/dialogs/F_Help.cpp

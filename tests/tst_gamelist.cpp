@@ -566,4 +566,72 @@ TEST( Gamelist, HashesAreComputedOnDemandAndAnOrphanHashesToNothing )
    EXPECT_TRUE( list.at( 2 ).crc32.isEmpty() );
 }
 
+TEST( Gamelist, UnlistedRomsAreTheFilesNoGameCoversAndNoMedia )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/Streets.zip" ), "rom" );
+   writeFile( fixture.path( "snes/sub/Zelda.sfc" ), "rom" );
+   writeFile( fixture.path( "snes/notes.txt" ), "not a rom" );
+   writeFile( fixture.path( "snes/media/images/extra.dat" ), "in the media folder" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   // Sonic.zip and sub/SONIC.ZIP are listed, the second under another case.
+   EXPECT_EQ( list.unlistedRoms(), QStringList( { fixture.path( "snes/Streets.zip" ),
+                                                  fixture.path( "snes/sub/Zelda.sfc" ) } ) );
+}
+
+TEST( Gamelist, AddGamesWritesPathAndNameAndSurvivesAReload )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/Streets.zip" ), "rom" );
+   writeFile( fixture.path( "snes/sub/Zelda.sfc" ), "rom" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   QString error;
+
+   // The listed Sonic.zip is skipped, not an error.
+   ASSERT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ), fixture.path( "snes/Sonic.zip" ),
+                               fixture.path( "snes/sub/Zelda.sfc" ) },
+                             &error ),
+              2 )
+      << error.toStdString();
+
+   ASSERT_EQ( list.count(), 5 );
+   EXPECT_EQ( list.at( 3 ).romPath, QStringLiteral( "./Streets.zip" ) );
+   EXPECT_EQ( list.at( 3 ).name, QStringLiteral( "Streets" ) );
+   EXPECT_FALSE( list.at( 3 ).isOrphan );
+   EXPECT_EQ( list.at( 4 ).romPath, QStringLiteral( "./sub/Zelda.sfc" ) );
+   EXPECT_TRUE( list.unlistedRoms().isEmpty() );
+
+   const Gamelist reloaded = reload( fixture );
+   ASSERT_EQ( reloaded.count(), 5 );
+   EXPECT_EQ( reloaded.at( 4 ).name, QStringLiteral( "Zelda" ) );
+}
+
+TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/Streets.zip" ), "rom" );
+   writeFile( fixture.path( "megadrive/Other.zip" ), "rom" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   QString error;
+
+   EXPECT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ), fixture.path( "megadrive/Other.zip" ) },
+                             &error ),
+              -1 );
+   EXPECT_FALSE( error.isEmpty() );
+   EXPECT_EQ( list.count(), 3 );
+   EXPECT_EQ( reload( fixture ).count(), 3 );
+
+   // And the rolled-back node is really gone from the document: a good add after it
+   // must not write the refused batch's first file too.
+   ASSERT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ) } ), 1 );
+   EXPECT_EQ( reload( fixture ).count(), 4 );
+}
+
 }  // namespace

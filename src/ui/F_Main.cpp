@@ -1,6 +1,7 @@
 #include "F_Main.h"
 
 #include "F_About.h"
+#include "F_AddRoms.h"
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
 #include "F_MoreInfos.h"
@@ -114,6 +115,10 @@ void Frm_Editor::buildMenu()
    file->addAction( QStringLiteral( "Quit" ), QKeySequence::Quit, this, &Frm_Editor::close );
 
    QMenu* actions = menuBar()->addMenu( QStringLiteral( "Actions" ) );
+   Mnu_AddRoms = actions->addAction( QStringLiteral( "Add missing ROMs..." ), this,
+                                     &Frm_Editor::addMissingRoms );
+   Mnu_AddRoms->setEnabled( false );
+   actions->addSeparator();
    Mnu_System = addPendingMenu( actions, QStringLiteral( "System" ),
                                 { QStringLiteral( "Convert all text to lowercase" ),
                                   QStringLiteral( "Convert all text to uppercase" ),
@@ -481,6 +486,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    Mnu_Reload->setEnabled( found );
 
    if ( !found ) {
+      Mnu_AddRoms->setEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -511,6 +517,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FModel->setGamelist( nullptr );
    FEditPanel->setGamelist( nullptr );
    FScrapePanel->setGamelist( nullptr );
+   Mnu_AddRoms->setEnabled( false );
 
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
@@ -538,10 +545,44 @@ void Frm_Editor::Cbx_SystemsChange()
    FModel->setGamelist( &FGamelist );
    FEditPanel->setGamelist( &FGamelist );
    FScrapePanel->setGamelist( &FGamelist );
+   Mnu_AddRoms->setEnabled( true );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
       Lbx_Games->setCurrentIndex( FProxy->index( 0, 0 ) );
+}
+
+void Frm_Editor::addMissingRoms()
+{
+   if ( !confirmLeaveEdits() )
+      return;
+
+   const QStringList chosen =
+      Frm_AddRoms( this ).Execute( FGamelist.systemDir(), FGamelist.unlistedRoms() );
+   if ( chosen.isEmpty() )
+      return;
+
+   const int firstNew = FGamelist.count();
+   QString error;
+   const int added = FGamelist.addGames( chosen, &error );
+   if ( added < 0 ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      return;
+   }
+   if ( added == 0 )
+      return;
+
+   // Rows are indices into the Gamelist; the model only knows how to reset for
+   // added games. The panels drop their selection with it.
+   FModel->setGamelist( &FGamelist );
+   FEditPanel->setGamelist( &FGamelist );
+   FScrapePanel->setGamelist( &FGamelist );
+   refreshFilter();
+
+   // A filter can hide the new game, so there may be no row to land on.
+   const QModelIndex first = FProxy->mapFromSource( FModel->index( firstNew ) );
+   if ( first.isValid() )
+      Lbx_Games->setCurrentIndex( first );
 }
 
 void Frm_Editor::LoadSystemLogo( SystemKind aKind )
