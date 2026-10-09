@@ -245,6 +245,11 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                reply->deleteLater();
 
                if ( reply->error() != QNetworkReply::NoError ) {
+                  // screenscraper.fr answers 404 when it has no match for the game.
+                  if ( reply->attribute( QNetworkRequest::HttpStatusCodeAttribute ).toInt() == 404 ) {
+                     emit gameInfoFailed( QStringLiteral( "Game not found" ) );
+                     return;
+                  }
          // errorString() embeds Qt's own copy of the request URL (credentials
          // and all), so the whole message needs sanitizing, not just query.
                   emit gameInfoFailed(
