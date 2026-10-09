@@ -37,6 +37,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 - [x] Browsing, searching and filtering the game list
 - [x] Edit a game
 - [x] Scrape using screenscraper.fr
+- [x] Manually adding new games
 
 ### Stubbed
 
@@ -47,11 +48,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 ### Features to add
 
 - [ ] Video playback
-
-- [ ] Manually adding new games.
-
 - [ ] Additional Scrapers (e.g., Launchbox)
-
 - [ ] Specific handling of the xml/media folders, e.g like es-de:
 
 ```
