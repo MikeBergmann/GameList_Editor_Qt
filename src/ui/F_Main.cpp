@@ -13,6 +13,7 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -437,10 +438,23 @@ void Frm_Editor::BuildSystemsList( bool aReload )
       return;
    }
 
+   QSettings settings;
+   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+
+   // Start where the user last picked, as long as that folder still exists.
+   QString start = FRootPath;
+   if ( start.isEmpty() ) {
+      const QString last = settings.value( QLatin1String( Cst_IniLastFolder ) ).toString();
+      if ( QDir( last ).exists() )
+         start = last;
+   }
+
    const QString root = QFileDialog::getExistingDirectory(
-      this, QStringLiteral( "Select the folder that holds your system folders" ), FRootPath );
+      this, QStringLiteral( "Select the folder that holds your system folders" ), start );
    if ( root.isEmpty() )
       return;
+
+   settings.setValue( QLatin1String( Cst_IniLastFolder ), root );
 
    openRootFolder( root );
 }
