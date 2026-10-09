@@ -239,6 +239,7 @@ inline constexpr const char* Cst_IniProxyPwd = "ProxyPwd";
 inline constexpr const char* Cst_IniProxyServer = "ProxyServer";
 inline constexpr const char* Cst_IniProxyPort = "ProxyPort";
 inline constexpr const char* Cst_IniProxyUse = "ProxyUse";
+inline constexpr const char* Cst_IniLastFolder = "LastFolder";
 
 // Language is the one key whose default is not the zero value: TLangName counts
 // from French, and the ini this replaces always shipped Language=2 (English).
