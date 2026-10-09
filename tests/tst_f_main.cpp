@@ -157,7 +157,7 @@ TEST( MainWindow, TheEditorFollowsTheSelectionAndTheListFollowsTheEditor )
    EXPECT_EQ( name->text(), QStringLiteral( "Sonic The Hedgehog" ) );
 
    QListView* games = editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) );
-   games->setCurrentIndex( games->model()->index( 2, 0 ) );
+   games->setCurrentIndex( games->model()->index( 2, 0 ) );  // sorted last
    EXPECT_EQ( name->text(), QStringLiteral( "Vanished" ) );
 
    QPushButton* save = editor.findChild<QPushButton*>( QStringLiteral( "Btn_SaveChanges" ) );
@@ -167,7 +167,8 @@ TEST( MainWindow, TheEditorFollowsTheSelectionAndTheListFollowsTheEditor )
    ASSERT_TRUE( save->isEnabled() );
    save->click();
 
-   EXPECT_EQ( shown( editor ).at( 2 ), QStringLiteral( "Found" ) );
+   // The list is sorted, so "Found" moves up ahead of the two Sonics.
+   EXPECT_EQ( shown( editor ).at( 0 ), QStringLiteral( "Found" ) );
    EXPECT_FALSE( save->isEnabled() );
 }
 

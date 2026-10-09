@@ -52,4 +52,5 @@ public:
 
 protected:
    bool filterAcceptsRow( int aSourceRow, const QModelIndex& aParent ) const override;
+   bool lessThan( const QModelIndex& aLeft, const QModelIndex& aRight ) const override;
 };

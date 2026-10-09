@@ -60,7 +60,14 @@ QVariant GamelistModel::data( const QModelIndex& aIndex, int aRole ) const
    return {};
 }
 
-GamelistFilter::GamelistFilter( QObject* aParent ) : QSortFilterProxyModel( aParent ) {}
+GamelistFilter::GamelistFilter( QObject* aParent ) : QSortFilterProxyModel( aParent )
+{
+   // Sorted by what the row displays, so it follows Chk_ListByRom / Chk_FullRomName
+   // and edits (dataChanged re-sorts while dynamicSortFilter is on, the default).
+   setSortCaseSensitivity( Qt::CaseInsensitive );
+
+   sort( 0 );
+}
 
 void GamelistFilter::setSourceModel( QAbstractItemModel* aModel )
 {
@@ -81,4 +88,13 @@ bool GamelistFilter::filterAcceptsRow( int aSourceRow, const QModelIndex& aParen
 
    auto* source = qobject_cast<GamelistModel*>( sourceModel() );
    return source && source->accepts( aSourceRow );
+}
+
+bool GamelistFilter::lessThan( const QModelIndex& aLeft, const QModelIndex& aRight ) const
+{
+   // Equal names (duplicates are common) keep gamelist order, so the list does
+   // not reshuffle itself between refreshes.
+   const int order = QString::compare( aLeft.data().toString(), aRight.data().toString(),
+                                       sortCaseSensitivity() );
+   return order != 0 ? order < 0 : aLeft.row() < aRight.row();
 }
