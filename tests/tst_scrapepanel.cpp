@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QImage>
 #include <QLineEdit>
 #include <QPushButton>
@@ -122,6 +123,7 @@ TEST( ScrapePanel, SaveWritesTheCheckedFieldsAndReloadsTheGamelist )
 
    // Save infos only - no picture chosen, video left unchecked.
    panel.button( "Btn_ScrapeSave" )->click();
+   QCoreApplication::processEvents();  // save() defers the write one event-loop turn
 
    EXPECT_EQ( panel.list.at( 0 ).name, QStringLiteral( "Sonic the Hedgehog 2" ) );
    EXPECT_EQ( panel.list.at( 0 ).genre, QStringLiteral( "Platform" ) );
