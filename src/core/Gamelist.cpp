@@ -2,9 +2,11 @@
 
 #include <QDate>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
+#include <QSet>
 
 namespace {
 
@@ -222,8 +224,7 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
                               .arg( column ) );
    }
 
-   const QString systemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
-   FSystemDir = systemDir;
+   FSystemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
@@ -234,31 +235,7 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
       if ( !node.hasChildNodes() )
          continue;
 
-      Game game;
-      game.romPath = childText( node, Cst_Path );
-      game.name = childText( node, Cst_Name );
-      game.description = childText( node, Cst_Description );
-      game.imagePath = childText( node, Cst_ImageLink );
-      game.videoPath = childText( node, Cst_VideoLink );
-      game.rating = childText( node, Cst_Rating );
-      game.releaseDate = gamelistDateToDisplay( childText( node, Cst_ReleaseDate ) );
-      game.developer = childText( node, Cst_Developer );
-      game.publisher = childText( node, Cst_Publisher );
-      game.genre = childText( node, Cst_Genre );
-      game.players = childText( node, Cst_Players );
-      game.region = childText( node, Cst_Region );
-      game.playcount = childText( node, Cst_Playcount );
-      game.lastplayed = childText( node, Cst_LastPlayed );
-      game.kidGame = gamelistFlag( childText( node, Cst_KidGame ) );
-      game.hidden = gamelistFlag( childText( node, Cst_Hidden ) );
-      game.favorite = gamelistFlag( childText( node, Cst_Favorite ) );
-
-      game.physicalRomPath = physicalPath( systemDir, game.romPath );
-      game.physicalImagePath = physicalPath( systemDir, game.imagePath );
-      game.physicalVideoPath = physicalPath( systemDir, game.videoPath );
-      game.isOrphan = fileMissing( game.physicalRomPath );
-      game.missingImage = fileMissing( game.physicalImagePath );
-      game.missingVideo = fileMissing( game.physicalVideoPath );
+      const Game game = gameFromNode( node );
 
       if ( !imageFolderFound && !game.imagePath.isEmpty() ) {
          FImageFolder = folderOf( game.imagePath );
@@ -279,6 +256,142 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
    countDuplicates();
 
    return true;
+}
+
+Game Gamelist::gameFromNode( const QDomElement& aNode ) const
+{
+   Game game;
+   game.romPath = childText( aNode, Cst_Path );
+   game.name = childText( aNode, Cst_Name );
+   game.description = childText( aNode, Cst_Description );
+   game.imagePath = childText( aNode, Cst_ImageLink );
+   game.videoPath = childText( aNode, Cst_VideoLink );
+   game.rating = childText( aNode, Cst_Rating );
+   game.releaseDate = gamelistDateToDisplay( childText( aNode, Cst_ReleaseDate ) );
+   game.developer = childText( aNode, Cst_Developer );
+   game.publisher = childText( aNode, Cst_Publisher );
+   game.genre = childText( aNode, Cst_Genre );
+   game.players = childText( aNode, Cst_Players );
+   game.region = childText( aNode, Cst_Region );
+   game.playcount = childText( aNode, Cst_Playcount );
+   game.lastplayed = childText( aNode, Cst_LastPlayed );
+   game.kidGame = gamelistFlag( childText( aNode, Cst_KidGame ) );
+   game.hidden = gamelistFlag( childText( aNode, Cst_Hidden ) );
+   game.favorite = gamelistFlag( childText( aNode, Cst_Favorite ) );
+
+   game.physicalRomPath = physicalPath( FSystemDir, game.romPath );
+   game.physicalImagePath = physicalPath( FSystemDir, game.imagePath );
+   game.physicalVideoPath = physicalPath( FSystemDir, game.videoPath );
+   game.isOrphan = fileMissing( game.physicalRomPath );
+   game.missingImage = fileMissing( game.physicalImagePath );
+   game.missingVideo = fileMissing( game.physicalVideoPath );
+   return game;
+}
+
+QStringList Gamelist::unlistedRoms() const
+{
+   // Case-folded absolute paths of everything the gamelist already points at.
+   const auto key = [this]( const QString& aPath ) {
+      return QDir::cleanPath( QDir( FSystemDir ).filePath( aPath ) ).toLower();
+   };
+
+   QSet<QString> listed;
+   for ( const Game& game : FGames )
+      listed.insert( key( game.romPath ) );
+
+   // Media is not a ROM: skip the folders the gamelist keeps its art in (when
+   // they are subfolders at all) and the usual non-ROM extensions.
+   QSet<QString> mediaDirs;
+   for ( const QString& folder : { FImageFolder, FVideoFolder } ) {
+      const QString top = QDir::cleanPath( folder ).split( QLatin1Char( '/' ) ).value( 0 );
+      if ( !top.isEmpty() && top != QLatin1String( "." ) )
+         mediaDirs.insert( top.toLower() );
+   }
+
+   // ponytail: a denylist, since the per-system ROM extensions live in
+   // EmulationStation's config, not here. A stray odd file shows up in the
+   // list and gets unticked; Browse covers anything this hides.
+   static const QSet<QString> notRoms = {
+      QStringLiteral( "xml" ),  QStringLiteral( "txt" ),   QStringLiteral( "png" ),
+      QStringLiteral( "jpg" ),  QStringLiteral( "jpeg" ),  QStringLiteral( "gif" ),
+      QStringLiteral( "bmp" ),  QStringLiteral( "mp4" ),   QStringLiteral( "avi" ),
+      QStringLiteral( "mkv" ),  QStringLiteral( "pdf" ),   QStringLiteral( "srm" ),
+      QStringLiteral( "sav" ),  QStringLiteral( "state" ), QStringLiteral( "cfg" ),
+      QStringLiteral( "ini" ),  QStringLiteral( "nfo" ),   QStringLiteral( "bak" ),
+   };
+
+   const QDir systemDir( FSystemDir );
+   QStringList found;
+   QDirIterator files( FSystemDir, QDir::Files, QDirIterator::Subdirectories );
+   while ( files.hasNext() ) {
+      const QString path = files.next();
+      const QString relative = systemDir.relativeFilePath( path );
+
+      if ( notRoms.contains( QFileInfo( path ).suffix().toLower() ) ||
+           mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) ||
+           listed.contains( key( path ) ) )
+         continue;
+
+      found << path;
+   }
+
+   found.sort( Qt::CaseInsensitive );
+   return found;
+}
+
+int Gamelist::addGames( const QStringList& aRomPaths, QString* aError )
+{
+   const QDir systemDir( FSystemDir );
+   QSet<QString> seen;
+   for ( const Game& game : FGames )
+      seen.insert( QDir::cleanPath( systemDir.filePath( game.romPath ) ).toLower() );
+
+   const int firstNew = static_cast<int>( FGames.size() );
+   QVector<QDomElement> added;
+
+   const auto rollback = [&] {
+      for ( QDomElement node : std::as_const( added ) )
+         FDocument.documentElement().removeChild( node );
+      FGames.resize( firstNew );
+      FNodes.resize( firstNew );
+   };
+
+   for ( const QString& path : aRomPaths ) {
+      const QFileInfo info( path );
+      const QString relative = systemDir.relativeFilePath( info.absoluteFilePath() );
+
+      if ( !info.isFile() || relative.startsWith( QLatin1String( ".." ) ) ) {
+         rollback();
+         fail( aError, QStringLiteral( "%1 is not a file inside %2." ).arg( path, FSystemDir ) );
+         return -1;
+      }
+
+      // Already listed, or picked twice: nothing to add, and not an error.
+      const QString key = QDir::cleanPath( info.absoluteFilePath() ).toLower();
+      if ( seen.contains( key ) )
+         continue;
+      seen.insert( key );
+
+      QDomElement node = FDocument.createElement( QLatin1String( Cst_Game ) );
+      FDocument.documentElement().appendChild( node );
+      setChildText( node, Cst_Path, QStringLiteral( "./" ) + relative );
+      setChildText( node, Cst_Name, info.completeBaseName() );
+
+      added << node;
+      FGames.append( gameFromNode( node ) );
+      FNodes.append( node );
+   }
+
+   if ( added.isEmpty() )
+      return 0;
+
+   if ( !save( aError ) ) {
+      rollback();
+      return -1;
+   }
+
+   countDuplicates();
+   return static_cast<int>( added.size() );
 }
 
 void Gamelist::countDuplicates()

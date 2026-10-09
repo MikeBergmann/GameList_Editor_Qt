@@ -53,6 +53,8 @@ private:
 
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
+   // Actions > Add missing ROMs.
+   void addMissingRoms();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
@@ -105,6 +107,7 @@ private:
    QLabel* Lbl_NbGamesFound = nullptr;
 
    QAction* Mnu_Reload = nullptr;
+   QAction* Mnu_AddRoms = nullptr;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

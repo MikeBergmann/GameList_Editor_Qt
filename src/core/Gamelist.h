@@ -8,6 +8,7 @@
 #include <QImage>
 #include <QMetaType>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 // The data half of F_Main: the root folder scan, and one system's gamelist.xml.
@@ -58,6 +59,7 @@ public:
    bool load( const SystemEntry& aSystem, QString* aError = nullptr );
 
    const SystemEntry& system() const { return FSystem; }
+   const QString& systemDir() const { return FSystemDir; }
    const QVector<Game>& games() const { return FGames; }
    // int, not qsizetype: indices and rows are int throughout (QAbstractItemModel's
    // are too), and a gamelist is nowhere near INT_MAX entries.
@@ -81,6 +83,16 @@ public:
    // write failed; true with aError set if only some file could not be removed.
    bool removeGame( int aIndex, QString* aError = nullptr );
 
+   // Files under the system folder that no <game> points at: the candidates for
+   // addGames. Absolute paths, sorted. Media and other non-ROM files are left out.
+   QStringList unlistedRoms() const;
+
+   // Appends a <game> (path and name only) per file, then writes the gamelist
+   // once. New games take the indices count()..count()+n-1. Files already listed
+   // are skipped. Returns how many were added, or -1 with aError set and the
+   // gamelist untouched: a file outside the system folder, or a failed write.
+   int addGames( const QStringList& aRomPaths, QString* aError = nullptr );
+
    int setDefaultImageForMissing( const QString& aSourcePath, QString* aError = nullptr );
 
    void ensureHashes( int aIndex );
@@ -101,6 +113,8 @@ public:
    QString displayName( int aIndex, const FilterSpec& aFilter ) const;
 
 private:
+   // One <game> element as a Game, filesystem flags included.
+   Game gameFromNode( const QDomElement& aNode ) const;
    bool matchesCategory( const Game& aGame, const FilterSpec& aFilter ) const;
 
    QDomElement ensureChild( QDomElement aNode, const char* aName );
