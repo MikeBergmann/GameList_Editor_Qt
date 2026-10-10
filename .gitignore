@@ -2,5 +2,6 @@
 build*/
 compile_commands.json
 
-# Local, personal porting notes
+# Local, personal
 transfer.md
+build.sh

@@ -36,6 +36,15 @@ QString resolvePath( const QString& aPath );
 QString gamelistDateToDisplay( const QString& aValue );
 QString displayDateToGamelist( const QString& aDate );
 
+// A picture or video that sits in the media folder under the ROM's name but that
+// the <game> does not point at (no link, or a link to a file that is not there).
+struct MediaLink
+{
+   int index = -1;  // the game
+   bool isImage = true;
+   QString path;  // absolute path of the file found
+};
+
 struct FilterSpec
 {
    // Cbx_Filter.ItemIndex, 0..30. See matchesCategory for what each one means.
@@ -94,6 +103,18 @@ public:
    int addGames( const QStringList& aRomPaths, QString* aError = nullptr );
 
    int setDefaultImageForMissing( const QString& aSourcePath, QString* aError = nullptr );
+
+   // Files in the image and video folders named after a game's ROM (case-blind,
+   // optional -image/-video suffix) for games whose link is empty or dead.
+   // Named after it with or without the ROM's extension ("x.scummvm.png"), in the
+   // gamelist's own media folders and in ./media/images|videos and ./images|videos.
+   // A link that works is never proposed for replacement.
+   QVector<MediaLink> unlinkedMedia() const;
+
+   // Points the games at the files, in place, then writes the gamelist once.
+   // Returns how many links were set, or -1 with aError set and the gamelist
+   // as it was: a failed write.
+   int linkMedia( const QVector<MediaLink>& aLinks, QString* aError = nullptr );
 
    void ensureHashes( int aIndex );
 

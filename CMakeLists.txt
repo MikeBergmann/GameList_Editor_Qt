@@ -57,6 +57,7 @@ add_library( gle_ui STATIC
    src/ui/dialogs/F_AdvNameEditor.cpp
    src/ui/dialogs/F_ConfigureNetwork.cpp
    src/ui/dialogs/F_Help.cpp
+   src/ui/dialogs/F_LinkMedia.cpp
    src/ui/dialogs/F_MoreInfos.cpp
 )
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
