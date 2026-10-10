@@ -110,7 +110,7 @@ void GameEditPanel::buildLayout()
    Img_Game = new QLabel( this );
    Img_Game->setObjectName( QStringLiteral( "Img_Game" ) );
    Img_Game->setAlignment( Qt::AlignCenter );
-   Img_Game->setMinimumSize( 260, 200 );
+   Img_Game->setMinimumSize( 200, 200 );
    // A QLabel's size hints follow its pixmap; Ignored stops the art from
    // driving the layout, so the label is sized by the window alone.
    Img_Game->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
@@ -120,7 +120,7 @@ void GameEditPanel::buildLayout()
    // The video page. Muted and paused by default: clicking through the list must
    // not make noise, and the player is not even loaded until the tab is shown.
    QVideoWidget* video = new QVideoWidget( this );
-   video->setMinimumSize( 260, 200 );
+   video->setMinimumSize( 200, 200 );
    video->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
 
    QAudioOutput* audio = new QAudioOutput( this );
