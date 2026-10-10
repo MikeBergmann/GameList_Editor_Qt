@@ -18,7 +18,7 @@ To manage these ROMs, I use [GameList Editor](https://github.com/andresdelcampo/
 
 I want to add some features, but unfortunately, it is written in Delphi (which I don't have a dev toolchain for).
 
-So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Editor` (itself a fork of `NeeeeB/GameList_Editor`).
+So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Editor` (itself a fork of `NeeeeB/GameList_Editor`).
 
 ## First Step
 
@@ -73,10 +73,9 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
         ├── screenshots/
         ├── videos/
 ```
+
 - [ ] Auto-Fix invalid media links
-
 - [ ] Normalize media. E.g., naming, size, etc.
-
 - [ ] Remove unused media
 
 ## screenscraper.fr credentials
