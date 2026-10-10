@@ -14,6 +14,12 @@ int main( int argc, char** argv )
    if ( qEnvironmentVariableIsEmpty( "QT_QPA_PLATFORM" ) )
       qputenv( "QT_QPA_PLATFORM", "offscreen" );
 
+   // GameEditPanel builds a QMediaPlayer. Qt 6.4's default GStreamer backend
+   // segfaults when the machine has no audio sink/plugins (a CI runner); the
+   // FFmpeg backend that ships with the same package constructs fine there.
+   if ( qEnvironmentVariableIsEmpty( "QT_MEDIA_BACKEND" ) )
+      qputenv( "QT_MEDIA_BACKEND", "ffmpeg" );
+
    QApplication app( argc, argv );
 
    QCoreApplication::setOrganizationName( QStringLiteral( "GameListEditorTests" ) );
