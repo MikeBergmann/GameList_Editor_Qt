@@ -84,6 +84,7 @@ TEST( Gamelist, NodesStayAlignedWithGames )
 // would then offer to delete the user's library.
 TEST( Gamelist, ResolvesPathsWhoseCaseDoesNotMatchTheDisk )
 {
+   SKIP_ON_CASE_INSENSITIVE_FS();
    Fixture fixture;
    Gamelist list;
 
@@ -393,6 +394,7 @@ TEST( Gamelist, SetImageReEncodesIntoTheSystemsImageFolder )
 
 TEST( Gamelist, ChangeAllOnlyTouchesGamesWithNoPicture )
 {
+   SKIP_ON_CASE_INSENSITIVE_FS();
    Fixture fixture;
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
@@ -440,6 +442,7 @@ TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShare )
 
 TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShareUnderDifferentCase )
 {
+   SKIP_ON_CASE_INSENSITIVE_FS();
    Fixture fixture;
    // Two spellings of the one snes/media/images/sonic.PNG the fixture puts on disk.
    writeFile( fixture.path( "snes/gamelist.xml" ), R"(<gameList>
@@ -509,6 +512,7 @@ TEST( Gamelist, SetAndRemoveVideo )
 
 TEST( Gamelist, WritesFollowAnExistingFolderUnderDifferentCase )
 {
+   SKIP_ON_CASE_INSENSITIVE_FS();
    Fixture fixture;
    // The gamelist says ./media/..., the disk says Media.
    ASSERT_TRUE( QDir().rename( fixture.path( "snes/media" ), fixture.path( "snes/Media" ) ) );
@@ -533,6 +537,7 @@ TEST( Gamelist, WritesFollowAnExistingFolderUnderDifferentCase )
 
 TEST( Gamelist, WritesFollowAPartlyExistingFolderUnderDifferentCase )
 {
+   SKIP_ON_CASE_INSENSITIVE_FS();
    Fixture fixture;
    // Media/images is there, Media/videos is not yet: the first video save.
    ASSERT_TRUE( QDir( fixture.path( "snes/media/videos" ) ).removeRecursively() );
