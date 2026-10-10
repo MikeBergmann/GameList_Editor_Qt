@@ -9,9 +9,13 @@
 class Gamelist;
 class QComboBox;
 class QLabel;
+class QHideEvent;
 class QLineEdit;
+class QMediaPlayer;
 class QPlainTextEdit;
 class QPushButton;
+class QShowEvent;
+class QTabWidget;
 
 // The 12 editable fields, the picture and the media buttons - the right-hand
 // half of Tbs_Main.
@@ -54,6 +58,10 @@ public:
    // God mode shows Delete Game; aSkipPrompt drops its confirmation.
    void setGodMode( bool aEnabled, bool aSkipPrompt );
 
+   // Start the video as soon as it is loaded, instead of paused on its first
+   // frame. Still muted unless the Mute box is unticked.
+   void setAutoplay( bool aEnabled ) { FAutoplay = aEnabled; }
+
 signals:
    void dirtyChanged( bool aDirty );
 
@@ -72,6 +80,11 @@ signals:
 protected:
    bool eventFilter( QObject* aWatched, QEvent* aEvent ) override;
 
+   // The player only holds a file while this panel is on screen, so the scrape
+   // tab can replace a video without it being open.
+   void showEvent( QShowEvent* aEvent ) override;
+   void hideEvent( QHideEvent* aEvent ) override;
+
 private:
    void buildLayout();
    void loadGame( int aIndex );  // LoadGame (1511)
@@ -80,6 +93,11 @@ private:
    void showPicture( int aIndex );
    void scalePicture();
    void reload();
+
+   // Loads the selected game's video, paused on its first frame, but only while
+   // the Video tab is the one on screen: nothing is opened or decoded otherwise.
+   void syncVideo();
+   void updateVideoTab( bool aHasVideo );
 
    // The five picture/video buttons (1585-1815). Each one is a file dialog and a
    // call into Gamelist, which owns the gamelist document and the media folders.
@@ -98,6 +116,7 @@ private:
    bool FDirty = false;
    bool FGodMode = false;
    bool FSkipDeletePrompt = false;
+   bool FAutoplay = false;
 
    QLineEdit* Edt_Name = nullptr;
    QLineEdit* Edt_RomPath = nullptr;
@@ -115,6 +134,12 @@ private:
 
    QLabel* Img_Game = nullptr;
    QPixmap FPicture;  // unscaled, so a resize can rescale from the original
+   QTabWidget* Tbs_Media = nullptr;  // Image | Video
+   QMediaPlayer* FPlayer = nullptr;
+   QPushButton* Btn_PlayVideo = nullptr;
+   QLabel* Lbl_VideoStatus = nullptr;
+   bool FPreferVideo = false;  // the user's last tab choice, kept across games
+   bool FSyncingTabs = false;  // tab changes made by the panel, not the user
    QPushButton* Btn_ChangeImage = nullptr;
    QPushButton* Btn_SetDefaultPicture = nullptr;
    QPushButton* Btn_ChangeAll = nullptr;

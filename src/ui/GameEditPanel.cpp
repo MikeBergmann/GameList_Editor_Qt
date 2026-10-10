@@ -3,6 +3,8 @@
 #include "Gamelist.h"
 #include "Resources.h"
 
+#include <QAudioOutput>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QEvent>
 #include <QFileDialog>
@@ -11,13 +13,20 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMediaPlayer>
 #include <QMessageBox>
 #include <QPixmap>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QTabWidget>
+#include <QUrl>
 #include <QVBoxLayout>
+#include <QVideoWidget>
 
 namespace {
+
+constexpr int Cst_ImageTab = 0;
+constexpr int Cst_VideoTab = 1;
 
 // The bundled generic picture. The per-system <system>-default.png lookup that
 // used to come first (1621-1630, 1646-1655) is statically dead now that only the
@@ -108,6 +117,72 @@ void GameEditPanel::buildLayout()
    Img_Game->setFrameShape( QFrame::StyledPanel );
    Img_Game->installEventFilter( this );
 
+   // The video page. Muted and paused by default: clicking through the list must
+   // not make noise, and the player is not even loaded until the tab is shown.
+   QVideoWidget* video = new QVideoWidget( this );
+   video->setMinimumSize( 260, 200 );
+   video->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
+
+   QAudioOutput* audio = new QAudioOutput( this );
+   audio->setMuted( true );
+   FPlayer = new QMediaPlayer( this );
+   FPlayer->setAudioOutput( audio );
+   FPlayer->setVideoOutput( video );
+
+   Btn_PlayVideo = new QPushButton( QStringLiteral( "Play" ), this );
+   Btn_PlayVideo->setObjectName( QStringLiteral( "Btn_PlayVideo" ) );
+   connect( Btn_PlayVideo, &QPushButton::clicked, this, [this] {
+      if ( FPlayer->playbackState() == QMediaPlayer::PlayingState )
+         FPlayer->pause();
+      else
+         FPlayer->play();
+   } );
+   connect( FPlayer, &QMediaPlayer::playbackStateChanged, this,
+            [this]( QMediaPlayer::PlaybackState aState ) {
+               Btn_PlayVideo->setText( aState == QMediaPlayer::PlayingState
+                                          ? QStringLiteral( "Pause" )
+                                          : QStringLiteral( "Play" ) );
+            } );
+
+   QCheckBox* mute = new QCheckBox( QStringLiteral( "Mute" ), this );
+   mute->setObjectName( QStringLiteral( "Chk_MuteVideo" ) );
+   mute->setChecked( true );
+   connect( mute, &QCheckBox::toggled, audio, &QAudioOutput::setMuted );
+
+   Lbl_VideoStatus = new QLabel( this );
+   Lbl_VideoStatus->setObjectName( QStringLiteral( "Lbl_VideoStatus" ) );
+   connect( FPlayer, &QMediaPlayer::errorOccurred, this,
+            [this]( QMediaPlayer::Error, const QString& aText ) {
+               Lbl_VideoStatus->setText( aText );
+            } );
+
+   QHBoxLayout* controls = new QHBoxLayout;
+   controls->addWidget( Btn_PlayVideo );
+   controls->addWidget( mute );
+   controls->addWidget( Lbl_VideoStatus, 1 );
+
+   QWidget* videoPage = new QWidget( this );
+   QVBoxLayout* videoColumn = new QVBoxLayout( videoPage );
+   videoColumn->setContentsMargins( 0, 0, 0, 0 );
+   videoColumn->addWidget( video, 1 );
+   videoColumn->addLayout( controls );
+
+   Tbs_Media = new QTabWidget( this );
+   Tbs_Media->setObjectName( QStringLiteral( "Tbs_Media" ) );
+   Tbs_Media->addTab( Img_Game, QStringLiteral( "Image" ) );
+   Tbs_Media->addTab( videoPage, QStringLiteral( "Video" ) );
+   // Sized by the window alone, like the label was: Ignored drops the content's
+   // own minimum too, so pin the one the pages need (the video must not spill
+   // over the buttons below).
+   Tbs_Media->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
+   Tbs_Media->setMinimumSize( Tbs_Media->minimumSizeHint() );
+   connect( Tbs_Media, &QTabWidget::currentChanged, this, [this]( int aIndex ) {
+      if ( FSyncingTabs )
+         return;
+      FPreferVideo = aIndex == Cst_VideoTab;
+      syncVideo();
+   } );
+
    const auto button = [this]( const char* aName, const QString& aText,
                                void ( GameEditPanel::*aSlot )() ) {
       QPushButton* push = new QPushButton( aText, this );
@@ -151,6 +226,7 @@ void GameEditPanel::buildLayout()
    connect( Btn_RemoveVideo, &QPushButton::clicked, this, [this, confirmDelete] {
       if ( !confirmDelete( QStringLiteral( "video" ) ) )
          return;
+      FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
       QString error;
       report( FGamelist && FGamelist->removeVideo( FSelection.value( 0, -1 ), &error ), error );
    } );
@@ -171,7 +247,7 @@ void GameEditPanel::buildLayout()
    connect( Btn_SaveChanges, &QPushButton::clicked, this, &GameEditPanel::save );
 
    QGridLayout* media = new QGridLayout;
-   media->addWidget( Img_Game, 0, 0, 1, 2 );
+   media->addWidget( Tbs_Media, 0, 0, 1, 2 );
    media->setRowStretch( 0, 1 );
    media->addWidget( Btn_ChangeImage, 1, 0 );
    media->addWidget( Btn_RemovePicture, 1, 1 );
@@ -266,6 +342,50 @@ bool GameEditPanel::eventFilter( QObject* aWatched, QEvent* aEvent )
       scalePicture();
 
    return QWidget::eventFilter( aWatched, aEvent );
+}
+
+void GameEditPanel::showEvent( QShowEvent* aEvent )
+{
+   QWidget::showEvent( aEvent );
+   syncVideo();
+}
+
+void GameEditPanel::hideEvent( QHideEvent* aEvent )
+{
+   QWidget::hideEvent( aEvent );
+   FPlayer->setSource( QUrl() );
+}
+
+void GameEditPanel::syncVideo()
+{
+   FPlayer->setSource( QUrl() );
+   Lbl_VideoStatus->clear();
+
+   if ( !isVisible() || Tbs_Media->currentIndex() != Cst_VideoTab || !FGamelist ||
+        FSelection.size() != 1 )
+      return;
+
+   const Game& game = FGamelist->at( FSelection.first() );
+   if ( game.missingVideo )
+      return;
+
+   FPlayer->setSource( QUrl::fromLocalFile( game.physicalVideoPath ) );
+   if ( FAutoplay )
+      FPlayer->play();
+   else
+      FPlayer->pause();  // shows the first frame instead of starting
+}
+
+// The Video tab is only there for a game that has one. The user's choice of tab
+// is remembered, so browsing a list on the Video tab stays on it.
+void GameEditPanel::updateVideoTab( bool aHasVideo )
+{
+   FSyncingTabs = true;
+   Tbs_Media->setTabEnabled( Cst_VideoTab, aHasVideo );
+   Tbs_Media->setCurrentIndex( aHasVideo && FPreferVideo ? Cst_VideoTab : Cst_ImageTab );
+   FSyncingTabs = false;
+
+   syncVideo();
 }
 
 GameFields GameEditPanel::fields() const
@@ -366,6 +486,7 @@ void GameEditPanel::enableComponents()
    const bool hasVideo = single && !FGamelist->at( FSelection.first() ).missingVideo;
    Btn_RemovePicture->setEnabled( hasPicture );
    Btn_RemoveVideo->setEnabled( hasVideo );
+   updateVideoTab( hasVideo );
 }
 
 bool GameEditPanel::save()
@@ -439,9 +560,11 @@ void GameEditPanel::deleteGame()
                                   .arg( FGamelist->at( index ).name ) ) != QMessageBox::Yes )
       return;
 
+   FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
    QString error;
    if ( !FGamelist->removeGame( index, &error ) ) {
       QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      syncVideo();
       return;
    }
 
@@ -481,6 +604,7 @@ void GameEditPanel::chooseVideo()
    if ( file.isEmpty() )
       return;
 
+   FPlayer->setSource( QUrl() );  // the new file replaces the one that is open
    QString error;
    report( FGamelist->setVideo( FSelection.value( 0, -1 ), file, &error ), error );
 }

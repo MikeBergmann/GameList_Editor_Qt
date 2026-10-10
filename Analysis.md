@@ -37,6 +37,7 @@ Other Design decisions:
 
 - C++17, Qt 6.4 minimum (what my Mint 22 ships), warnings `-Wall -Wextra -Wshadow -Wconversion`.
 - zlib is linked directly because Qt has no CRC32. It is a build dependency (`zlib1g-dev`).
+- Video playback uses Qt Multimedia (`qt6-multimedia-dev`, linked into `gle_ui` only).
 - Tests use their own `main()` because widgets need a `QApplication`. It defaults to the `offscreen` platform (so CI needs no X server) and redirects `QSettings` to a temporary directory so tests never touch the real config.
 - CI is Linux only (Ubuntu 24.04, `ctest`).
 

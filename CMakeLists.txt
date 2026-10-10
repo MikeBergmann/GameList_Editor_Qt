@@ -14,7 +14,7 @@ endif()
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
-find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network )
+find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
 find_package( ZLIB REQUIRED )
 find_package( GTest REQUIRED )
 
@@ -61,7 +61,7 @@ add_library( gle_ui STATIC
    src/ui/dialogs/F_MoreInfos.cpp
 )
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
-target_link_libraries( gle_ui PUBLIC Qt6::Widgets gle_core gle_scraper )
+target_link_libraries( gle_ui PUBLIC Qt6::Widgets Qt6::Multimedia Qt6::MultimediaWidgets gle_core gle_scraper )
 
 add_executable( GameListEditor
    src/main.cpp

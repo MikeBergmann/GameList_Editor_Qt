@@ -85,6 +85,7 @@ private:
    bool FDelWoPrompt = false;
    bool FShowTips = false;
    bool FGenesisLogo = false;
+   bool FAutoplayVideo = false;
 
    // Guards the filter/selection round trip: re-filtering moves the current row,
    // which would otherwise re-enter refreshFilter through the selection change.
@@ -116,6 +117,7 @@ private:
    QAction* Mnu_AutoHash = nullptr;
    QAction* Mnu_ShowTips = nullptr;
    QAction* Mnu_Genesis = nullptr;
+   QAction* Mnu_AutoplayVideo = nullptr;
 
    // Everything these three hold operates on the whole system or the selection,
    // so they stay disabled until step 4.4 gives them a Gamelist to write to.
