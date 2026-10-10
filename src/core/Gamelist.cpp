@@ -170,6 +170,9 @@ QString resolvePath( const QString& aPath )
    QString resolved = parts.takeFirst();
    if ( resolved.isEmpty() )
       resolved = QStringLiteral( "/" );
+   // "C:" alone is the drive's current directory on Windows, not its root.
+   else if ( resolved.size() == 2 && resolved.at( 1 ) == QLatin1Char( ':' ) )
+      resolved += QLatin1Char( '/' );
 
    // re-lists the containing directory on every component that misses,
    // so a ROM folder that is absent altogether costs one listing per game. That

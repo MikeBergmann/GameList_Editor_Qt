@@ -22,6 +22,21 @@ inline void writeFile( const QString& aPath, const QByteArray& aContent )
    ASSERT_EQ( file.write( aContent ), aContent.size() );
 }
 
+// NTFS (and default macOS volumes) fold case, so tests built on two files that
+// differ only in case cannot hold there.
+inline bool filesystemIsCaseInsensitive()
+{
+   QTemporaryDir dir;
+   QFile file( dir.filePath( QStringLiteral( "a" ) ) );
+   return file.open( QIODevice::WriteOnly ) && QFileInfo::exists( dir.filePath( QStringLiteral( "A" ) ) );
+}
+
+#define SKIP_ON_CASE_INSENSITIVE_FS()                         \
+   do {                                                       \
+      if ( filesystemIsCaseInsensitive() )                    \
+         GTEST_SKIP() << "filesystem folds case";             \
+   } while ( false )
+
 // Four games, in the shape EmulationStation writes: paths relative to the system
 // folder, dates as yyyymmddT000000, flags as the literal "true".
 inline const QByteArray Cst_Gamelist = R"(<?xml version="1.0"?>
