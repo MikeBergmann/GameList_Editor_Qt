@@ -231,6 +231,7 @@ inline constexpr const char* Cst_IniAutoHash = "AutoHash";
 inline constexpr const char* Cst_IniDelWoPrompt = "DelWoPrompt";
 inline constexpr const char* Cst_ShowTips = "ShowTips";
 inline constexpr const char* Cst_IniGenesisLogo = "GenesisLogo";
+inline constexpr const char* Cst_IniAutoplayVideo = "AutoplayVideo";
 inline constexpr const char* Cst_IniLanguage = "Language";
 inline constexpr const char* Cst_IniSSUser = "SSUser";
 inline constexpr const char* Cst_IniSSPwd = "SSPwd";

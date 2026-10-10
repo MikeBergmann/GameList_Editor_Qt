@@ -155,6 +155,7 @@ void Frm_Editor::buildMenu()
    Mnu_AutoHash = addToggle( QStringLiteral( "Auto Hash" ), &FAutoHash );
    Mnu_ShowTips = addToggle( QStringLiteral( "Show tips at start" ), &FShowTips );
    Mnu_Genesis = addToggle( QStringLiteral( "Use Genesis logo" ), &FGenesisLogo );
+   Mnu_AutoplayVideo = addToggle( QStringLiteral( "Autoplay video" ), &FAutoplayVideo );
 
    // God mode is what makes deleting possible at all, so it gates its own
    // "don't ask me" - and turning it off has to clear that, not just grey it.
@@ -315,6 +316,7 @@ void Frm_Editor::buildCentralWidget()
    const auto syncGodMode = [this] { FEditPanel->setGodMode( FGodMode, FDelWoPrompt ); };
    connect( Mnu_GodMode, &QAction::toggled, this, syncGodMode );
    connect( Mnu_DeleteWoPrompt, &QAction::toggled, this, syncGodMode );
+   connect( Mnu_AutoplayVideo, &QAction::toggled, FEditPanel, &GameEditPanel::setAutoplay );
 
    // Rows are indices into the Gamelist, and removing one renumbered the rest:
    // reset the model, then land on the neighbour the user was next to.
@@ -359,6 +361,8 @@ void Frm_Editor::LoadFromIni()
    Mnu_DeleteWoPrompt->setEnabled( Mnu_GodMode->isChecked() );
    Mnu_ShowTips->setChecked( settings.value( QLatin1String( Cst_ShowTips ), true ).toBool() );
    Mnu_Genesis->setChecked( settings.value( QLatin1String( Cst_IniGenesisLogo ), false ).toBool() );
+   Mnu_AutoplayVideo->setChecked(
+      settings.value( QLatin1String( Cst_IniAutoplayVideo ), false ).toBool() );
 }
 
 void Frm_Editor::SaveToIni()
@@ -372,6 +376,7 @@ void Frm_Editor::SaveToIni()
    settings.setValue( QLatin1String( Cst_IniDelWoPrompt ), FGodMode && FDelWoPrompt );
    settings.setValue( QLatin1String( Cst_ShowTips ), FShowTips );
    settings.setValue( QLatin1String( Cst_IniGenesisLogo ), FGenesisLogo );
+   settings.setValue( QLatin1String( Cst_IniAutoplayVideo ), FAutoplayVideo );
 }
 
 void Frm_Editor::showTipsAtStart()

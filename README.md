@@ -23,6 +23,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 ## First Step
 
 - Target: Linux Mint 22.1 (Ubuntu 24.04), Qt6.4, cmake, gcc
+- Build dependencies (Ubuntu/Mint): `qt6-base-dev qt6-multimedia-dev zlib1g-dev libgtest-dev`
 - Testing: Google Test
 - First drop will contain:
   - No SSH / no Pi remote control
@@ -38,6 +39,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 - [x] Edit a game
 - [x] Scrape using screenscraper.fr
 - [x] Manually adding new games
+- [x] Video playback
 
 ### Stubbed
 
@@ -47,7 +49,6 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 
 ### Features to add
 
-- [ ] Video playback
 - [ ] Additional Scrapers (e.g., Launchbox)
 - [ ] Specific handling of the xml/media folders, e.g like es-de:
 
