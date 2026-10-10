@@ -634,4 +634,102 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
    EXPECT_EQ( reload( fixture ).count(), 4 );
 }
 
+TEST( Gamelist, UnlinkedMediaFindsFilesByRomNameAndLinkMediaPointsTheGamesAtThem )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/media/images/Vanished-image.jpg" ), "jpg" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   // Game 0 links working files; game 1 has a dead image link and no video, and
+   // sonic.PNG / Sonic.mp4 sit there under its ROM name; game 2 has a -image.
+   const QVector<MediaLink> found = list.unlinkedMedia();
+   ASSERT_EQ( found.size(), 3 );
+   EXPECT_EQ( found[0].index, 1 );
+   EXPECT_TRUE( found[0].isImage );
+   EXPECT_EQ( found[0].path, fixture.path( "snes/media/images/sonic.PNG" ) );
+   EXPECT_EQ( found[1].index, 2 );
+   EXPECT_EQ( found[1].path, fixture.path( "snes/media/images/Vanished-image.jpg" ) );
+   EXPECT_EQ( found[2].index, 1 );
+   EXPECT_FALSE( found[2].isImage );
+
+   QString error;
+   ASSERT_EQ( list.linkMedia( found, &error ), 3 ) << error.toStdString();
+   EXPECT_FALSE( list.at( 1 ).missingImage );
+   EXPECT_FALSE( list.at( 1 ).missingVideo );
+   EXPECT_TRUE( list.unlinkedMedia().isEmpty() );
+
+   // The link keeps the file's real case, and survives a reload.
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 1 ).imagePath, QStringLiteral( "./media/images/sonic.PNG" ) );
+   EXPECT_EQ( saved.at( 1 ).videoPath, QStringLiteral( "./media/videos/Sonic.mp4" ) );
+   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished-image.jpg" ) );
+   EXPECT_EQ( saved.at( 0 ).imagePath, QStringLiteral( "./media/images/Sonic.png" ) );
+}
+
+TEST( Gamelist, UnlinkedMediaAlsoFindsFullRomNamesInPlainImagesAndVideosFolders )
+{
+   // A ScummVM system: no media links yet, art in ./images and ./videos, named
+   // after the whole ROM name.
+   Fixture fixture;
+   writeFile( fixture.path( "snes/images/Vanished.zip.png" ), "png" );
+   writeFile( fixture.path( "snes/videos/Vanished.zip.mp4" ), "mp4" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   bool image = false;
+   bool video = false;
+   for ( const MediaLink& link : list.unlinkedMedia() ) {
+      if ( link.index != 2 )
+         continue;
+      ( link.isImage ? image : video ) = true;
+      EXPECT_TRUE( link.path.contains( link.isImage ? QStringLiteral( "/images/Vanished.zip.png" )
+                                                    : QStringLiteral( "/videos/Vanished.zip.mp4" ) ) );
+   }
+   EXPECT_TRUE( image );
+   EXPECT_TRUE( video );
+}
+
+TEST( Gamelist, UnlinkedMediaGoesByMimeTypeNotAnExtensionList )
+{
+   // .webp and .webm are in no list of ours, and a .txt of the same name is not media.
+   Fixture fixture;
+   writeFile( fixture.path( "snes/media/images/Vanished.txt" ), "notes" );
+   writeFile( fixture.path( "snes/media/images/Vanished.webp" ), "webp" );
+   writeFile( fixture.path( "snes/media/videos/Vanished.txt" ), "notes" );
+   writeFile( fixture.path( "snes/media/videos/Vanished.webm" ), "webm" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   QStringList paths;
+   for ( const MediaLink& link : list.unlinkedMedia() )
+      if ( link.index == 2 )
+         paths << link.path;
+   paths.sort();
+   EXPECT_EQ( paths, QStringList( { fixture.path( "snes/media/images/Vanished.webp" ),
+                                    fixture.path( "snes/media/videos/Vanished.webm" ) } ) );
+}
+
+TEST( Gamelist, UnlinkedMediaDoesNotSearchTheWorkingDirectoryForAnEmptyMediaFolder )
+{
+   // A link with no '/' leaves the media folder empty; QDir("") is the working directory.
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ),
+              "<gameList><game><path>./Lost.zip</path><image>Lost.png</image></game></gameList>" );
+   writeFile( fixture.path( "elsewhere/Lost.png" ), "png" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   const QString previous = QDir::currentPath();
+   ASSERT_TRUE( QDir::setCurrent( fixture.path( "elsewhere" ) ) );
+   const QVector<MediaLink> found = list.unlinkedMedia();
+   QDir::setCurrent( previous );
+
+   EXPECT_TRUE( found.isEmpty() );
+}
+
 }  // namespace

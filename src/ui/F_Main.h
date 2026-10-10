@@ -55,6 +55,8 @@ private:
    void Cbx_SystemsChange();
    // Actions > Add missing ROMs.
    void addMissingRoms();
+   // Actions > Link existing media.
+   void linkExistingMedia();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
@@ -108,6 +110,7 @@ private:
 
    QAction* Mnu_Reload = nullptr;
    QAction* Mnu_AddRoms = nullptr;
+   QAction* Mnu_LinkMedia = nullptr;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

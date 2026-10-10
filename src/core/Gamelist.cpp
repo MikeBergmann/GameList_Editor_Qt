@@ -5,6 +5,8 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
+#include <QMimeDatabase>
 #include <QSaveFile>
 #include <QSet>
 
@@ -15,6 +17,56 @@ namespace {
 // into the ROM folder; this is the layout EmulationStation itself writes.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
+
+// Media already on disk is looked for in the gamelist's own folder, then in these:
+// ES writes ./media/..., older setups and ScummVM keep plain ./images.
+const QStringList Cst_ImageSearchFolders = { QStringLiteral( "./media/images/" ),
+                                             QStringLiteral( "./images/" ) };
+const QStringList Cst_VideoSearchFolders = { QStringLiteral( "./media/videos/" ),
+                                             QStringLiteral( "./videos/" ) };
+
+// What scrapers append to the ROM name, in order of preference: the plain name first.
+const QStringList Cst_ImageStems = { QString(), QStringLiteral( "-image" ) };
+const QStringList Cst_VideoStems = { QString(), QStringLiteral( "-video" ) };
+
+// Kind of file by MIME type, so no extension list to keep.
+const QString Cst_ImageMime = QStringLiteral( "image/" );
+const QString Cst_VideoMime = QStringLiteral( "video/" );
+
+// The files of aDir whose MIME type starts with aMimePrefix, by lower-cased name
+// without the extension ("x.scummvm.png" is "x.scummvm") -> the real name. Judged
+// by file name alone: nothing is opened. Of several files with the same name
+// (Sonic.png, Sonic.jpg) the first in name order wins.
+QHash<QString, QString> mediaIndex( const QDir& aDir, const QString& aMimePrefix )
+{
+   const QMimeDatabase mimes;
+   QHash<QString, QString> index;
+   for ( const QString& name : aDir.entryList( QDir::Files ) ) {
+      if ( !mimes.mimeTypeForFile( name, QMimeDatabase::MatchExtension )
+              .name()
+              .startsWith( aMimePrefix ) )
+         continue;
+
+      const QString key = QFileInfo( name ).completeBaseName().toLower();
+      if ( !index.contains( key ) )
+         index.insert( key, name );
+   }
+   return index;
+}
+
+// The file name for the first base+stem that aIndex holds, or empty.
+QString findMedia( const QHash<QString, QString>& aIndex, const QStringList& aBases,
+                   const QStringList& aStems )
+{
+   for ( const QString& base : aBases ) {
+      for ( const QString& stem : aStems ) {
+         const QString name = aIndex.value( base + stem );
+         if ( !name.isEmpty() )
+            return name;
+      }
+   }
+   return {};
+}
 
 QString folderOf( const QString& aLink )
 {
@@ -574,6 +626,104 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
       return 0;
 
    return changed;
+}
+
+QVector<MediaLink> Gamelist::unlinkedMedia() const
+{
+   struct Kind
+   {
+      bool isImage;
+      const QString& mime;
+      QStringList folders;  // the gamelist's own first, then the usual ones
+      const QStringList& stems;
+   };
+   const Kind kinds[] = {
+      { true, Cst_ImageMime, QStringList( FImageFolder ) + Cst_ImageSearchFolders, Cst_ImageStems },
+      { false, Cst_VideoMime, QStringList( FVideoFolder ) + Cst_VideoSearchFolders, Cst_VideoStems },
+   };
+
+   QVector<MediaLink> found;
+   for ( const Kind& kind : kinds ) {
+      // One index per folder: the match is case-blind but the link keeps the
+      // file's real case, which a case-sensitive FS needs.
+      struct Folder
+      {
+         QDir dir;
+         QHash<QString, QString> index;
+      };
+      QVector<Folder> folders;
+      QStringList seen;
+      for ( const QString& link : kind.folders ) {
+         // An empty folder (a link with no '/') would be QDir(""): the working directory.
+         const QString path = physicalPath( FSystemDir, link );
+         if ( path.isEmpty() || seen.contains( path ) )
+            continue;
+         seen << path;
+
+         Folder folder{ QDir( path ), {} };
+         folder.index = mediaIndex( folder.dir, kind.mime );
+         if ( !folder.index.isEmpty() )
+            folders.append( folder );
+      }
+      if ( folders.isEmpty() )
+         continue;
+
+      for ( int index = 0; index < FGames.size(); ++index ) {
+         const Game& game = FGames.at( index );
+         if ( !( kind.isImage ? game.missingImage : game.missingVideo ) || game.romPath.isEmpty() )
+            continue;
+
+         // "Sonic" for Sonic.zip, and "Sonic.zip" itself: ES names the media of a
+         // ScummVM "game" folder, wetlands-us.scummvm, after the whole name.
+         const QStringList bases = { game.romNameWoExt().toLower(), game.romName().toLower() };
+         for ( const Folder& folder : folders ) {
+            const QString name = findMedia( folder.index, bases, kind.stems );
+            if ( !name.isEmpty() ) {
+               found.append( { index, kind.isImage, folder.dir.filePath( name ) } );
+               break;
+            }
+         }
+      }
+   }
+
+   return found;
+}
+
+int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
+{
+   const QVector<Game> before = FGames;
+   const QDir systemDir( FSystemDir );
+
+   int linked = 0;
+   for ( const MediaLink& link : aLinks ) {
+      if ( link.index < 0 || link.index >= FGames.size() )
+         continue;
+
+      Game& game = FGames[link.index];
+      const QString text = QStringLiteral( "./" ) + systemDir.relativeFilePath( link.path );
+      setChildText( FNodes[link.index], link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
+      ( link.isImage ? game.imagePath : game.videoPath ) = text;
+      ( link.isImage ? game.physicalImagePath : game.physicalVideoPath ) = link.path;
+      ( link.isImage ? game.missingImage : game.missingVideo ) = false;
+      ++linked;
+   }
+
+   if ( linked == 0 )
+      return 0;
+
+   if ( !save( aError ) ) {
+      for ( const MediaLink& link : aLinks ) {
+         if ( link.index < 0 || link.index >= FGames.size() )
+            continue;
+         const Game& old = before.at( link.index );
+         setChildText( FNodes[link.index], link.isImage ? Cst_ImageLink : Cst_VideoLink,
+                       link.isImage ? old.imagePath : old.videoPath );
+      }
+      FGames = before;
+      return -1;
+   }
+
+   return linked;
 }
 
 bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError )

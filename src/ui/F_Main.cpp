@@ -4,6 +4,7 @@
 #include "F_AddRoms.h"
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
+#include "F_LinkMedia.h"
 #include "F_MoreInfos.h"
 #include "GameEditPanel.h"
 #include "GamelistModel.h"
@@ -118,6 +119,9 @@ void Frm_Editor::buildMenu()
    Mnu_AddRoms = actions->addAction( QStringLiteral( "Add missing ROMs..." ), this,
                                      &Frm_Editor::addMissingRoms );
    Mnu_AddRoms->setEnabled( false );
+   Mnu_LinkMedia = actions->addAction( QStringLiteral( "Link existing media..." ), this,
+                                       &Frm_Editor::linkExistingMedia );
+   Mnu_LinkMedia->setEnabled( false );
    actions->addSeparator();
    Mnu_System = addPendingMenu( actions, QStringLiteral( "System" ),
                                 { QStringLiteral( "Convert all text to lowercase" ),
@@ -487,6 +491,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
 
    if ( !found ) {
       Mnu_AddRoms->setEnabled( false );
+      Mnu_LinkMedia->setEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -518,6 +523,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FEditPanel->setGamelist( nullptr );
    FScrapePanel->setGamelist( nullptr );
    Mnu_AddRoms->setEnabled( false );
+   Mnu_LinkMedia->setEnabled( false );
 
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
@@ -546,6 +552,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FEditPanel->setGamelist( &FGamelist );
    FScrapePanel->setGamelist( &FGamelist );
    Mnu_AddRoms->setEnabled( true );
+   Mnu_LinkMedia->setEnabled( true );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
@@ -583,6 +590,34 @@ void Frm_Editor::addMissingRoms()
    const QModelIndex first = FProxy->mapFromSource( FModel->index( firstNew ) );
    if ( first.isValid() )
       Lbx_Games->setCurrentIndex( first );
+}
+
+void Frm_Editor::linkExistingMedia()
+{
+   if ( !confirmLeaveEdits() )
+      return;
+
+   const QVector<MediaLink> candidates = FGamelist.unlinkedMedia();
+   if ( candidates.isEmpty() ) {
+      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+                                QStringLiteral( "No unlinked picture or video found." ) );
+      return;
+   }
+
+   const QVector<MediaLink> chosen = Frm_LinkMedia( this ).Execute( FGamelist, candidates );
+   if ( chosen.isEmpty() )
+      return;
+
+   QString error;
+   if ( FGamelist.linkMedia( chosen, &error ) < 0 ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      return;
+   }
+
+   // Same refresh as after a scrape: the games are the same, only their media changed.
+   FEditPanel->setSelection( selectedGameIndexes() );
+   FModel->refresh();
+   updateCount();
 }
 
 void Frm_Editor::LoadSystemLogo( SystemKind aKind )
