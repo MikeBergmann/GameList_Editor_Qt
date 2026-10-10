@@ -22,8 +22,18 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 
 ## First Step
 
-- Target: Linux Mint 22.1 (Ubuntu 24.04), Qt6.4, cmake, gcc
+- Target: Linux Mint 22.1 (Ubuntu 24.04), Qt6.4, cmake, gcc; also builds on Windows with Qt's MinGW kit (tested with Qt 6.12 / MinGW 13.1)
 - Build dependencies (Ubuntu/Mint): `qt6-base-dev qt6-multimedia-dev zlib1g-dev libgtest-dev`
+- Windows: install Qt 6 (MinGW kit, with Qt Multimedia, CMake and Ninja) via the Qt installer. zlib comes with the MinGW kit; GoogleTest is downloaded by CMake if not installed.
+
+  ```
+  set PATH=C:\Qt\Tools\CMake_64\bin;C:\Qt\Tools\Ninja;C:\Qt\Tools\mingw1310_64\bin;C:\Qt\6.12.0\mingw_64\bin;%PATH%
+  cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.12.0/mingw_64
+  cmake --build build
+  build\tests.exe
+  windeployqt dist\GameListEditor.exe   # only needed to run it without Qt on PATH (copy the exe to dist\ first, not next to tests.exe)
+  ```
+
 - Testing: Google Test
 - First drop will contain:
   - No SSH / no Pi remote control
@@ -40,6 +50,7 @@ So this repo will hopefully become a C++/Qt6 port of the GPLv3 `andresdelcampo/G
 - [x] Scrape using screenscraper.fr
 - [x] Manually adding new games
 - [x] Video playback
+- [x] Windows build (experimental)
 
 ### Stubbed
 
@@ -82,7 +93,7 @@ Scraping needs two separate sets of credentials:
 
 ## Still undecided
 
-Whether Windows stays a supported target or this is Linux-only. Unfortunately, my Mac no longer runs macOS, so there will be no macOS version.
+Unfortunately, my Mac no longer runs macOS, so there won't be a macOS version until someone volunteers to test.
 
 ## AI usage
 

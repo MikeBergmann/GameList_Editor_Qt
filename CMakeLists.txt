@@ -15,8 +15,23 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
 find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
+if( MINGW AND NOT ZLIB_ROOT )
+   # Qt's MinGW kit ships zlib in the compiler sysroot, which CMake does not search.
+   get_filename_component( _mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY )
+   set( ZLIB_ROOT "${_mingw_bin}/../x86_64-w64-mingw32" )
+endif()
 find_package( ZLIB REQUIRED )
-find_package( GTest REQUIRED )
+find_package( GTest QUIET )
+if( NOT GTest_FOUND )
+   # No system GTest (typical on Windows): build it from source.
+   include( FetchContent )
+   FetchContent_Declare( googletest
+      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE )
+   set( INSTALL_GTEST OFF CACHE BOOL "" FORCE )
+   set( gtest_force_shared_crt ON CACHE BOOL "" FORCE )
+   FetchContent_MakeAvailable( googletest )
+endif()
 
 include( GoogleTest )
 
@@ -63,7 +78,7 @@ add_library( gle_ui STATIC
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
 target_link_libraries( gle_ui PUBLIC Qt6::Widgets Qt6::Multimedia Qt6::MultimediaWidgets gle_core gle_scraper )
 
-add_executable( GameListEditor
+add_executable( GameListEditor WIN32
    src/main.cpp
    Resources/assets.qrc
 )

@@ -5,3 +5,5 @@ compile_commands.json
 # Local, personal
 transfer.md
 build.sh
+build_win.bat
+dist/
