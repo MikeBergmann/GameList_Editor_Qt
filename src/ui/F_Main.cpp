@@ -30,6 +30,7 @@
 #include <QMessageLogger>
 #include <QPixmap>
 #include <QProgressDialog>
+#include <QSaveFile>
 #include <QSettings>
 #include <QSplitter>
 #include <QTabWidget>
@@ -132,13 +133,19 @@ void Frm_Editor::buildMenu()
                                           &Frm_Editor::shrinkLargeImages );
    Mnu_ShrinkImages->setEnabled( false );
    actions->addSeparator();
-   Mnu_System = addPendingMenu( actions, QStringLiteral( "System" ),
-                                { QStringLiteral( "Convert all text to lowercase" ),
-                                  QStringLiteral( "Convert all text to uppercase" ),
-                                  QStringLiteral( "Remove region from games names" ),
-                                  QStringLiteral( "Delete orphans from gamelist" ),
-                                  QStringLiteral( "Delete duplicates from gamelist" ),
-                                  QStringLiteral( "Export games list to txt file" ) } );
+   Mnu_System = actions->addMenu( QStringLiteral( "System" ) );
+   for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
+                              "Remove region from games names" } )
+      Mnu_System->addAction( QLatin1String( text ) )->setEnabled( false );
+   Mnu_DeleteOrphans = Mnu_System->addAction( QStringLiteral( "Delete orphans from gamelist..." ),
+                                              this, &Frm_Editor::deleteOrphans );
+   Mnu_DeleteDuplicates = Mnu_System->addAction(
+      QStringLiteral( "Delete duplicates from gamelist..." ), this, &Frm_Editor::deleteDuplicates );
+   Mnu_ExportList = Mnu_System->addAction( QStringLiteral( "Export games list to txt file..." ),
+                                           this, &Frm_Editor::exportGamesList );
+   Mnu_DeleteOrphans->setEnabled( false );
+   Mnu_DeleteDuplicates->setEnabled( false );
+   Mnu_ExportList->setEnabled( false );
    Mnu_Game = addPendingMenu( actions, QStringLiteral( "Game" ),
                               { QStringLiteral( "Convert all text to lowercase" ),
                                 QStringLiteral( "Convert all text to uppercase" ) } );
@@ -542,6 +549,9 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_LinkMedia->setEnabled( false );
    Mnu_RenameMedia->setEnabled( false );
    Mnu_ShrinkImages->setEnabled( false );
+   Mnu_DeleteOrphans->setEnabled( false );
+   Mnu_DeleteDuplicates->setEnabled( false );
+   Mnu_ExportList->setEnabled( false );
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
       updateCount();
@@ -572,6 +582,9 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_LinkMedia->setEnabled( true );
    Mnu_RenameMedia->setEnabled( true );
    Mnu_ShrinkImages->setEnabled( true );
+   Mnu_DeleteOrphans->setEnabled( true );
+   Mnu_DeleteDuplicates->setEnabled( true );
+   Mnu_ExportList->setEnabled( true );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
@@ -724,6 +737,78 @@ void Frm_Editor::shrinkLargeImages()
 
    // The links are unchanged, but the preview may be showing a file that just changed.
    FEditPanel->setSelection( selectedGameIndexes() );
+}
+
+void Frm_Editor::deleteOrphans()
+{
+   if ( confirmLeaveEdits() )
+      confirmAndRemove( FGamelist.orphanIndexes(), QStringLiteral( "whose ROM is missing" ) );
+}
+
+void Frm_Editor::deleteDuplicates()
+{
+   if ( confirmLeaveEdits() )
+      confirmAndRemove( FGamelist.duplicateIndexes(),
+                        QStringLiteral( "that list a ROM already listed above them (the first stays)" ) );
+}
+
+void Frm_Editor::confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat )
+{
+   if ( aIndexes.isEmpty() ) {
+      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+                                QStringLiteral( "Nothing to delete." ) );
+      return;
+   }
+
+   const auto answer = QMessageBox::question(
+      this, QStringLiteral( "GameList Editor" ),
+      QStringLiteral( "Remove %1 game(s) %2 from the gamelist?\n\nNo ROM, picture or video file is deleted." )
+         .arg( aIndexes.size() )
+         .arg( aWhat ),
+      QMessageBox::Yes | QMessageBox::No, QMessageBox::No );
+   if ( answer != QMessageBox::Yes )
+      return;
+
+   QString error;
+   if ( !FGamelist.removeGames( aIndexes, &error ) ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      return;
+   }
+
+   // Indices shifted: same reset as after adding games.
+   FModel->setGamelist( &FGamelist );
+   FEditPanel->setGamelist( &FGamelist );
+   FScrapePanel->setGamelist( &FGamelist );
+   refreshFilter();
+   if ( FProxy->rowCount() > 0 )
+      Lbx_Games->setCurrentIndex( FProxy->index( 0, 0 ) );
+}
+
+void Frm_Editor::exportGamesList()
+{
+   const QString path = QFileDialog::getSaveFileName(
+      this, QStringLiteral( "Export games list" ),
+      QDir( FGamelist.systemDir() ).filePath( FGamelist.system().folderName + QStringLiteral( ".txt" ) ),
+      QStringLiteral( "Text files (*.txt)" ) );
+   if ( path.isEmpty() )
+      return;
+
+   // What the list shows, in the order it shows it: filter, search and the
+   // ROM / name toggles all apply.
+   QByteArray content;
+   for ( int row = 0; row < FProxy->rowCount(); ++row )
+      content += FProxy->index( row, 0 ).data().toString().toUtf8() + '\n';
+
+   QSaveFile file( path );
+   if ( !file.open( QIODevice::WriteOnly ) || file.write( content ) != content.size() ||
+        !file.commit() ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ),
+                            QStringLiteral( "Cannot write %1: %2" ).arg( path, file.errorString() ) );
+      return;
+   }
+
+   QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+                             QStringLiteral( "%1 game(s) exported." ).arg( FProxy->rowCount() ) );
 }
 
 void Frm_Editor::LoadSystemLogo( SystemKind aKind )

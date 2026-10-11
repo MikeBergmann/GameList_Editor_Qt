@@ -118,6 +118,18 @@ public:
    // write failed; true with aError set if only some file could not be removed.
    bool removeGame( int aIndex, QString* aError = nullptr );
 
+   // Actions > System > Delete orphans / duplicates: drops the <game>s only, no
+   // file, then writes the gamelist once. Indices shift afterwards, so callers
+   // must reset their views. False, with the gamelist untouched, if the write failed.
+   bool removeGames( const QVector<int>& aIndexes, QString* aError = nullptr );
+
+   // Games whose ROM is not on disk.
+   QVector<int> orphanIndexes() const;
+
+   // The later entries of every ROM listed more than once, so the first stays.
+   // The same file is meant: Sonic.zip in two folders is two games.
+   QVector<int> duplicateIndexes() const;
+
    // Files under the system folder that no <game> points at: the candidates for
    // addGames. Absolute paths, sorted. Media and other non-ROM files are left out.
    QStringList unlistedRoms() const;
