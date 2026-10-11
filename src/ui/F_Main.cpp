@@ -82,11 +82,15 @@ bool dependsOnSelection( int aFilterIndex )
 
 // The entries of Actions that operate on a whole system or on a selection. They
 // exist here because the menu is this unit's; their handlers are step 4.4's.
+// An empty item is a separator.
 QMenu* addPendingMenu( QMenu* aParent, const QString& aTitle, const QStringList& aItems )
 {
    QMenu* menu = aParent->addMenu( aTitle );
    for ( const QString& item : aItems )
-      menu->addAction( item );
+      if ( item.isEmpty() )
+         menu->addSeparator();
+      else
+         menu->addAction( item );
    menu->setEnabled( false );
    return menu;
 }
@@ -120,40 +124,42 @@ void Frm_Editor::buildMenu()
    file->addAction( QStringLiteral( "Quit" ), QKeySequence::Quit, this, &Frm_Editor::close );
 
    QMenu* actions = menuBar()->addMenu( QStringLiteral( "Actions" ) );
-   Mnu_AddRoms = actions->addAction( QStringLiteral( "Add missing ROMs..." ), this,
-                                     &Frm_Editor::addMissingRoms );
-   Mnu_AddRoms->setEnabled( false );
-   Mnu_LinkMedia = actions->addAction( QStringLiteral( "Link existing media..." ), this,
-                                       &Frm_Editor::linkExistingMedia );
-   Mnu_LinkMedia->setEnabled( false );
-   Mnu_RenameMedia = actions->addAction( QStringLiteral( "Rename media after ROMs..." ), this,
-                                         &Frm_Editor::renameMediaAfterRoms );
-   Mnu_RenameMedia->setEnabled( false );
-   Mnu_ShrinkImages = actions->addAction( QStringLiteral( "Shrink large pictures..." ), this,
-                                          &Frm_Editor::shrinkLargeImages );
-   Mnu_ShrinkImages->setEnabled( false );
-   actions->addSeparator();
    Mnu_System = actions->addMenu( QStringLiteral( "System" ) );
+   Mnu_AddRoms = Mnu_System->addAction( QStringLiteral( "Add missing ROMs..." ), this,
+                                        &Frm_Editor::addMissingRoms );
+   Mnu_AddRoms->setEnabled( false );
+   Mnu_LinkMedia = Mnu_System->addAction( QStringLiteral( "Link existing media..." ), this,
+                                          &Frm_Editor::linkExistingMedia );
+   Mnu_LinkMedia->setEnabled( false );
+   Mnu_RenameMedia = Mnu_System->addAction( QStringLiteral( "Rename media after ROMs..." ), this,
+                                            &Frm_Editor::renameMediaAfterRoms );
+   Mnu_RenameMedia->setEnabled( false );
+   Mnu_ShrinkImages = Mnu_System->addAction( QStringLiteral( "Shrink large pictures..." ), this,
+                                             &Frm_Editor::shrinkLargeImages );
+   Mnu_ShrinkImages->setEnabled( false );
+   Mnu_System->addSeparator();
    for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
                               "Remove region from games names" } )
       Mnu_System->addAction( QLatin1String( text ) )->setEnabled( false );
+   Mnu_System->addSeparator();
    Mnu_DeleteOrphans = Mnu_System->addAction( QStringLiteral( "Delete orphans from gamelist..." ),
                                               this, &Frm_Editor::deleteOrphans );
    Mnu_DeleteDuplicates = Mnu_System->addAction(
       QStringLiteral( "Delete duplicates from gamelist..." ), this, &Frm_Editor::deleteDuplicates );
+   Mnu_System->addSeparator();
    Mnu_ExportList = Mnu_System->addAction( QStringLiteral( "Export games list to txt file..." ),
                                            this, &Frm_Editor::exportGamesList );
    Mnu_DeleteOrphans->setEnabled( false );
    Mnu_DeleteDuplicates->setEnabled( false );
    Mnu_ExportList->setEnabled( false );
    Mnu_Game = addPendingMenu( actions, QStringLiteral( "Game" ),
-                              { QStringLiteral( "Convert all text to lowercase" ),
-                                QStringLiteral( "Convert all text to uppercase" ) } );
+                              { QStringLiteral( "Convert text to lowercase" ),
+                                QStringLiteral( "Convert text to uppercase" ) } );
    Mnu_Selection = addPendingMenu( actions, QStringLiteral( "Selection" ),
-                                   { QStringLiteral( "Add to Hidden" ),
-                                     QStringLiteral( "Remove from Hidden" ),
-                                     QStringLiteral( "Add to Favorites" ),
-                                     QStringLiteral( "Remove from Favorites" ),
+                                   { QStringLiteral( "Add to Favorites" ),
+                                     QStringLiteral( "Remove from Favorites" ), QString(),
+                                     QStringLiteral( "Add to Hidden" ),
+                                     QStringLiteral( "Remove from Hidden" ), QString(),
                                      QStringLiteral( "Advanced name editor" ) } );
 
    QMenu* options = menuBar()->addMenu( QStringLiteral( "Options" ) );
