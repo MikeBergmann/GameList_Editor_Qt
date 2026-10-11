@@ -61,6 +61,13 @@ private:
    void renameMediaAfterRoms();
    // Actions > Shrink large pictures.
    void shrinkLargeImages();
+   // Actions > System > Delete orphans / Delete duplicates.
+   void deleteOrphans();
+   void deleteDuplicates();
+   // Asks, drops the games, and resets the views onto what is left.
+   void confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat );
+   // Actions > System > Export games list.
+   void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
@@ -118,6 +125,9 @@ private:
    QAction* Mnu_LinkMedia = nullptr;
    QAction* Mnu_RenameMedia = nullptr;
    QAction* Mnu_ShrinkImages = nullptr;
+   QAction* Mnu_DeleteOrphans = nullptr;
+   QAction* Mnu_DeleteDuplicates = nullptr;
+   QAction* Mnu_ExportList = nullptr;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;
@@ -125,8 +135,8 @@ private:
    QAction* Mnu_Genesis = nullptr;
    QAction* Mnu_AutoplayVideo = nullptr;
 
-   // Everything these three hold operates on the whole system or the selection,
-   // so they stay disabled until step 4.4 gives them a Gamelist to write to.
+   // Game and Selection operate on a game or the selection, so they stay disabled
+   // until step 4.4. System is live, minus its three text conversions.
    QMenu* Mnu_System = nullptr;
    QMenu* Mnu_Game = nullptr;
    QMenu* Mnu_Selection = nullptr;
