@@ -487,6 +487,50 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
    EXPECT_FALSE( list.removeGame( 2, &error ) );
 }
 
+TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   // Game 2 (Vanished.zip) is the one orphan; Sonic.zip in two folders is two games.
+   EXPECT_EQ( list.orphanIndexes(), QVector<int>( { 2 } ) );
+   EXPECT_TRUE( list.duplicateIndexes().isEmpty() );
+
+   QString error;
+   ASSERT_TRUE( list.removeGames( { 0, 2, 99 }, &error ) ) << error.toStdString();
+
+   ASSERT_EQ( list.count(), 1 );
+   EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
+   EXPECT_EQ( list.gameNode( 0 ).firstChildElement( QStringLiteral( "path" ) ).text(),
+              list.at( 0 ).romPath );
+   EXPECT_EQ( reload( fixture ).count(), 1 );
+   // Unlike removeGame, no file goes with the entry.
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4" ) ) );
+}
+
+TEST( Gamelist, DuplicateIndexesKeepTheFirstOfEachRom )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), R"(<gameList>
+   <game><path>./Sonic.zip</path><name>A</name></game>
+   <game><path>./sub/Sonic.zip</path><name>B</name></game>
+   <game><path>./Sonic.zip</path><name>C</name></game>
+   <game><path>./Sonic.zip</path><name>D</name></game>
+</gameList>)" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 2, 3 } ) );
+
+   ASSERT_TRUE( list.removeGames( list.duplicateIndexes() ) );
+   EXPECT_EQ( list.count(), 2 );
+   EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "A" ) );
+   EXPECT_EQ( list.at( 1 ).name, QStringLiteral( "B" ) );
+   EXPECT_TRUE( list.duplicateIndexes().isEmpty() );
+}
+
 TEST( Gamelist, SetAndRemoveVideo )
 {
    Fixture fixture;

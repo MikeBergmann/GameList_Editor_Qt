@@ -53,10 +53,11 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Shrinking large pictures: e-encodes linked pictures over a chosen size.
 - [x] Video playback
 - [x] Windows build (experimental)
+- [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
 
 ### Stubbed
 
-- [ ] Actions → System: lowercase or uppercase all text, remove region from names, delete orphans, delete duplicates, export the list to a txt file
+- [ ] Actions → System: lowercase or uppercase all text, remove region from names
 - [ ] Actions → Game: lowercase or uppercase all text
 - [ ] Actions → Selection: add to or remove from Hidden and Favorites, and the Advanced name editor
 
