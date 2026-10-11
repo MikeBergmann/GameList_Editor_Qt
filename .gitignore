@@ -7,3 +7,4 @@ transfer.md
 build.sh
 build_win.bat
 dist/
+dist_setup/
