@@ -10,7 +10,7 @@ namespace {
 // from EM_AUTOURLDETECT, which has no Qt equivalent - and does not need one,
 // since the URLs are fixed and known here.
 constexpr const char* Cst_AboutHtml = R"html(
-<p>GameList Editor manages the <code>gamelist.xml</code> of a
+<p>GameList Editor Qt manages the <code>gamelist.xml</code> of a
 <a href="https://www.recalbox.com/">Recalbox</a> or
 <a href="https://retropie.org.uk/">RetroPie</a> installation.</p>
 

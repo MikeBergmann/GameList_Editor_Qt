@@ -99,7 +99,7 @@ QMenu* addPendingMenu( QMenu* aParent, const QString& aTitle, const QStringList&
 
 Frm_Editor::Frm_Editor( QWidget* aParent ) : QMainWindow( aParent )
 {
-   setWindowTitle( QStringLiteral( "GameList Editor" ) );
+   setWindowTitle( QStringLiteral( "GameList Editor Qt" ) );
 
    FModel = new GamelistModel( this );
    FProxy = new GamelistFilter( this );
@@ -425,7 +425,7 @@ bool Frm_Editor::confirmLeaveEdits()
       return true;
 
    const QMessageBox::StandardButton answer =
-      QMessageBox::question( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::question( this, QStringLiteral( "GameList Editor Qt" ),
                              QStringLiteral(
                                 "There are changes you have not saved yet.\nSave them first?" ),
                              QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel );
@@ -577,7 +577,7 @@ void Frm_Editor::Cbx_SystemsChange()
    QString error;
    if ( !FGamelist.load( system, &error ) ) {
       updateCount();
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return;
    }
 
@@ -611,7 +611,7 @@ void Frm_Editor::addMissingRoms()
    QString error;
    const int added = FGamelist.addGames( chosen, &error );
    if ( added < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return;
    }
    if ( added == 0 )
@@ -637,7 +637,7 @@ void Frm_Editor::linkExistingMedia()
 
    const QVector<MediaLink> candidates = FGamelist.unlinkedMedia();
    if ( candidates.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No unlinked picture or video found." ) );
       return;
    }
@@ -648,7 +648,7 @@ void Frm_Editor::linkExistingMedia()
 
    QString error;
    if ( FGamelist.linkMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return;
    }
 
@@ -665,7 +665,7 @@ void Frm_Editor::renameMediaAfterRoms()
 
    // Strict is the superset: if it finds nothing, no checkbox state can.
    if ( FGamelist.misnamedMedia( true ).isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "Every picture and video is named after its ROM." ) );
       return;
    }
@@ -676,7 +676,7 @@ void Frm_Editor::renameMediaAfterRoms()
 
    QString error;
    if ( FGamelist.renameMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return;
    }
 
@@ -700,7 +700,7 @@ void Frm_Editor::shrinkLargeImages()
 
    const QVector<OversizedImage> candidates = FGamelist.oversizedImages( maxBytes );
    if ( candidates.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No picture is over that size." ) );
       return;
    }
@@ -739,7 +739,7 @@ void Frm_Editor::shrinkLargeImages()
                      .arg( QLocale().formattedDataSize( saved, 1, QLocale::DataSizeTraditionalFormat ) );
    if ( !problems.isEmpty() )
       text += QStringLiteral( "\n\nNot shrunk:\n%1" ).arg( problems.join( QLatin1Char( '\n' ) ) );
-   QMessageBox::information( this, QStringLiteral( "GameList Editor" ), text );
+   QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ), text );
 
    // The links are unchanged, but the preview may be showing a file that just changed.
    FEditPanel->setSelection( selectedGameIndexes() );
@@ -761,13 +761,13 @@ void Frm_Editor::deleteDuplicates()
 void Frm_Editor::confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat )
 {
    if ( aIndexes.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "Nothing to delete." ) );
       return;
    }
 
    const auto answer = QMessageBox::question(
-      this, QStringLiteral( "GameList Editor" ),
+      this, QStringLiteral( "GameList Editor Qt" ),
       QStringLiteral( "Remove %1 game(s) %2 from the gamelist?\n\nNo ROM, picture or video file is deleted." )
          .arg( aIndexes.size() )
          .arg( aWhat ),
@@ -777,7 +777,7 @@ void Frm_Editor::confirmAndRemove( const QVector<int>& aIndexes, const QString& 
 
    QString error;
    if ( !FGamelist.removeGames( aIndexes, &error ) ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return;
    }
 
@@ -808,12 +808,12 @@ void Frm_Editor::exportGamesList()
    QSaveFile file( path );
    if ( !file.open( QIODevice::WriteOnly ) || file.write( content ) != content.size() ||
         !file.commit() ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ),
                             QStringLiteral( "Cannot write %1: %2" ).arg( path, file.errorString() ) );
       return;
    }
 
-   QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+   QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                              QStringLiteral( "%1 game(s) exported." ).arg( FProxy->rowCount() ) );
 }
 
