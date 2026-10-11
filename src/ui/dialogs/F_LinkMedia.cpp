@@ -1,5 +1,6 @@
 #include "F_LinkMedia.h"
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QLabel>
@@ -23,6 +24,10 @@ Frm_LinkMedia::Frm_LinkMedia( QWidget* aParent ) : QDialog( aParent )
    Lbl_Intro = new QLabel( this );
    Lbl_Intro->setWordWrap( true );
 
+   Chk_Strict = new QCheckBox(
+      QStringLiteral( "Also rename files ending in -image or -video (x-image.png \u2192 x.png)" ), this );
+   Chk_Strict->setVisible( false );
+
    Lst_Media = new QListWidget( this );
    Lst_Media->setObjectName( QStringLiteral( "Lst_Media" ) );
 
@@ -33,6 +38,7 @@ Frm_LinkMedia::Frm_LinkMedia( QWidget* aParent ) : QDialog( aParent )
 
    QVBoxLayout* layout = new QVBoxLayout( this );
    layout->addWidget( Lbl_Intro );
+   layout->addWidget( Chk_Strict );
    layout->addWidget( Lst_Media, 1 );
    layout->addWidget( buttons );
 }
@@ -42,7 +48,22 @@ QVector<int> Frm_LinkMedia::review( const QString& aTitle, const QString& aIntro
 {
    setWindowTitle( aTitle );
    Lbl_Intro->setText( aIntro );
+   fill( aRows );
 
+   if ( exec() != QDialog::Accepted )
+      return {};
+
+   QVector<int> chosen;
+   for ( int row = 0; row < Lst_Media->count(); ++row ) {
+      const QListWidgetItem* item = Lst_Media->item( row );
+      if ( item->checkState() == Qt::Checked )
+         chosen.append( item->data( Qt::UserRole ).toInt() );
+   }
+   return chosen;
+}
+
+void Frm_LinkMedia::fill( const QVector<Row>& aRows )
+{
    Lst_Media->clear();
    for ( int row = 0; row < aRows.size(); ++row ) {
       QListWidgetItem* item = new QListWidgetItem( aRows.at( row ).text, Lst_Media );
@@ -55,17 +76,6 @@ QVector<int> Frm_LinkMedia::review( const QString& aTitle, const QString& aIntro
          item->setCheckState( Qt::Unchecked );
       }
    }
-
-   if ( exec() != QDialog::Accepted )
-      return {};
-
-   QVector<int> chosen;
-   for ( int row = 0; row < Lst_Media->count(); ++row ) {
-      const QListWidgetItem* item = Lst_Media->item( row );
-      if ( item->checkState() == Qt::Checked )
-         chosen.append( item->data( Qt::UserRole ).toInt() );
-   }
-   return chosen;
 }
 
 QVector<MediaLink> Frm_LinkMedia::Execute( const Gamelist& aGamelist,
@@ -115,27 +125,39 @@ QVector<OversizedImage> Frm_LinkMedia::ExecuteShrink( const Gamelist& aGamelist,
    return chosen;
 }
 
-QVector<MediaRename> Frm_LinkMedia::ExecuteRename( const Gamelist& aGamelist,
-                                                   const QVector<MediaRename>& aCandidates )
+QVector<MediaRename> Frm_LinkMedia::ExecuteRename( const Gamelist& aGamelist )
 {
    const QDir systemDir( aGamelist.systemDir() );
 
-   QVector<Row> rows;
-   for ( const MediaRename& rename : aCandidates ) {
-      QString text = QStringLiteral( "%1: %2 %3 %4 %5" )
-                        .arg( aGamelist.at( rename.index ).romName(), kindName( rename.isImage ),
-                              systemDir.relativeFilePath( rename.path ), QString( QChar( 0x2192 ) ),
-                              QFileInfo( rename.newPath ).fileName() );
-      if ( !rename.problem.isEmpty() )
-         text += QStringLiteral( " (not renamed: %1)" ).arg( rename.problem );
-      rows.append( { text, rename.problem.isEmpty() } );
-   }
+   QVector<MediaRename> candidates;
+   const auto rows = [&]() {
+      candidates = aGamelist.misnamedMedia( Chk_Strict->isChecked() );
+
+      QVector<Row> result;
+      for ( const MediaRename& rename : candidates ) {
+         QString text = QStringLiteral( "%1: %2 %3 %4 %5" )
+                           .arg( aGamelist.at( rename.index ).romName(), kindName( rename.isImage ),
+                                 systemDir.relativeFilePath( rename.path ), QString( QChar( 0x2192 ) ),
+                                 QFileInfo( rename.newPath ).fileName() );
+         if ( !rename.problem.isEmpty() )
+            text += QStringLiteral( " (not renamed: %1)" ).arg( rename.problem );
+         result.append( { text, rename.problem.isEmpty() } );
+      }
+      return result;
+   };
+
+   Chk_Strict->setChecked( false );
+   Chk_Strict->setVisible( true );
+   const QMetaObject::Connection toggled =
+      connect( Chk_Strict, &QCheckBox::toggled, this, [&]() { fill( rows() ); } );
 
    QVector<MediaRename> chosen;
    for ( const int row : review( QStringLiteral( "Rename media after their ROM" ),
                                  QStringLiteral( "Pictures and videos whose file name is not their "
                                                  "ROM's. Untick what you do not want renamed." ),
-                                 rows ) )
-      chosen.append( aCandidates.at( row ) );
+                                 rows() ) )
+      chosen.append( candidates.at( row ) );
+
+   disconnect( toggled );
    return chosen;
 }
