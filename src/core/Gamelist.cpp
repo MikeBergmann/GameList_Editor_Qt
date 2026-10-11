@@ -909,15 +909,21 @@ qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError 
       return qint64( -1 );
    };
 
-   QImageReader reader( aPath );
-   reader.setAutoTransform( false );
-   const QByteArray format = reader.format();
-   if ( reader.imageCount() > 1 )
-      return failed( QStringLiteral( "animated pictures are left alone." ) );
+   // The reader is scoped so its file handle is closed before QSaveFile renames over
+   // aPath: Windows refuses to replace a file that is still open.
+   QByteArray format;
+   QImage picture;
+   {
+      QImageReader reader( aPath );
+      reader.setAutoTransform( false );
+      format = reader.format();
+      if ( reader.imageCount() > 1 )
+         return failed( QStringLiteral( "animated pictures are left alone." ) );
 
-   const QImage picture = reader.read();
-   if ( picture.isNull() )
-      return failed( reader.errorString() );
+      picture = reader.read();
+      if ( picture.isNull() )
+         return failed( reader.errorString() );
+   }
 
    const qint64 original = QFileInfo( aPath ).size();
    if ( original <= aMaxBytes )
