@@ -45,6 +45,17 @@ struct MediaLink
    QString path;  // absolute path of the file found
 };
 
+// A linked picture or video that does not carry its ROM's name. A non-empty
+// problem means it must not be renamed (and why), so the review can show it.
+struct MediaRename
+{
+   int index = -1;  // the game
+   bool isImage = true;
+   QString path;     // absolute path as it is now
+   QString newPath;  // absolute path it should have, in the same folder
+   QString problem;
+};
+
 struct FilterSpec
 {
    // Cbx_Filter.ItemIndex, 0..30. See matchesCategory for what each one means.
@@ -115,6 +126,17 @@ public:
    // Returns how many links were set, or -1 with aError set and the gamelist
    // as it was: a failed write.
    int linkMedia( const QVector<MediaLink>& aLinks, QString* aError = nullptr );
+
+   // Linked files that exist but are not named after their ROM: the ROM's name
+   // (with or without its extension) plus nothing, "-image" or "-video", in the
+   // same case. Those are the names unlinkedMedia accepts, so the two agree.
+   // Files another game also links, or whose proper name is taken, carry a problem.
+   QVector<MediaRename> misnamedMedia() const;
+
+   // Renames the files without a problem and repoints the games at them, then
+   // writes the gamelist once. Returns how many were renamed, or -1 with aError
+   // set, the gamelist as it was and the files back under their old names.
+   int renameMedia( const QVector<MediaRename>& aRenames, QString* aError = nullptr );
 
    void ensureHashes( int aIndex );
 

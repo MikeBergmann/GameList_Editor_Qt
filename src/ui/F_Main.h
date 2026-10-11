@@ -57,6 +57,8 @@ private:
    void addMissingRoms();
    // Actions > Link existing media.
    void linkExistingMedia();
+   // Actions > Rename media after ROMs.
+   void renameMediaAfterRoms();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
@@ -112,6 +114,7 @@ private:
    QAction* Mnu_Reload = nullptr;
    QAction* Mnu_AddRoms = nullptr;
    QAction* Mnu_LinkMedia = nullptr;
+   QAction* Mnu_RenameMedia = nullptr;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

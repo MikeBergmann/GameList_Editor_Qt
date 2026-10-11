@@ -729,6 +729,105 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
    return linked;
 }
 
+QVector<MediaRename> Gamelist::misnamedMedia() const
+{
+   QVector<MediaRename> found;
+   QSet<QString> claimed;  // lower-cased new paths, so two games cannot take one name
+
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      const Game& game = FGames.at( index );
+      if ( game.romPath.isEmpty() )
+         continue;
+
+      for ( const bool isImage : { true, false } ) {
+         if ( isImage ? game.missingImage : game.missingVideo )
+            continue;
+
+         const QString path = isImage ? game.physicalImagePath : game.physicalVideoPath;
+         const QFileInfo info( path );
+         const QString stem = info.completeBaseName();
+
+         bool named = false;
+         for ( const QString& base : { game.romNameWoExt(), game.romName() } ) {
+            for ( const QString& suffix : isImage ? Cst_ImageStems : Cst_VideoStems )
+               named = named || stem == base + suffix;
+         }
+         if ( named )
+            continue;
+
+         MediaRename rename{ index, isImage, path, {}, {} };
+         rename.newPath = info.dir().filePath(
+            info.suffix().isEmpty() ? game.romNameWoExt()
+                                    : game.romNameWoExt() + QLatin1Char( '.' ) + info.suffix() );
+
+         // ponytail: a case-only rename on a case-folding filesystem is offered but
+         // QFile::rename may refuse it; the whole batch then rolls back. Upgrade: two
+         // steps through a temporary name.
+         if ( fileShared( index, path, isImage ) ) {
+            rename.problem = QStringLiteral( "shared with another game" );
+         } else if ( QFileInfo::exists( rename.newPath ) &&
+                     QFileInfo( rename.newPath ).canonicalFilePath() != info.canonicalFilePath() ) {
+            rename.problem = QStringLiteral( "a file with that name exists" );
+         } else if ( claimed.contains( rename.newPath.toLower() ) ) {
+            rename.problem = QStringLiteral( "another game is renamed to that name" );
+         } else {
+            claimed.insert( rename.newPath.toLower() );
+         }
+
+         found.append( rename );
+      }
+   }
+
+   return found;
+}
+
+int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError )
+{
+   const QVector<Game> before = FGames;
+
+   QVector<const MediaRename*> done;
+   auto undo = [&]() {
+      for ( auto it = done.crbegin(); it != done.crend(); ++it )
+         QFile::rename( ( *it )->newPath, ( *it )->path );
+      for ( const MediaRename* rename : done ) {
+         const Game& old = before.at( rename->index );
+         setChildText( FNodes[rename->index], rename->isImage ? Cst_ImageLink : Cst_VideoLink,
+                       rename->isImage ? old.imagePath : old.videoPath );
+      }
+      FGames = before;
+   };
+
+   for ( const MediaRename& rename : aRenames ) {
+      if ( rename.index < 0 || rename.index >= FGames.size() || !rename.problem.isEmpty() )
+         continue;
+
+      if ( !QFile::rename( rename.path, rename.newPath ) ) {
+         undo();
+         fail( aError, QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) );
+         return -1;
+      }
+      done << &rename;
+
+      // Only the file name changes: the folder part of the link stays as written.
+      Game& game = FGames[rename.index];
+      const QString oldLink = rename.isImage ? game.imagePath : game.videoPath;
+      const QString text = folderOf( oldLink ) + QFileInfo( rename.newPath ).fileName();
+      setChildText( FNodes[rename.index], rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
+      ( rename.isImage ? game.imagePath : game.videoPath ) = text;
+      ( rename.isImage ? game.physicalImagePath : game.physicalVideoPath ) = rename.newPath;
+   }
+
+   if ( done.isEmpty() )
+      return 0;
+
+   if ( !save( aError ) ) {
+      undo();
+      return -1;
+   }
+
+   return done.size();
+}
+
 bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )

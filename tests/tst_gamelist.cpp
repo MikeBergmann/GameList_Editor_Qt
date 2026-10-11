@@ -673,6 +673,46 @@ TEST( Gamelist, UnlinkedMediaFindsFilesByRomNameAndLinkMediaPointsTheGamesAtThem
    EXPECT_EQ( saved.at( 0 ).imagePath, QStringLiteral( "./media/images/Sonic.png" ) );
 }
 
+TEST( Gamelist, MisnamedMediaProposesRomNamesAndRenameMediaRelinksThem )
+{
+   SKIP_ON_CASE_INSENSITIVE_FS();
+   Fixture fixture;
+   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );
+   writeFile( fixture.path( "snes/media/images/Sonic.PNG" ), "png" );  // blocks game 1's rename
+   writeFile( fixture.path( "snes/media/images/Renamed.jpg" ), "jpg" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   // Game 1 links sonic.PNG, whose proper name Sonic.PNG is taken; game 2 links Renamed.jpg.
+   ASSERT_EQ( list.linkMedia( { { 1, true, fixture.path( "snes/media/images/sonic.PNG" ) },
+                                { 2, true, fixture.path( "snes/media/images/Renamed.jpg" ) } } ),
+              2 );
+
+   // Game 0's Sonic.png / Sonic.mp4 are already right.
+   const QVector<MediaRename> found = list.misnamedMedia();
+   ASSERT_EQ( found.size(), 2 );
+   EXPECT_EQ( found[0].index, 1 );
+   EXPECT_FALSE( found[0].problem.isEmpty() );
+   EXPECT_EQ( found[1].index, 2 );
+   EXPECT_TRUE( found[1].problem.isEmpty() );
+   EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
+
+   QString error;
+   ASSERT_EQ( list.renameMedia( found, &error ), 1 ) << error.toStdString();
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Renamed.jpg" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.jpg" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/sonic.PNG" ) ) );
+   EXPECT_FALSE( list.at( 2 ).missingImage );
+
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
+   EXPECT_EQ( saved.at( 1 ).imagePath, QStringLiteral( "./media/images/sonic.PNG" ) );
+
+   // Nothing left to propose but the blocked one.
+   EXPECT_EQ( list.misnamedMedia().size(), 1 );
+}
+
 TEST( Gamelist, UnlinkedMediaAlsoFindsFullRomNamesInPlainImagesAndVideosFolders )
 {
    // A ScummVM system: no media links yet, art in ./images and ./videos, named
