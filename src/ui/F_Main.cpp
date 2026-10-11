@@ -19,14 +19,17 @@
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
+#include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMessageLogger>
 #include <QPixmap>
+#include <QProgressDialog>
 #include <QSettings>
 #include <QSplitter>
 #include <QTabWidget>
@@ -125,6 +128,9 @@ void Frm_Editor::buildMenu()
    Mnu_RenameMedia = actions->addAction( QStringLiteral( "Rename media after ROMs..." ), this,
                                          &Frm_Editor::renameMediaAfterRoms );
    Mnu_RenameMedia->setEnabled( false );
+   Mnu_ShrinkImages = actions->addAction( QStringLiteral( "Shrink large pictures..." ), this,
+                                          &Frm_Editor::shrinkLargeImages );
+   Mnu_ShrinkImages->setEnabled( false );
    actions->addSeparator();
    Mnu_System = addPendingMenu( actions, QStringLiteral( "System" ),
                                 { QStringLiteral( "Convert all text to lowercase" ),
@@ -501,6 +507,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
       Mnu_AddRoms->setEnabled( false );
       Mnu_LinkMedia->setEnabled( false );
       Mnu_RenameMedia->setEnabled( false );
+      Mnu_ShrinkImages->setEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -534,7 +541,7 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_AddRoms->setEnabled( false );
    Mnu_LinkMedia->setEnabled( false );
    Mnu_RenameMedia->setEnabled( false );
-
+   Mnu_ShrinkImages->setEnabled( false );
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
       updateCount();
@@ -564,6 +571,7 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_AddRoms->setEnabled( true );
    Mnu_LinkMedia->setEnabled( true );
    Mnu_RenameMedia->setEnabled( true );
+   Mnu_ShrinkImages->setEnabled( true );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
@@ -656,6 +664,66 @@ void Frm_Editor::renameMediaAfterRoms()
    FEditPanel->setSelection( selectedGameIndexes() );
    FModel->refresh();
    updateCount();
+}
+
+void Frm_Editor::shrinkLargeImages()
+{
+   if ( !confirmLeaveEdits() )
+      return;
+
+   bool ok = false;
+   const double megabytes = QInputDialog::getDouble(
+      this, QStringLiteral( "Shrink large pictures" ),
+      QStringLiteral( "Shrink pictures larger than (MB):" ), 1.0, 0.1, 100.0, 1, &ok );
+   if ( !ok )
+      return;
+   const qint64 maxBytes = qRound64( megabytes * 1024 * 1024 );
+
+   const QVector<OversizedImage> candidates = FGamelist.oversizedImages( maxBytes );
+   if ( candidates.isEmpty() ) {
+      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+                                QStringLiteral( "No picture is over that size." ) );
+      return;
+   }
+
+   const QVector<OversizedImage> chosen =
+      Frm_LinkMedia( this ).ExecuteShrink( FGamelist, maxBytes, candidates );
+   if ( chosen.isEmpty() )
+      return;
+
+   QProgressDialog progress( QStringLiteral( "Shrinking pictures..." ), QStringLiteral( "Cancel" ), 0,
+                             static_cast<int>( chosen.size() ), this );
+   progress.setWindowModality( Qt::WindowModal );
+   progress.setMinimumDuration( 0 );
+
+   int shrunk = 0;
+   qint64 saved = 0;
+   QStringList problems;
+   for ( int row = 0; row < chosen.size(); ++row ) {
+      progress.setValue( row );
+      if ( progress.wasCanceled() )
+         break;
+
+      QString error;
+      const qint64 size = shrinkImageFile( chosen.at( row ).path, maxBytes, &error );
+      if ( size < 0 ) {
+         problems << error;
+         continue;
+      }
+      ++shrunk;
+      saved += chosen.at( row ).size - size;
+   }
+   progress.setValue( static_cast<int>( chosen.size() ) );
+
+   QString text = QStringLiteral( "%1 picture(s) shrunk, %2 saved." )
+                     .arg( shrunk )
+                     .arg( QLocale().formattedDataSize( saved, 1, QLocale::DataSizeTraditionalFormat ) );
+   if ( !problems.isEmpty() )
+      text += QStringLiteral( "\n\nNot shrunk:\n%1" ).arg( problems.join( QLatin1Char( '\n' ) ) );
+   QMessageBox::information( this, QStringLiteral( "GameList Editor" ), text );
+
+   // The links are unchanged, but the preview may be showing a file that just changed.
+   FEditPanel->setSelection( selectedGameIndexes() );
 }
 
 void Frm_Editor::LoadSystemLogo( SystemKind aKind )

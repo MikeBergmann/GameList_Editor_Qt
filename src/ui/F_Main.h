@@ -59,6 +59,8 @@ private:
    void linkExistingMedia();
    // Actions > Rename media after ROMs.
    void renameMediaAfterRoms();
+   // Actions > Shrink large pictures.
+   void shrinkLargeImages();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
@@ -115,6 +117,7 @@ private:
    QAction* Mnu_AddRoms = nullptr;
    QAction* Mnu_LinkMedia = nullptr;
    QAction* Mnu_RenameMedia = nullptr;
+   QAction* Mnu_ShrinkImages = nullptr;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

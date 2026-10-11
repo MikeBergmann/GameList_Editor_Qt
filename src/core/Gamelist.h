@@ -56,6 +56,21 @@ struct MediaRename
    QString problem;
 };
 
+// A linked picture that is bigger than the limit the user set.
+struct OversizedImage
+{
+   int index = -1;  // the first game that links it
+   QString path;    // absolute path
+   qint64 size = 0;  // bytes
+};
+
+// Re-encodes the picture in place, in its own format and under the same name, at
+// the largest size that fits aMaxBytes (a little under it, so "ca." holds).
+// The aspect ratio is kept and it is never enlarged. Returns the new size in
+// bytes, or -1 with aError set and the file untouched: unreadable, animated, a
+// format Qt cannot write, or one that will not get that small.
+qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError = nullptr );
+
 struct FilterSpec
 {
    // Cbx_Filter.ItemIndex, 0..30. See matchesCategory for what each one means.
@@ -137,6 +152,11 @@ public:
    // writes the gamelist once. Returns how many were renamed, or -1 with aError
    // set, the gamelist as it was and the files back under their old names.
    int renameMedia( const QVector<MediaRename>& aRenames, QString* aError = nullptr );
+
+   // Linked pictures that exist and are bigger than aMaxBytes, each file once even
+   // when several games share it. The gamelist is not touched by shrinking them:
+   // the file keeps its name and format, so the links stay right.
+   QVector<OversizedImage> oversizedImages( qint64 aMaxBytes ) const;
 
    void ensureHashes( int aIndex );
 

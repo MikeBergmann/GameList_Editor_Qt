@@ -50,6 +50,7 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Scrape using screenscraper.fr
 - [x] Manually adding new games
 - [x] Linking existing media, and renaming linked media after their ROM (both with a review before anything changes)
+- [x] Shrinking large pictures: e-encodes linked pictures over a chosen size.
 - [x] Video playback
 - [x] Windows build (experimental)
 
@@ -76,7 +77,7 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 ```
 
 - [ ] Auto-Fix invalid media links
-- [ ] Normalize media. E.g., size, etc. (naming is done: Actions → Rename media after ROMs)
+- [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
 
 ## screenscraper.fr credentials

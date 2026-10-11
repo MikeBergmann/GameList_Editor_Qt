@@ -1,14 +1,19 @@
 #include "Gamelist.h"
 
+#include <QBuffer>
 #include <QDate>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QImageReader>
+#include <QImageWriter>
 #include <QMimeDatabase>
 #include <QSaveFile>
 #include <QSet>
+
+#include <cmath>
 
 namespace {
 
@@ -875,6 +880,81 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
    }
 
    return false;
+}
+
+QVector<OversizedImage> Gamelist::oversizedImages( qint64 aMaxBytes ) const
+{
+   QVector<OversizedImage> found;
+   QSet<QString> seen;
+
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      const QString& path = FGames.at( index ).physicalImagePath;
+      if ( path.isEmpty() || seen.contains( path ) )
+         continue;
+      seen.insert( path );
+
+      const qint64 size = QFileInfo( path ).size();
+      if ( size > aMaxBytes )
+         found.append( { index, path, size } );
+   }
+
+   return found;
+}
+
+qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError )
+{
+   const auto failed = [&]( const QString& aMessage ) {
+      fail( aError, QStringLiteral( "%1: %2" ).arg( QFileInfo( aPath ).fileName(), aMessage ) );
+      return qint64( -1 );
+   };
+
+   QImageReader reader( aPath );
+   reader.setAutoTransform( false );
+   const QByteArray format = reader.format();
+   if ( reader.imageCount() > 1 )
+      return failed( QStringLiteral( "animated pictures are left alone." ) );
+
+   const QImage picture = reader.read();
+   if ( picture.isNull() )
+      return failed( reader.errorString() );
+
+   const qint64 original = QFileInfo( aPath ).size();
+   if ( original <= aMaxBytes )
+      return original;
+
+   // Size follows the pixel count, so aim at the area ratio and correct from what
+   // the encoder really produced. Always scaled from the original: scaling the
+   // scaled copy over and over would blur it. 0.95 aims a little under the limit.
+   double factor = std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( original ) ) * 0.95;
+   QByteArray encoded;
+   for ( int pass = 0; pass < 8; ++pass ) {
+      const QSize size( qMax( 1, qRound( picture.width() * factor ) ),
+                        qMax( 1, qRound( picture.height() * factor ) ) );
+      const QImage scaled = picture.scaled( size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation );
+
+      encoded.clear();
+      QBuffer buffer( &encoded );
+      buffer.open( QIODevice::WriteOnly );
+      QImageWriter writer( &buffer, format );
+      if ( !writer.write( scaled ) )
+         return failed( writer.errorString() );
+
+      if ( encoded.size() <= aMaxBytes )
+         break;
+
+      factor *= std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( encoded.size() ) ) * 0.95;
+      encoded.clear();
+   }
+
+   if ( encoded.isEmpty() )
+      return failed( QStringLiteral( "cannot be made that small." ) );
+
+   QSaveFile file( aPath );
+   if ( !file.open( QIODevice::WriteOnly ) || file.write( encoded ) != encoded.size() ||
+        !file.commit() )
+      return failed( file.errorString() );
+
+   return encoded.size();
 }
 
 bool Gamelist::removeImage( int aIndex, QString* aError )
