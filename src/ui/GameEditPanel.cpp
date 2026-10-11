@@ -206,7 +206,7 @@ void GameEditPanel::buildLayout()
    // These delete the file from disk, so they ask first.
    const auto confirmDelete = [this]( const QString& aWhat ) {
       return QMessageBox::question(
-                this, QStringLiteral( "GameList Editor" ),
+                this, QStringLiteral( "GameList Editor Qt" ),
                 QStringLiteral( "Delete the %1 of this game?\n"
                                 "The file is deleted from disk unless another game uses it." )
                    .arg( aWhat ) ) == QMessageBox::Yes;
@@ -521,7 +521,7 @@ bool GameEditPanel::save()
       for ( qsizetype n = 0; n < FSelection.size(); ++n )
          FGamelist->setFields( { FSelection.at( n ) }, before.at( n ), which );
 
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       return false;
    }
 
@@ -552,7 +552,7 @@ void GameEditPanel::deleteGame()
 
    const int index = FSelection.first();
    if ( !FSkipDeletePrompt &&
-        QMessageBox::question( this, QStringLiteral( "GameList Editor" ),
+        QMessageBox::question( this, QStringLiteral( "GameList Editor Qt" ),
                                QStringLiteral( "Delete \"%1\"?\n"
                                                "Its gamelist entry, picture, video and ROM file "
                                                "are deleted from disk, unless another game uses "
@@ -563,13 +563,13 @@ void GameEditPanel::deleteGame()
    FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
    QString error;
    if ( !FGamelist->removeGame( index, &error ) ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
       syncVideo();
       return;
    }
 
    if ( !error.isEmpty() )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
 
    // The edits were for a game that no longer exists, so they must not prompt.
    setSelection( {} );
@@ -579,7 +579,7 @@ void GameEditPanel::deleteGame()
 void GameEditPanel::report( bool aOk, const QString& aError )
 {
    if ( !aOk )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), aError );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aError );
 
    reload();
 }
@@ -623,7 +623,7 @@ void GameEditPanel::setDefaultPictureForAll()
    // A failure partway through still saves the games done before it, so the
    // count is shown whenever there is one, not only on full success.
    if ( changed > 0 || error.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral(
                                    "%1 game(s) had no picture and now have the default one." )
                                    .arg( changed ) );
