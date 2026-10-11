@@ -158,7 +158,8 @@ public:
    // (with or without its extension) plus nothing, "-image" or "-video", in the
    // same case. Those are the names unlinkedMedia accepts, so the two agree.
    // Files another game also links, or whose proper name is taken, carry a problem.
-   QVector<MediaRename> misnamedMedia() const;
+   // aStrict: only the plain ROM name is right, so "x-image.png" becomes "x.png".
+   QVector<MediaRename> misnamedMedia( bool aStrict = false ) const;
 
    // Renames the files without a problem and repoints the games at them, then
    // writes the gamelist once. Returns how many were renamed, or -1 with aError
