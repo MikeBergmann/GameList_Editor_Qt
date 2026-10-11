@@ -25,6 +25,10 @@ public:
    QVector<MediaRename> ExecuteRename( const Gamelist& aGamelist,
                                        const QVector<MediaRename>& aCandidates );
 
+   // The ticked pictures. The files are overwritten, so the intro says so.
+   QVector<OversizedImage> ExecuteShrink( const Gamelist& aGamelist, qint64 aMaxBytes,
+                                          const QVector<OversizedImage>& aCandidates );
+
 private:
    struct Row
    {

@@ -777,4 +777,52 @@ TEST( Gamelist, UnlinkedMediaDoesNotSearchTheWorkingDirectoryForAnEmptyMediaFold
    EXPECT_TRUE( found.isEmpty() );
 }
 
+TEST( Gamelist, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
+{
+   Fixture fixture;
+
+   // Noise does not compress, so this PNG is big and the test does not depend on the encoder.
+   QImage noise( 600, 400, QImage::Format_RGB32 );
+   quint32 state = 12345;
+   for ( int y = 0; y < noise.height(); ++y )
+      for ( int x = 0; x < noise.width(); ++x ) {
+         state = state * 1664525u + 1013904223u;
+         noise.setPixel( x, y, state | 0xFF000000u );
+      }
+   const QString big = fixture.path( "snes/media/images/Sonic.png" );
+   ASSERT_TRUE( noise.save( big ) );
+   const qint64 before = QFileInfo( big ).size();
+   const qint64 limit = before / 3;
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   // Game 0 links the big file; game 1 links a missing one, game 2 none.
+   const QVector<OversizedImage> found = list.oversizedImages( limit );
+   ASSERT_EQ( found.size(), 1 );
+   EXPECT_EQ( found.at( 0 ).index, 0 );
+   EXPECT_EQ( found.at( 0 ).size, before );
+   EXPECT_TRUE( list.oversizedImages( before ).isEmpty() );
+
+   QString error;
+   const qint64 after = shrinkImageFile( big, limit, &error );
+   ASSERT_GT( after, 0 ) << error.toStdString();
+   EXPECT_LE( after, limit );
+   EXPECT_GT( after, limit / 2 );  // "ca.": close to the limit, not shrunk to a thumbnail
+   EXPECT_EQ( QFileInfo( big ).size(), after );
+
+   const QImage result( big );
+   EXPECT_LT( result.width(), 600 );
+   EXPECT_NEAR( static_cast<double>( result.width() ) / result.height(), 1.5, 0.02 );
+   EXPECT_TRUE( list.oversizedImages( limit ).isEmpty() );
+
+   // Already small enough: left alone, and an unreadable file is an error that leaves it be.
+   EXPECT_EQ( shrinkImageFile( big, limit ), after );
+   const QString junk = fixture.path( "snes/media/images/junk.png" );
+   writeFile( junk, QByteArray( 5000, 'x' ) );
+   EXPECT_EQ( shrinkImageFile( junk, 100, &error ), -1 );
+   EXPECT_FALSE( error.isEmpty() );
+   EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
+}
+
 }  // namespace

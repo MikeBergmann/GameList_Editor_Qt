@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocale>
 #include <QVBoxLayout>
 
 namespace {
@@ -83,6 +84,32 @@ QVector<MediaLink> Frm_LinkMedia::Execute( const Gamelist& aGamelist,
    for ( const int row : review( QStringLiteral( "Link existing media" ),
                                  QStringLiteral( "Pictures and videos found for games that do not "
                                                  "link them. Untick what you do not want." ),
+                                 rows ) )
+      chosen.append( aCandidates.at( row ) );
+   return chosen;
+}
+
+QVector<OversizedImage> Frm_LinkMedia::ExecuteShrink( const Gamelist& aGamelist, qint64 aMaxBytes,
+                                                      const QVector<OversizedImage>& aCandidates )
+{
+   const QDir systemDir( aGamelist.systemDir() );
+   const QLocale locale;
+
+   QVector<Row> rows;
+   for ( const OversizedImage& image : aCandidates ) {
+      rows.append( { QStringLiteral( "%1: %2 (%3)" )
+                        .arg( aGamelist.at( image.index ).romName(),
+                              systemDir.relativeFilePath( image.path ),
+                              locale.formattedDataSize( image.size, 1, QLocale::DataSizeTraditionalFormat ) ) } );
+   }
+
+   QVector<OversizedImage> chosen;
+   for ( const int row : review( QStringLiteral( "Shrink large pictures" ),
+                                 QStringLiteral( "Pictures over %1. They are re-encoded in place, in "
+                                                 "the same format, to just under that size. The "
+                                                 "originals are overwritten. Untick what you want "
+                                                 "left alone." )
+                                    .arg( locale.formattedDataSize( aMaxBytes, 1, QLocale::DataSizeTraditionalFormat ) ),
                                  rows ) )
       chosen.append( aCandidates.at( row ) );
    return chosen;
