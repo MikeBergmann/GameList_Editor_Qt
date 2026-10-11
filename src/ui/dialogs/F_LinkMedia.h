@@ -5,6 +5,7 @@
 #include <QDialog>
 #include <QVector>
 
+class QCheckBox;
 class QLabel;
 class QListWidget;
 
@@ -22,8 +23,8 @@ public:
    QVector<MediaLink> Execute( const Gamelist& aGamelist, const QVector<MediaLink>& aCandidates );
 
    // The ticked renames. Rows with a problem are shown, unticked and disabled.
-   QVector<MediaRename> ExecuteRename( const Gamelist& aGamelist,
-                                       const QVector<MediaRename>& aCandidates );
+   // Lists the games' misnamed media itself, again when the strict box is toggled.
+   QVector<MediaRename> ExecuteRename( const Gamelist& aGamelist );
 
    // The ticked pictures. The files are overwritten, so the intro says so.
    QVector<OversizedImage> ExecuteShrink( const Gamelist& aGamelist, qint64 aMaxBytes,
@@ -36,9 +37,12 @@ private:
       bool enabled = true;
    };
 
+   void fill( const QVector<Row>& aRows );
+
    // The ticked row numbers; empty if the user cancelled.
    QVector<int> review( const QString& aTitle, const QString& aIntro, const QVector<Row>& aRows );
 
    QLabel* Lbl_Intro = nullptr;
+   QCheckBox* Chk_Strict = nullptr;
    QListWidget* Lst_Media = nullptr;
 };

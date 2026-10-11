@@ -663,14 +663,14 @@ void Frm_Editor::renameMediaAfterRoms()
    if ( !confirmLeaveEdits() )
       return;
 
-   const QVector<MediaRename> candidates = FGamelist.misnamedMedia();
-   if ( candidates.isEmpty() ) {
+   // Strict is the superset: if it finds nothing, no checkbox state can.
+   if ( FGamelist.misnamedMedia( true ).isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
                                 QStringLiteral( "Every picture and video is named after its ROM." ) );
       return;
    }
 
-   const QVector<MediaRename> chosen = Frm_LinkMedia( this ).ExecuteRename( FGamelist, candidates );
+   const QVector<MediaRename> chosen = Frm_LinkMedia( this ).ExecuteRename( FGamelist );
    if ( chosen.isEmpty() )
       return;
 
