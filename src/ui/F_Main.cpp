@@ -122,6 +122,9 @@ void Frm_Editor::buildMenu()
    Mnu_LinkMedia = actions->addAction( QStringLiteral( "Link existing media..." ), this,
                                        &Frm_Editor::linkExistingMedia );
    Mnu_LinkMedia->setEnabled( false );
+   Mnu_RenameMedia = actions->addAction( QStringLiteral( "Rename media after ROMs..." ), this,
+                                         &Frm_Editor::renameMediaAfterRoms );
+   Mnu_RenameMedia->setEnabled( false );
    actions->addSeparator();
    Mnu_System = addPendingMenu( actions, QStringLiteral( "System" ),
                                 { QStringLiteral( "Convert all text to lowercase" ),
@@ -497,6 +500,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    if ( !found ) {
       Mnu_AddRoms->setEnabled( false );
       Mnu_LinkMedia->setEnabled( false );
+      Mnu_RenameMedia->setEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -529,6 +533,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FScrapePanel->setGamelist( nullptr );
    Mnu_AddRoms->setEnabled( false );
    Mnu_LinkMedia->setEnabled( false );
+   Mnu_RenameMedia->setEnabled( false );
 
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
@@ -558,6 +563,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FScrapePanel->setGamelist( &FGamelist );
    Mnu_AddRoms->setEnabled( true );
    Mnu_LinkMedia->setEnabled( true );
+   Mnu_RenameMedia->setEnabled( true );
    refreshFilter();
 
    if ( FProxy->rowCount() > 0 )
@@ -620,6 +626,33 @@ void Frm_Editor::linkExistingMedia()
    }
 
    // Same refresh as after a scrape: the games are the same, only their media changed.
+   FEditPanel->setSelection( selectedGameIndexes() );
+   FModel->refresh();
+   updateCount();
+}
+
+void Frm_Editor::renameMediaAfterRoms()
+{
+   if ( !confirmLeaveEdits() )
+      return;
+
+   const QVector<MediaRename> candidates = FGamelist.misnamedMedia();
+   if ( candidates.isEmpty() ) {
+      QMessageBox::information( this, QStringLiteral( "GameList Editor" ),
+                                QStringLiteral( "Every picture and video is named after its ROM." ) );
+      return;
+   }
+
+   const QVector<MediaRename> chosen = Frm_LinkMedia( this ).ExecuteRename( FGamelist, candidates );
+   if ( chosen.isEmpty() )
+      return;
+
+   QString error;
+   if ( FGamelist.renameMedia( chosen, &error ) < 0 ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), error );
+      return;
+   }
+
    FEditPanel->setSelection( selectedGameIndexes() );
    FModel->refresh();
    updateCount();
