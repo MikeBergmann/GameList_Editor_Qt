@@ -70,7 +70,7 @@ void Frm_AddRoms::browse()
 
    for ( const QString& file : files ) {
       if ( QDir( FSystemDir ).relativeFilePath( file ).startsWith( QLatin1String( ".." ) ) ) {
-         QMessageBox::warning( this, QStringLiteral( "GameList Editor" ),
+         QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ),
                                QStringLiteral( "%1 is not inside the system folder." ).arg( file ) );
          continue;
       }

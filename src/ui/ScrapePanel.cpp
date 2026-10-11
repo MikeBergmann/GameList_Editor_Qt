@@ -431,7 +431,7 @@ void ScrapePanel::handleGameInfoFailed( const QString& aMessage )
 {
    Img_Loading->setVisible( false );
    setEnabled( true );
-   QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), aMessage );
+   QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aMessage );
 }
 
 void ScrapePanel::handleMediaReady( int /*aIndex*/, const QImage& aImage )
@@ -535,7 +535,7 @@ void ScrapePanel::report( bool aOk, const QString& aError )
    setEnabled( true );
 
    if ( !aOk )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor" ), aError );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aError );
 
    emit gamesChanged();
 }
