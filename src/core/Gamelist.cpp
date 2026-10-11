@@ -734,7 +734,7 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
    return linked;
 }
 
-QVector<MediaRename> Gamelist::misnamedMedia() const
+QVector<MediaRename> Gamelist::misnamedMedia( bool aStrict ) const
 {
    QVector<MediaRename> found;
    QSet<QString> claimed;  // lower-cased new paths, so two games cannot take one name
@@ -753,8 +753,9 @@ QVector<MediaRename> Gamelist::misnamedMedia() const
          const QString stem = info.completeBaseName();
 
          bool named = false;
+         const QStringList lenient = isImage ? Cst_ImageStems : Cst_VideoStems;
          for ( const QString& base : { game.romNameWoExt(), game.romName() } ) {
-            for ( const QString& suffix : isImage ? Cst_ImageStems : Cst_VideoStems )
+            for ( const QString& suffix : aStrict ? QStringList( QString() ) : lenient )
                named = named || stem == base + suffix;
          }
          if ( named )

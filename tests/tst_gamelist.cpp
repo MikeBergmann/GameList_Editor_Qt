@@ -757,6 +757,37 @@ TEST( Gamelist, MisnamedMediaProposesRomNamesAndRenameMediaRelinksThem )
    EXPECT_EQ( list.misnamedMedia().size(), 1 );
 }
 
+TEST( Gamelist, StrictMisnamedMediaAlsoRenamesDashImageAndDashVideoFiles )
+{
+   SKIP_ON_CASE_INSENSITIVE_FS();
+   Fixture fixture;
+   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );
+   writeFile( fixture.path( "snes/media/images/Vanished-image.jpg" ), "jpg" );
+   writeFile( fixture.path( "snes/media/videos/Vanished-video.mp4" ), "mp4" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_EQ( list.linkMedia( { { 2, true, fixture.path( "snes/media/images/Vanished-image.jpg" ) },
+                                { 2, false, fixture.path( "snes/media/videos/Vanished-video.mp4" ) } } ),
+              2 );
+
+   // Scraper-style names are fine by default ...
+   EXPECT_TRUE( list.misnamedMedia().isEmpty() );
+
+   // ... and wrong when asked for the plain ROM name.
+   const QVector<MediaRename> found = list.misnamedMedia( true );
+   ASSERT_EQ( found.size(), 2 );
+   EXPECT_EQ( found[0].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
+   EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/videos/Vanished.mp4" ) );
+
+   QString error;
+   ASSERT_EQ( list.renameMedia( found, &error ), 2 ) << error.toStdString();
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
+   EXPECT_EQ( saved.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.mp4" ) );
+   EXPECT_TRUE( list.misnamedMedia( true ).isEmpty() );
+}
+
 TEST( Gamelist, UnlinkedMediaAlsoFindsFullRomNamesInPlainImagesAndVideosFolders )
 {
    // A ScummVM system: no media links yet, art in ./images and ./videos, named
