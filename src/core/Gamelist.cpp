@@ -1052,6 +1052,84 @@ bool Gamelist::removeGame( int aIndex, QString* aError )
    return true;
 }
 
+bool Gamelist::removeGames( const QVector<int>& aIndexes, QString* aError )
+{
+   QSet<int> doomed;
+   for ( int index : aIndexes ) {
+      if ( index >= 0 && index < FGames.size() )
+         doomed.insert( index );
+   }
+   if ( doomed.isEmpty() )
+      return true;
+
+   struct Removed
+   {
+      QDomElement node;
+      QDomNode parent;
+      QDomNode next;
+   };
+   QVector<Removed> removed;
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      if ( !doomed.contains( index ) )
+         continue;
+
+      const QDomElement node = FNodes.at( index );
+      removed.append( { node, node.parentNode(), node.nextSibling() } );
+      removed.last().parent.removeChild( node );
+   }
+
+   if ( !save( aError ) ) {
+      // Backwards, so every remembered neighbour is back in place first.
+      for ( auto it = removed.crbegin(); it != removed.crend(); ++it ) {
+         QDomNode parent = it->parent;
+         parent.insertBefore( it->node, it->next );
+      }
+      return false;
+   }
+
+   QVector<Game> games;
+   QVector<QDomElement> nodes;
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      if ( doomed.contains( index ) )
+         continue;
+
+      games.append( FGames.at( index ) );
+      nodes.append( FNodes.at( index ) );
+   }
+   FGames = games;
+   FNodes = nodes;
+   countDuplicates();
+   return true;
+}
+
+QVector<int> Gamelist::orphanIndexes() const
+{
+   QVector<int> found;
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      if ( FGames.at( index ).isOrphan )
+         found.append( index );
+   }
+   return found;
+}
+
+QVector<int> Gamelist::duplicateIndexes() const
+{
+   // physicalRomPath already has its case settled against the disk, so two links
+   // to one file match and two files differing only in case do not.
+   QSet<QString> seen;
+   QVector<int> found;
+   for ( int index = 0; index < FGames.size(); ++index ) {
+      const QString& path = FGames.at( index ).physicalRomPath;
+      if ( path.isEmpty() )
+         continue;
+      if ( seen.contains( path ) )
+         found.append( index );
+      else
+         seen.insert( path );
+   }
+   return found;
+}
+
 void Gamelist::ensureHashes( int aIndex )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
