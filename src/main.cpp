@@ -12,6 +12,7 @@ int main( int argc, char** argv )
 
    QCoreApplication::setOrganizationName( QStringLiteral( "GameListEditorQt" ) );
    QCoreApplication::setApplicationName( QStringLiteral( "GameListEditorQt" ) );
+   QCoreApplication::setApplicationVersion( QStringLiteral( GLE_VERSION ) );
    // Without this QSettings writes the registry on Windows, which is neither
    // inspectable nor consistent with the Linux build.
    QSettings::setDefaultFormat( QSettings::IniFormat );
