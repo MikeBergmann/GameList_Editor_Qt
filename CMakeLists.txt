@@ -13,6 +13,38 @@ endif()
 
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
+# Version from git: "v1.2.3" on a tag, "v1.2.3-5-g7d1a75e" after it, and
+# "2026.10.14+7d1a75e" (commit date + hash) while there is no tag at all.
+# "-dirty" is appended for uncommitted changes. "unknown" outside a git checkout.
+# ponytail: evaluated at configure time only, so an IDE build that never re-runs
+# CMake keeps a stale version; re-run the configure step to refresh it.
+set( GLE_VERSION "unknown" )
+find_package( Git QUIET )
+if( GIT_FOUND )
+   execute_process( COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+      OUTPUT_VARIABLE _ver RESULT_VARIABLE _rc
+      OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET )
+   if( _rc EQUAL 0 )
+      set( GLE_VERSION "${_ver}" )
+   else()
+      execute_process( COMMAND "${GIT_EXECUTABLE}" describe --always --dirty
+         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+         OUTPUT_VARIABLE _hash RESULT_VARIABLE _rc1
+         OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET )
+      execute_process( COMMAND "${GIT_EXECUTABLE}" log -1 --format=%cd --date=format:%Y.%m.%d
+         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+         OUTPUT_VARIABLE _date RESULT_VARIABLE _rc2
+         OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET )
+      if( _rc1 EQUAL 0 AND _rc2 EQUAL 0 )
+         set( GLE_VERSION "${_date}+${_hash}" )
+      endif()
+   endif()
+endif()
+message( STATUS "GameListEditorQt version: ${GLE_VERSION}" )
+# Plain-text copy for packaging tools, so an installer gets exactly the version the exe reports.
+file( WRITE "${CMAKE_BINARY_DIR}/version.txt" "${GLE_VERSION}\n" )
+
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
 find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
 if( MINGW AND NOT ZLIB_ROOT )
@@ -83,6 +115,7 @@ add_executable( GameListEditor WIN32
    Resources/assets.qrc
 )
 target_link_libraries( GameListEditor PRIVATE gle_ui )
+target_compile_definitions( GameListEditor PRIVATE GLE_VERSION="${GLE_VERSION}" )
 
 add_executable( tests
    tests/main.cpp

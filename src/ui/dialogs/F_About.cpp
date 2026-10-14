@@ -1,5 +1,6 @@
 #include "F_About.h"
 
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QTextBrowser>
 #include <QVBoxLayout>
@@ -30,7 +31,10 @@ Frm_About::Frm_About( QWidget* aParent ) : QDialog( aParent )
 
    Red_About = new QTextBrowser( this );
    Red_About->setOpenExternalLinks( true );
-   Red_About->setHtml( QLatin1String( Cst_AboutHtml ) );
+   // Empty when not set (tests), in which case the line is left out.
+   const QString version = QCoreApplication::applicationVersion().toHtmlEscaped();
+   Red_About->setHtml( ( version.isEmpty() ? QString() : QStringLiteral( "<p><b>Version %1</b></p>" ).arg( version ) )
+                       + QLatin1String( Cst_AboutHtml ) );
 
    QDialogButtonBox* buttons = new QDialogButtonBox( QDialogButtonBox::Close, this );
    connect( buttons, &QDialogButtonBox::rejected, this, &QDialog::reject );
