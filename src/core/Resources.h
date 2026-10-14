@@ -241,6 +241,9 @@ inline constexpr const char* Cst_IniProxyServer = "ProxyServer";
 inline constexpr const char* Cst_IniProxyPort = "ProxyPort";
 inline constexpr const char* Cst_IniProxyUse = "ProxyUse";
 inline constexpr const char* Cst_IniLastFolder = "LastFolder";
+// Own group: folder name -> the known system's folder name ("amiga500" = "amiga"),
+// for folders the tables do not recognise. Actions > System > Set system type.
+inline constexpr const char* Cst_IniSystemMap = "SystemMap";
 
 // Language is the one key whose default is not the zero value: TLangName counts
 // from French, and the ini this replaces always shipped Language=2 (English).
@@ -253,7 +256,7 @@ inline constexpr const char* Cst_Category = "jeuInfos.php";
 inline constexpr const char* Cst_ScrapeLogin = "?devid=";
 inline constexpr const char* Cst_ScrapePwd = "&devpassword=";
 inline constexpr const char* Cst_ScrapePwdSafe = "&devpassword=";
-inline constexpr const char* Cst_DevSoftName = "&softname=GameListEditorv1";
+inline constexpr const char* Cst_DevSoftName = "&softname=GameListEditorQtv1";
 inline constexpr const char* Cst_Output = "&output=xml";
 inline constexpr const char* Cst_SSId = "&ssid=";
 inline constexpr const char* Cst_SSPwd = "&sspassword=";

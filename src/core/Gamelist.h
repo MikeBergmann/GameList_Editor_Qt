@@ -94,6 +94,8 @@ public:
    bool load( const SystemEntry& aSystem, QString* aError = nullptr );
 
    const SystemEntry& system() const { return FSystem; }
+   // Re-types the open system (a user mapping); nothing on disk depends on it.
+   void setSystemKind( SystemKind aKind ) { FSystem.kind = aKind; }
    const QString& systemDir() const { return FSystemDir; }
    const QVector<Game>& games() const { return FGames; }
    // int, not qsizetype: indices and rows are int throughout (QAbstractItemModel's

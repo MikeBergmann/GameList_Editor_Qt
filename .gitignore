@@ -3,11 +3,14 @@ build*/
 compile_commands.json
 
 # Local, personal
-transfer.md
+*.log
+AGENTS.md
+Android.md
 build.sh
-
 build_win.btm
-installer.iss
 dist/
 dist_setup/
+installer.iss
+tcc_private/
 licenses/
+transfer.md

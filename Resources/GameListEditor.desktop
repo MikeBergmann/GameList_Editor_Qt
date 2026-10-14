@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=GameList Editor Qt
+Comment=Editor for EmulationStation gamelist.xml files
+Exec=GameListEditor
+Icon=GameListEditor
+Categories=Utility;
+Terminal=false

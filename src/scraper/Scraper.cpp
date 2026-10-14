@@ -65,7 +65,12 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
 {
    QDomDocument doc;
    QString parseError;
-   if ( !doc.setContent( aXml, &parseError ) ) {
+   // ScreenScraper sometimes appends a plain-text note after </Data> (e.g.
+   // "CRC non trouve : ..." when the lookup fell back to the ROM name), which a
+   // strict parser rejects as extra content. The document itself is complete.
+   const qsizetype end = aXml.lastIndexOf( "</Data>" );
+   const QByteArray xml = end < 0 ? aXml : aXml.left( end + 7 );
+   if ( !doc.setContent( xml, &parseError ) ) {
       if ( aError )
          *aError = parseError;
       return false;
@@ -161,7 +166,7 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
 QString sanitizeUrl( const QString& aUrl )
 {
    QString safe = aUrl;
-   safe.replace( QRegularExpression( QStringLiteral( "(devpassword=|sspassword=)[^&]*" ) ),
+   safe.replace( QRegularExpression( QStringLiteral( "(devid=|devpassword=|ssid=|sspassword=)[^&]*" ) ),
                  QStringLiteral( "\\1" ) );
    return safe;
 }
@@ -227,6 +232,15 @@ void Scraper::setProxy( const QString& aServer, int aPort, const QString& aUser,
                                      static_cast<quint16>( aPort ), aUser, aPassword ) );
 }
 
+// What the server actually sent, for the "Show details" box of the error dialog
+// and its Export button. Not truncated: the export is the whole point. The request
+// comes first so the details show which systemid/crc/romnom were really sent.
+static QString responseDetails( const QString& aQuery, const QByteArray& aBody )
+{
+   return sanitizeUrl( QStringLiteral( "Request:\n%1\n\nReply:\n%2" )
+                          .arg( aQuery, QString::fromUtf8( aBody ) ) );
+}
+
 void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& aMediaTypes,
                            bool aWantVideo, LangName aLanguage )
 {
@@ -247,13 +261,15 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                if ( reply->error() != QNetworkReply::NoError ) {
                   // screenscraper.fr answers 404 when it has no match for the game.
                   if ( reply->attribute( QNetworkRequest::HttpStatusCodeAttribute ).toInt() == 404 ) {
-                     emit gameInfoFailed( QStringLiteral( "Game not found" ) );
+                     emit gameInfoFailed( QStringLiteral( "Game not found" ),
+                                          responseDetails( query, reply->readAll() ) );
                      return;
                   }
          // errorString() embeds Qt's own copy of the request URL (credentials
          // and all), so the whole message needs sanitizing, not just query.
                   emit gameInfoFailed(
-                     sanitizeUrl( query + QStringLiteral( "\n" ) + describeError( reply ) ) );
+                     sanitizeUrl( query + QStringLiteral( "\n" ) + describeError( reply ) ),
+                     responseDetails( query, reply->readAll() ) );
                   return;
                }
 
@@ -267,7 +283,7 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                QString error;
                if ( !parseScrapeResponse( data, aMediaTypes, aWantVideo, aLanguage, info,
                                           &error ) ) {
-                  emit gameInfoFailed( error );
+                  emit gameInfoFailed( error, responseDetails( query, data ) );
                   return;
                }
                emit gameInfoReady( info );

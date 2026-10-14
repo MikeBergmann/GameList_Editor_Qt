@@ -17,6 +17,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSettings>
 #include <QTimer>
 
 namespace {
@@ -65,6 +66,26 @@ TEST( MainWindow, ListsTheGamesOfTheSelectedSystem )
    // Switching systems reloads: the other folder holds the same gamelist.
    systems->setCurrentIndex( 1 );
    EXPECT_EQ( shown( editor ).size(), 3 );
+}
+
+TEST( MainWindow, AMappedFolderIsTreatedAsTheKnownSystem )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "amiga500/gamelist.xml" ), Cst_Gamelist );
+   Frm_Editor editor;
+   QComboBox* systems = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) );
+
+   editor.openRootFolder( fixture.dir.path() );
+   ASSERT_EQ( systems->itemText( 0 ), QStringLiteral( "amiga500" ) );  // unknown: its own name
+   EXPECT_EQ( systems->itemData( 0 ).value<SystemEntry>().kind, skOther );
+
+   QSettings settings;
+   settings.setValue( QStringLiteral( "SystemMap/amiga500" ), QStringLiteral( "amiga" ) );
+   editor.openRootFolder( fixture.dir.path() );
+   settings.remove( QStringLiteral( "SystemMap" ) );
+
+   EXPECT_EQ( systems->itemText( 0 ), QStringLiteral( "Amiga (amiga500)" ) );
+   EXPECT_EQ( systems->itemData( 0 ).value<SystemEntry>().kind, skAM );
 }
 
 TEST( MainWindow, TheFourListWidgetsDriveTheFilter )

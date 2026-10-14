@@ -136,3 +136,26 @@ target_link_libraries( tests PRIVATE gle_core gle_scraper gle_ui GTest::gtest )
 
 enable_testing()
 gtest_discover_tests( tests )
+
+# Packaging: `cpack -G DEB` (see build.sh). Test binaries are not installed.
+install( TARGETS GameListEditor RUNTIME DESTINATION bin )
+install( FILES Resources/GameListEditor.desktop DESTINATION share/applications )
+install( FILES Resources/Icons/app.png DESTINATION share/pixmaps RENAME GameListEditor.png )
+# The app is GPLv3; Qt, FFmpeg and libstdc++ come from the distro's own packages (with their own
+# copyright files), so unlike the Windows installer no third-party licence texts are shipped.
+install( FILES LICENSE DESTINATION share/doc/gamelisteditor RENAME copyright )
+
+set( CPACK_GENERATOR DEB )
+set( CPACK_PACKAGE_CONTACT "Mike Bergmann <Mike@mdb977.de>" )
+set( CPACK_PACKAGE_DESCRIPTION_SUMMARY "Editor for EmulationStation gamelist.xml files" )
+# Same version the exe reports. A .deb version must start with a digit: drop git's "v" prefix,
+# and fall back for "unknown" (no git).
+string( REGEX REPLACE "^v" "" CPACK_PACKAGE_VERSION "${GLE_VERSION}" )
+if( NOT CPACK_PACKAGE_VERSION MATCHES "^[0-9]" )
+   set( CPACK_PACKAGE_VERSION "0.0.0" )
+endif()
+set( CPACK_DEBIAN_PACKAGE_SECTION utils )
+# Derives the Qt6/zlib runtime dependencies from the built binary (needs dpkg-dev).
+set( CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON )
+set( CPACK_DEBIAN_FILE_NAME DEB-DEFAULT )
+include( CPack )

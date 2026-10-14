@@ -68,7 +68,7 @@ private:
    void report( bool aOk, const QString& aError );
 
    void handleGameInfo( const ScrapedInfo& aInfo );
-   void handleGameInfoFailed( const QString& aMessage );
+   void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );
    void handleMediaReady( int aIndex, const QImage& aImage );
    void handleMediaFinished();
 
