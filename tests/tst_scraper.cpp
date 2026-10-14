@@ -125,7 +125,7 @@ TEST( ParseScrapeResponse, IgnoresATextNoteAfterTheDocument )
    const QByteArray reply = kResponse + "\nCRC non trouv\xC3\xA9 : Champ systemeid obligatoire  \n";
 
    EXPECT_TRUE( parseScrapeResponse( reply, {}, false, lnEnglish, info, &error ) ) << qPrintable( error );
-   EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball" ) );
+   EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball (Europe)" ) );
 }
 
 TEST( ParseScrapeResponse, FailsOnMalformedXml )
