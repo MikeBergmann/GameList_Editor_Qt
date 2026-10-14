@@ -117,6 +117,17 @@ TEST( ParseScrapeResponse, FailsWithoutAGameNode )
    EXPECT_FALSE( error.isEmpty() );
 }
 
+TEST( ParseScrapeResponse, IgnoresATextNoteAfterTheDocument )
+{
+   // Seen from the live API: the name fallback appends a French note after </Data>.
+   ScrapedInfo info;
+   QString error;
+   const QByteArray reply = kResponse + "\nCRC non trouv\xC3\xA9 : Champ systemeid obligatoire  \n";
+
+   EXPECT_TRUE( parseScrapeResponse( reply, {}, false, lnEnglish, info, &error ) ) << qPrintable( error );
+   EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball" ) );
+}
+
 TEST( ParseScrapeResponse, FailsOnMalformedXml )
 {
    ScrapedInfo info;
@@ -142,6 +153,11 @@ TEST( SanitizeUrl, ScrubsBothDevAndUserPasswordAnywhereInTheMessage )
 
    EXPECT_FALSE( safe.contains( QStringLiteral( "Galaga" ) ) );
    EXPECT_FALSE( safe.contains( QStringLiteral( "Asteroids" ) ) );
+   EXPECT_FALSE( safe.contains( QStringLiteral( "Frogger" ) ) );
+   EXPECT_FALSE( safe.contains( QStringLiteral( "Pitfall" ) ) );
+   EXPECT_TRUE( safe.contains( QStringLiteral( "devid=&" ) ) );
+   EXPECT_TRUE( safe.contains( QStringLiteral( "ssid=&" ) ) );
+   EXPECT_TRUE( safe.contains( QStringLiteral( "crc=DFCAE7E1" ) ) );
    EXPECT_TRUE( safe.contains( QStringLiteral( "devpassword=&" ) ) );
    EXPECT_TRUE( safe.contains( QStringLiteral( "sspassword=&" ) ) );
 }

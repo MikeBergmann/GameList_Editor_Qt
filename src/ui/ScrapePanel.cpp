@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QDir>
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QGuiApplication>
@@ -427,11 +428,42 @@ void ScrapePanel::handleGameInfo( const ScrapedInfo& aInfo )
    FScraper.requestMedia( aInfo.pictures, aInfo.maxThreads );
 }
 
-void ScrapePanel::handleGameInfoFailed( const QString& aMessage )
+void ScrapePanel::handleGameInfoFailed( const QString& aMessage, const QString& aDetails )
 {
    Img_Loading->setVisible( false );
    setEnabled( true );
-   QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aMessage );
+
+   QMessageBox box( QMessageBox::Warning, QStringLiteral( "GameList Editor Qt" ), aMessage, QMessageBox::Ok,
+                    this );
+   if ( aDetails.isEmpty() ) {
+      box.exec();
+      return;
+   }
+
+   box.setDetailedText( aDetails );
+   QPushButton* exportButton =
+      box.addButton( QStringLiteral( "Export..." ), QMessageBox::ActionRole );
+
+   // Any button closes a QMessageBox, so Export reopens it afterwards.
+   for ( ;; ) {
+      box.exec();
+      if ( box.clickedButton() != exportButton )
+         break;
+
+      const QString path = QFileDialog::getSaveFileName(
+         this, QStringLiteral( "Export server reply" ),
+         QDir::home().filePath( QStringLiteral( "scrape-reply.txt" ) ),
+         QStringLiteral( "Text files (*.txt);;All files (*)" ) );
+      if ( path.isEmpty() )
+         continue;
+
+      QFile file( path );
+      if ( !file.open( QIODevice::WriteOnly | QIODevice::Truncate ) ||
+           file.write( aDetails.toUtf8() ) < 0 )
+         QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ),
+                               QStringLiteral( "Could not write %1:\n%2" )
+                                  .arg( path, file.errorString() ) );
+   }
 }
 
 void ScrapePanel::handleMediaReady( int /*aIndex*/, const QImage& aImage )

@@ -36,6 +36,8 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace {
 
 // Cbx_Filter, in the order the indices of FilterSpec::index are numbered.
@@ -137,6 +139,9 @@ void Frm_Editor::buildMenu()
    Mnu_ShrinkImages = Mnu_System->addAction( QStringLiteral( "Shrink large pictures..." ), this,
                                              &Frm_Editor::shrinkLargeImages );
    Mnu_ShrinkImages->setEnabled( false );
+   Mnu_SetSystemType = Mnu_System->addAction( QStringLiteral( "Set system type..." ), this,
+                                              &Frm_Editor::setSystemType );
+   Mnu_SetSystemType->setEnabled( false );
    Mnu_System->addSeparator();
    for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
                               "Remove region from games names" } )
@@ -502,7 +507,17 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
 
    FRootPath = aRootPath;
 
-   const QVector<SystemEntry> systems = scanSystems( FRootPath );
+   const QVector<SystemEntry> systems = [this] {
+      QVector<SystemEntry> found = scanSystems( FRootPath );
+
+      // A folder the tables do not know can be mapped to a system by hand.
+      QSettings settings;
+      settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+      for ( SystemEntry& system : found )
+         if ( system.kind == skOther && settings.contains( system.folderName ) )
+            system.kind = systemKindFromFolder( settings.value( system.folderName ).toString() );
+      return found;
+   }();
 
    // Filling the combo would otherwise load the first system halfway through.
    const QSignalBlocker blocked( Cbx_Systems );
@@ -521,6 +536,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
       Mnu_LinkMedia->setEnabled( false );
       Mnu_RenameMedia->setEnabled( false );
       Mnu_ShrinkImages->setEnabled( false );
+      Mnu_SetSystemType->setEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -555,6 +571,7 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_LinkMedia->setEnabled( false );
    Mnu_RenameMedia->setEnabled( false );
    Mnu_ShrinkImages->setEnabled( false );
+   Mnu_SetSystemType->setEnabled( false );
    Mnu_DeleteOrphans->setEnabled( false );
    Mnu_DeleteDuplicates->setEnabled( false );
    Mnu_ExportList->setEnabled( false );
@@ -588,6 +605,7 @@ void Frm_Editor::Cbx_SystemsChange()
    Mnu_LinkMedia->setEnabled( true );
    Mnu_RenameMedia->setEnabled( true );
    Mnu_ShrinkImages->setEnabled( true );
+   Mnu_SetSystemType->setEnabled( true );
    Mnu_DeleteOrphans->setEnabled( true );
    Mnu_DeleteDuplicates->setEnabled( true );
    Mnu_ExportList->setEnabled( true );
@@ -856,10 +874,75 @@ QString Frm_Editor::systemDisplayName( const SystemEntry& aSystem ) const
    if ( aSystem.kind == skOther )
       return aSystem.folderName;
 
+   QString name = QLatin1String( Cst_SystemKindStr[aSystem.kind] );
    if ( aSystem.kind == skMegaDrive && FGenesisLogo )
-      return QLatin1String( Cst_SystemKindStr[skGenesis] );
+      name = QLatin1String( Cst_SystemKindStr[skGenesis] );
 
-   return QLatin1String( Cst_SystemKindStr[aSystem.kind] );
+   // A mapped folder ("amiga500" treated as Amiga) keeps its own name visible.
+   if ( aSystem.folderName != QLatin1String( Cst_SystemKindFolderNames[aSystem.kind] ) )
+      name += QStringLiteral( " (%1)" ).arg( aSystem.folderName );
+   return name;
+}
+
+void Frm_Editor::setSystemType()
+{
+   const int item = Cbx_Systems->currentIndex();
+   if ( item < 0 )
+      return;
+
+   SystemEntry system = Cbx_Systems->itemData( item ).value<SystemEntry>();
+
+   // The mapping is only consulted for folders the tables do not know, so for a
+   // known one it would be saved and then silently ignored.
+   if ( systemKindFromFolder( system.folderName ) != skOther ) {
+      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
+                                QStringLiteral( "This folder name is already a known system." ) );
+      return;
+   }
+
+   // The table names repeat (two "Colecovision", two "PC Engine"), so each entry
+   // carries its ES folder name, which is unique.
+   QVector<QPair<QString, int>> choices;
+   for ( int kind = 0; kind < skOther; ++kind )
+      choices.append( { QStringLiteral( "%1 (%2)" )
+                           .arg( QLatin1String( Cst_SystemKindStr[kind] ),
+                                 QLatin1String( Cst_SystemKindFolderNames[kind] ) ),
+                        kind } );
+   std::sort( choices.begin(), choices.end(), []( const auto& a, const auto& b ) {
+      return a.first.compare( b.first, Qt::CaseInsensitive ) < 0;
+   } );
+
+   QStringList labels{ QStringLiteral( "Other (no mapping)" ) };
+   int current = 0;
+   for ( int i = 0; i < choices.size(); ++i ) {
+      labels.append( choices[i].first );
+      if ( choices[i].second == system.kind )
+         current = i + 1;
+   }
+
+   bool ok = false;
+   const QString chosen = QInputDialog::getItem(
+      this, QStringLiteral( "Set system type" ),
+      QStringLiteral( "Treat the folder \"%1\" as:" ).arg( system.folderName ), labels, current,
+      false, &ok );
+   if ( !ok )
+      return;
+
+   const int picked = static_cast<int>( labels.indexOf( chosen ) );
+   const SystemKind kind = picked <= 0 ? skOther : static_cast<SystemKind>( choices[picked - 1].second );
+
+   QSettings settings;
+   settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+   if ( kind == skOther )
+      settings.remove( system.folderName );
+   else
+      settings.setValue( system.folderName, QLatin1String( Cst_SystemKindFolderNames[kind] ) );
+
+   system.kind = kind;
+   Cbx_Systems->setItemData( item, QVariant::fromValue( system ) );
+   Cbx_Systems->setItemText( item, systemDisplayName( system ) );
+   FGamelist.setSystemKind( kind );
+   LoadSystemLogo( kind );
 }
 
 void Frm_Editor::refreshFilter()

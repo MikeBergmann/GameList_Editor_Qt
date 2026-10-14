@@ -116,7 +116,8 @@ public:
 
 signals:
    void gameInfoReady( const ScrapedInfo& aInfo );
-   void gameInfoFailed( const QString& aMessage );
+   // aDetails is the (sanitized) body the server sent; empty when there was none.
+   void gameInfoFailed( const QString& aMessage, const QString& aDetails = QString() );
 
    void mediaReady( int aIndex, const QImage& aImage );
    void mediaFailed( int aIndex, const QString& aMessage );

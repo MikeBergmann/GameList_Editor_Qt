@@ -66,6 +66,8 @@ private:
    void deleteDuplicates();
    // Asks, drops the games, and resets the views onto what is left.
    void confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat );
+   // Actions > System > Set system type: maps an unrecognised folder to a known system.
+   void setSystemType();
    // Actions > System > Export games list.
    void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
@@ -125,6 +127,7 @@ private:
    QAction* Mnu_LinkMedia = nullptr;
    QAction* Mnu_RenameMedia = nullptr;
    QAction* Mnu_ShrinkImages = nullptr;
+   QAction* Mnu_SetSystemType = nullptr;
    QAction* Mnu_DeleteOrphans = nullptr;
    QAction* Mnu_DeleteDuplicates = nullptr;
    QAction* Mnu_ExportList = nullptr;
