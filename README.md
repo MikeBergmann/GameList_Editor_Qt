@@ -98,6 +98,19 @@ Scraping needs two separate sets of credentials:
 
 Unfortunately, my Mac no longer runs macOS, so there won't be a macOS version until someone volunteers to test.
 
+## Third-party components
+
+GameList Editor Qt is licensed under the GPLv3 (see [LICENSE](LICENSE)). The Windows installer additionally ships:
+
+- [Qt 6](https://www.qt.io/) (Core, Gui, Widgets, Network, Xml, Multimedia, MultimediaWidgets), LGPLv3. Source: <https://download.qt.io/official_releases/qt/>. Qt is shipped as separate DLLs, so you can replace them with your own build.
+- [FFmpeg](https://ffmpeg.org/) as bundled with Qt Multimedia, LGPLv2.1+.
+- The MinGW-w64 / GCC runtime (GPL with the GCC Runtime Library Exception, winpthreads under an MIT-style license).
+- [zlib](https://zlib.net/), zlib license.
+
+The license texts are installed next to the program in `licenses\`. The installer itself is built with [Inno Setup](https://jrsoftware.org/isinfo.php).
+
+Console and brand logos are trademarks of their respective owners and are used for identification only. Game metadata comes from [screenscraper.fr](https://www.screenscraper.fr), whose terms apply.
+
 ## AI usage
 
 Yes, I used and will use AI. In my opinion, AI is a great tool for every developer to speed up their work and keep learning, especially if you have no colleagues, as in side projects like this.
