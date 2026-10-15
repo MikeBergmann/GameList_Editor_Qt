@@ -83,11 +83,29 @@ target_link_libraries( gle_core PUBLIC Qt6::Core Qt6::Gui Qt6::Xml ZLIB::ZLIB )
 # CI secrets, everyone else registers their own or builds without (README).
 set( GLE_SS_DEVID "$ENV{GLE_SS_DEVID}" CACHE STRING "screenscraper.fr devid" )
 set( GLE_SS_DEVPWD "$ENV{GLE_SS_DEVPWD}" CACHE STRING "screenscraper.fr devpassword" )
-# Escape for a C string literal; configure_file does no escaping of its own.
-foreach( var GLE_SS_DEVID GLE_SS_DEVPWD )
-   string( REPLACE "\\" "\\\\" ${var}_C "${${var}}" )
-   string( REPLACE "\"" "\\\"" ${var}_C "${${var}_C}" )
-endforeach()
+# Emit each value as NUL-terminated, XOR-ed bytes so it is not a plain string in the binary.
+# Key byte i is (0xA5 + 31*i) & 0xFF; decodeDevSecret() in Scraper.cpp must use the same one.
+# ponytail: obfuscation only - the values still travel in every request URL.
+function( gle_xor_encode aVar aOut )
+   string( HEX "${${aVar}}" hex )
+   string( APPEND hex "00" )
+   string( LENGTH "${hex}" len )
+   set( bytes "" )
+   set( i 0 )
+   set( pos 0 )
+   while( pos LESS len )
+      string( SUBSTRING "${hex}" ${pos} 2 byte )
+      math( EXPR key "(0xA5 + 31 * ${i}) & 0xFF" )
+      math( EXPR enc "0x${byte} ^ ${key}" OUTPUT_FORMAT HEXADECIMAL )
+      list( APPEND bytes "${enc}" )
+      math( EXPR i "${i} + 1" )
+      math( EXPR pos "${pos} + 2" )
+   endwhile()
+   list( JOIN bytes ", " joined )
+   set( ${aOut} "${joined}" PARENT_SCOPE )
+endfunction()
+gle_xor_encode( GLE_SS_DEVID GLE_SS_DEVID_XOR )
+gle_xor_encode( GLE_SS_DEVPWD GLE_SS_DEVPWD_XOR )
 configure_file( src/scraper/DevCredentials.h.in generated/DevCredentials.h @ONLY )
 
 add_library( gle_scraper STATIC
@@ -140,6 +158,9 @@ gtest_discover_tests( tests )
 
 # Packaging: `cpack -G DEB` (see build.sh). Test binaries are not installed.
 install( TARGETS GameListEditor RUNTIME DESTINATION bin )
+# Debian policy: 644 files, 755 dirs/executables. The umask and any default ACLs on the build
+# tree otherwise leak into the package, see cmake/CPackPermissions.cmake.
+set( CPACK_PRE_BUILD_SCRIPTS "${CMAKE_SOURCE_DIR}/cmake/CPackPermissions.cmake" )
 install( FILES Resources/GameListEditor.desktop DESTINATION share/applications )
 install( FILES Resources/Icons/app.png DESTINATION share/pixmaps RENAME GameListEditor.png )
 # The app is GPLv3; Qt, FFmpeg and libstdc++ come from the distro's own packages (with their own
@@ -155,6 +176,7 @@ string( REGEX REPLACE "^v" "" CPACK_PACKAGE_VERSION "${GLE_VERSION}" )
 if( NOT CPACK_PACKAGE_VERSION MATCHES "^[0-9]" )
    set( CPACK_PACKAGE_VERSION "0.0.0" )
 endif()
+set( CPACK_STRIP_FILES ON )
 set( CPACK_DEBIAN_PACKAGE_SECTION utils )
 # Derives the Qt6/zlib runtime dependencies from the built binary (needs dpkg-dev).
 set( CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON )
