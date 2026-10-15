@@ -13,6 +13,7 @@ endif()
 
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
+# Only "v<digit>*" tags count, so a rolling tag such as "pre-release-rolling" is ignored.
 # Version from git: "v1.2.3" on a tag, "v1.2.3-5-g7d1a75e" after it, and
 # "2026.10.14+7d1a75e" (commit date + hash) while there is no tag at all.
 # "-dirty" is appended for uncommitted changes. "unknown" outside a git checkout.
@@ -21,7 +22,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 set( GLE_VERSION "unknown" )
 find_package( Git QUIET )
 if( GIT_FOUND )
-   execute_process( COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty
+   execute_process( COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --match "v[0-9]*"
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
       OUTPUT_VARIABLE _ver RESULT_VARIABLE _rc
       OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET )
