@@ -83,6 +83,10 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
 // request URL, credentials included.
 QString sanitizeUrl( const QString& aUrl );
 
+// Decodes one of the XOR-encoded, NUL-terminated Cst_Dev*Xor arrays of DevCredentials.h.
+// aData must be terminated (the generated arrays always are).
+QString decodeDevSecret( const unsigned char* aData );
+
 // False when the build carries no developer credentials (devid/devpassword);
 // requestGame() then fails immediately instead of calling the API.
 bool devCredentialsConfigured();

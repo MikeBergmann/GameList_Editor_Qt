@@ -163,6 +163,17 @@ TEST( SanitizeUrl, ScrubsBothDevAndUserPasswordAnywhereInTheMessage )
 }
 
 // Self-check for the unconfigured build: must fail fast, offline, with a hint.
+// Bytes worked out by hand from key(i) = (0xA5 + 31*i) & 0xFF, not by calling the encoder, so a
+// change to either side of the CMake/C++ pair shows up here.
+TEST( Scraper, DecodesXorEncodedDevSecret )
+{
+   const unsigned char abc[] = { 0xC4, 0xA6, 0x80, 0x02 };
+   const unsigned char empty[] = { 0xA5 };
+
+   EXPECT_EQ( decodeDevSecret( abc ), QStringLiteral( "abc" ) );
+   EXPECT_TRUE( decodeDevSecret( empty ).isEmpty() );
+}
+
 TEST( Scraper, FailsWithoutDevCredentials )
 {
    if ( devCredentialsConfigured() )

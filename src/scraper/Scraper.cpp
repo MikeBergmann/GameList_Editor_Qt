@@ -13,6 +13,17 @@
 
 #include <utility>
 
+QString decodeDevSecret( const unsigned char* aData )
+{
+   QByteArray out;
+   for ( unsigned i = 0;; ++i ) {
+      const char c = static_cast<char>( aData[i] ^ ( ( 0xA5u + 31u * i ) & 0xFFu ) );
+      if ( c == '\0' )
+         return QString::fromUtf8( out );
+      out.append( c );
+   }
+}
+
 namespace {
 
 // GetFormatedDate (F_Main 3810). The dates node holds ISO "yyyy-mm-dd",
@@ -177,9 +188,9 @@ QString buildGameQuery( const ScrapeRequest& aRequest )
 {
    QString query = QLatin1String( Cst_ScraperAddress ) + QLatin1String( Cst_Category ) +
                    QLatin1String( Cst_ScrapeLogin ) +
-                   QString::fromUtf8( QUrl::toPercentEncoding( QString::fromUtf8( Cst_DevId ) ) ) +
+                   QString::fromUtf8( QUrl::toPercentEncoding( decodeDevSecret( Cst_DevIdXor ) ) ) +
                    QLatin1String( Cst_ScrapePwd ) +
-                   QString::fromUtf8( QUrl::toPercentEncoding( QString::fromUtf8( Cst_DevPwd ) ) ) +
+                   QString::fromUtf8( QUrl::toPercentEncoding( decodeDevSecret( Cst_DevPwdXor ) ) ) +
                    QLatin1String( Cst_DevSoftName ) + QLatin1String( Cst_Output );
 
    if ( !aRequest.ssLogin.isEmpty() && !aRequest.ssPassword.isEmpty() )
@@ -216,7 +227,7 @@ QString describeError( const QNetworkReply* aReply )
 
 bool devCredentialsConfigured()
 {
-   return *Cst_DevId != '\0' && *Cst_DevPwd != '\0';
+   return !decodeDevSecret( Cst_DevIdXor ).isEmpty() && !decodeDevSecret( Cst_DevPwdXor ).isEmpty();
 }
 
 Scraper::Scraper( QObject* aParent ) : QObject( aParent ) {}
