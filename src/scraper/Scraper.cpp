@@ -184,30 +184,6 @@ QString sanitizeUrl( const QString& aUrl )
 
 namespace {
 
-QString buildGameQuery( const ScrapeRequest& aRequest )
-{
-   QString query = QLatin1String( Cst_ScraperAddress ) + QLatin1String( Cst_Category ) +
-                   QLatin1String( Cst_ScrapeLogin ) +
-                   QString::fromUtf8( QUrl::toPercentEncoding( decodeDevSecret( Cst_DevIdXor ) ) ) +
-                   QLatin1String( Cst_ScrapePwd ) +
-                   QString::fromUtf8( QUrl::toPercentEncoding( decodeDevSecret( Cst_DevPwdXor ) ) ) +
-                   QLatin1String( Cst_DevSoftName ) + QLatin1String( Cst_Output );
-
-   if ( !aRequest.ssLogin.isEmpty() && !aRequest.ssPassword.isEmpty() )
-      query += QLatin1String( Cst_SSId ) + aRequest.ssLogin + QLatin1String( Cst_SSPwd ) +
-               aRequest.ssPassword;
-
-   query +=
-      QLatin1String( Cst_Crc ) + aRequest.crc32 + QLatin1String( Cst_SystemId ) + aRequest.systemId;
-
-   if ( !aRequest.manualCrc )
-      query += QLatin1String( Cst_RomName ) +
-               QString::fromUtf8( QUrl::toPercentEncoding( aRequest.romName ) ) +
-               QLatin1String( Cst_RomSize ) + QString::number( aRequest.romSize );
-
-   return query;
-}
-
 constexpr const char* Cst_StreamError = "Oops !! An error has occured while reading the stream !!";
 
 // errorString() reports "... - server replied: <reason phrase>", but HTTP/2
@@ -224,6 +200,39 @@ QString describeError( const QNetworkReply* aReply )
 }
 
 }  // namespace
+
+namespace {
+
+// Every value is percent-encoded, not just the dev credentials: a password with
+// '&', '#', '+' or '%' otherwise ends the parameter early or is read as something
+// else, so the login fails (or the query is silently altered) for exactly those users.
+QString encoded( const QString& aValue )
+{
+   return QString::fromUtf8( QUrl::toPercentEncoding( aValue ) );
+}
+
+}  // namespace
+
+QString buildGameQuery( const ScrapeRequest& aRequest )
+{
+   QString query = QLatin1String( Cst_ScraperAddress ) + QLatin1String( Cst_Category ) +
+                   QLatin1String( Cst_ScrapeLogin ) + encoded( decodeDevSecret( Cst_DevIdXor ) ) +
+                   QLatin1String( Cst_ScrapePwd ) + encoded( decodeDevSecret( Cst_DevPwdXor ) ) +
+                   QLatin1String( Cst_DevSoftName ) + QLatin1String( Cst_Output );
+
+   if ( !aRequest.ssLogin.isEmpty() && !aRequest.ssPassword.isEmpty() )
+      query += QLatin1String( Cst_SSId ) + encoded( aRequest.ssLogin ) + QLatin1String( Cst_SSPwd ) +
+               encoded( aRequest.ssPassword );
+
+   query += QLatin1String( Cst_Crc ) + encoded( aRequest.crc32 ) + QLatin1String( Cst_SystemId ) +
+            encoded( aRequest.systemId );
+
+   if ( !aRequest.manualCrc )
+      query += QLatin1String( Cst_RomName ) + encoded( aRequest.romName ) +
+               QLatin1String( Cst_RomSize ) + QString::number( aRequest.romSize );
+
+   return query;
+}
 
 bool devCredentialsConfigured()
 {
