@@ -33,6 +33,14 @@ QStringList shown( const Frm_Editor& aEditor )
    return rows;
 }
 
+// Picks the combo item by what it filters, not by where it sits in the list.
+void select( QComboBox* aFilter, FilterCategory aCategory )
+{
+   const int item = aFilter->findData( static_cast<int>( aCategory ) );
+   ASSERT_GE( item, 0 );
+   aFilter->setCurrentIndex( item );
+}
+
 TEST( MainWindow, ConstructsWithNothingLoaded )
 {
    Frm_Editor editor;
@@ -88,6 +96,20 @@ TEST( MainWindow, AMappedFolderIsTreatedAsTheKnownSystem )
    EXPECT_EQ( systems->itemData( 0 ).value<SystemEntry>().kind, skAM );
 }
 
+TEST( MainWindow, TheFilterComboOffersEveryCategoryOnceWithAName )
+{
+   Frm_Editor editor;
+   QComboBox* filter = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Filter" ) );
+
+   ASSERT_EQ( filter->count(), static_cast<int>( FilterCategory::Count ) );
+   for ( int item = 0; item < filter->count(); ++item ) {
+      EXPECT_EQ( filter->itemData( item ).toInt(), item );
+      EXPECT_FALSE( filter->itemText( item ).isEmpty() ) << item;
+   }
+   EXPECT_EQ( filter->itemText( static_cast<int>( FilterCategory::Orphan ) ),
+              QStringLiteral( "Orphan" ) );
+}
+
 TEST( MainWindow, TheFourListWidgetsDriveTheFilter )
 {
    Fixture fixture;
@@ -103,13 +125,13 @@ TEST( MainWindow, TheFourListWidgetsDriveTheFilter )
    // same gamelist with nothing behind it, so there every game is an orphan.
    editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->setCurrentIndex( 1 );
 
-   filter->setCurrentIndex( 14 );  // orphan
+   select( filter, FilterCategory::Orphan );
    EXPECT_EQ( shown( editor ), QStringList( { QStringLiteral( "Vanished" ) } ) );
    // Off "All", the count says how much of the system is being hidden.
    EXPECT_EQ( editor.findChild<QLabel*>( QStringLiteral( "Lbl_NbGamesFound" ) )->text(),
               QStringLiteral( "1 / 3 game(s) found." ) );
 
-   filter->setCurrentIndex( 0 );
+   select( filter, FilterCategory::All );
    search->setText( QStringLiteral( "sonic" ) );
    EXPECT_EQ( shown( editor ).size(), 2 );
 
@@ -132,7 +154,7 @@ TEST( MainWindow, TheFourListWidgetsDriveTheFilter )
    EXPECT_EQ( shown( editor ), QStringList( { QStringLiteral( "sub/Sonic.zip" ) } ) );
 }
 
-// Filters 15-28 compare against the selected game, so the list has to re-filter
+// The "same as" categories compare against the selected game, so the list has to re-filter
 // when the selection moves. The Delphi only got this right by accident, by
 // reading the reference out of the listbox before it cleared it.
 TEST( MainWindow, SameAsSelectedFollowsTheSelection )
@@ -145,21 +167,21 @@ TEST( MainWindow, SameAsSelectedFollowsTheSelection )
    QComboBox* filter = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Filter" ) );
 
    // The first game is selected on load, and it is the only one in "wor".
-   filter->setCurrentIndex( 15 );  // same region
+   select( filter, FilterCategory::SameRegion );
    EXPECT_EQ( shown( editor ), QStringList( { QStringLiteral( "Sonic The Hedgehog" ) } ) );
 
    // Select the game in ./sub, then ask for everything in its folder: it is the
    // only one there, so the answer has to follow the selection, not the load.
-   filter->setCurrentIndex( 0 );
+   select( filter, FilterCategory::All );
    games->setCurrentIndex( games->model()->index( 1, 0 ) );
 
-   filter->setCurrentIndex( 26 );  // same folder
+   select( filter, FilterCategory::SameFolder );
    EXPECT_EQ( shown( editor ), QStringList( { QStringLiteral( "Sonic The Hedgehog" ) } ) );
 
    // Back to a game in the system root, and the other two come back with it.
-   filter->setCurrentIndex( 0 );
+   select( filter, FilterCategory::All );
    games->setCurrentIndex( games->model()->index( 0, 0 ) );
-   filter->setCurrentIndex( 26 );
+   select( filter, FilterCategory::SameFolder );
    EXPECT_EQ( shown( editor ).size(), 2 );
 }
 

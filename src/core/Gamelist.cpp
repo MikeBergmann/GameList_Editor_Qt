@@ -1183,37 +1183,39 @@ QString Gamelist::displayName( int aIndex, const FilterSpec& aFilter ) const
 
 bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) const
 {
-   switch ( aFilter.index ) {
-      case 0: return true;
-      case 1: return aGame.missingImage;
-      case 2: return aGame.missingVideo;
-      case 3: return aGame.releaseDate.isEmpty();
-      case 4: return aGame.players.isEmpty();
-      case 5: return aGame.rating.isEmpty();
-      case 6: return aGame.developer.isEmpty();
-      case 7: return aGame.publisher.isEmpty();
-      case 8: return aGame.description.isEmpty();
-      case 9: return aGame.genre.isEmpty();
-      case 10: return aGame.region.isEmpty();
-      case 11: return aGame.kidGame == 1;
-      case 12: return aGame.hidden == 1;
-      case 13: return aGame.favorite == 1;
-      case 14: return aGame.isOrphan;
-      case 29: return FNameCounts.value( aGame.name ) > 1;
-      case 30: return FRomCounts.value( aGame.romName() ) > 1;
-      default: break;
-   }
-
-   if ( aFilter.reference < 0 || aFilter.reference >= FGames.size() )
+   // The "same as" categories compare against the selected game; with none selected
+   // nothing matches (the Delphi's Assigned( ReferenceGame ) guard).
+   const bool needsReference = filterDependsOnSelection( aFilter.category );
+   if ( needsReference && ( aFilter.reference < 0 || aFilter.reference >= FGames.size() ) )
       return false;
 
-   const Game& reference = FGames.at( aFilter.reference );
+   // Only read by the categories above, for which it is valid. No default in the
+   // switch below, so the compiler flags a category added to the enum and not handled.
+   const Game& reference = needsReference ? FGames.at( aFilter.reference ) : aGame;
 
-   switch ( aFilter.index ) {
-      case 15: return aGame.region == reference.region;
-      case 16: return aGame.releaseDate == reference.releaseDate;
-      case 17:
-      case 18: {
+   switch ( aFilter.category ) {
+      case FilterCategory::All: return true;
+      case FilterCategory::MissingImage: return aGame.missingImage;
+      case FilterCategory::MissingVideo: return aGame.missingVideo;
+      case FilterCategory::MissingDate: return aGame.releaseDate.isEmpty();
+      case FilterCategory::MissingPlayers: return aGame.players.isEmpty();
+      case FilterCategory::MissingRating: return aGame.rating.isEmpty();
+      case FilterCategory::MissingDeveloper: return aGame.developer.isEmpty();
+      case FilterCategory::MissingPublisher: return aGame.publisher.isEmpty();
+      case FilterCategory::MissingDescription: return aGame.description.isEmpty();
+      case FilterCategory::MissingGenre: return aGame.genre.isEmpty();
+      case FilterCategory::MissingRegion: return aGame.region.isEmpty();
+      case FilterCategory::KidGame: return aGame.kidGame == 1;
+      case FilterCategory::Hidden: return aGame.hidden == 1;
+      case FilterCategory::Favorite: return aGame.favorite == 1;
+      case FilterCategory::Orphan: return aGame.isOrphan;
+      case FilterCategory::DuplicateNames: return FNameCounts.value( aGame.name ) > 1;
+      case FilterCategory::DuplicateRoms: return FRomCounts.value( aGame.romName() ) > 1;
+
+      case FilterCategory::SameRegion: return aGame.region == reference.region;
+      case FilterCategory::SameDate: return aGame.releaseDate == reference.releaseDate;
+      case FilterCategory::SameOrEarlierDate:
+      case FilterCategory::SameOrLaterDate: {
          if ( aGame.releaseDate.isEmpty() )
             return false;
          // An unset reference date meant "today" in the Delphi, via StrToDateDef.
@@ -1221,27 +1223,31 @@ bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) c
          if ( !referenceDate.isValid() )
             referenceDate = QDate::currentDate();
          const QDate date = releaseDateValue( aGame.releaseDate );
-         return aFilter.index == 17 ? date <= referenceDate : date >= referenceDate;
+         return aFilter.category == FilterCategory::SameOrEarlierDate ? date <= referenceDate
+                                                                      : date >= referenceDate;
       }
-      case 19: return aGame.players == reference.players;
-      case 20: return aGame.rating == reference.rating;
-      case 21:
+      case FilterCategory::SamePlayers: return aGame.players == reference.players;
+      case FilterCategory::SameRating: return aGame.rating == reference.rating;
+      case FilterCategory::SameOrLowerRating:
          return !aGame.rating.isEmpty() &&
                 ratingValue( aGame.rating ) <= ratingValue( reference.rating );
-      case 22:
+      case FilterCategory::SameOrHigherRating:
          return !aGame.rating.isEmpty() &&
                 ratingValue( aGame.rating ) >= ratingValue( reference.rating );
-      case 23: return aGame.publisher == reference.publisher;
-      case 24: return aGame.developer == reference.developer;
-      case 25: return aGame.genre == reference.genre;
+      case FilterCategory::SamePublisher: return aGame.publisher == reference.publisher;
+      case FilterCategory::SameDeveloper: return aGame.developer == reference.developer;
+      case FilterCategory::SameGenre: return aGame.genre == reference.genre;
       // Trap: AnsiSameText here was a case-insensitive compare of two paths,
       // which on Linux would call two distinct directories the same one. The
       // case is already settled against the disk by resolvePath, so compare it.
-      case 26:
+      case FilterCategory::SameFolder:
          return QFileInfo( aGame.physicalRomPath ).path() ==
                 QFileInfo( reference.physicalRomPath ).path();
-      case 27: return aGame.name == reference.name;
-      case 28: return aGame.romName() == reference.romName();
-      default: return false;
+      case FilterCategory::SameName: return aGame.name == reference.name;
+      case FilterCategory::SameRom: return aGame.romName() == reference.romName();
+
+      case FilterCategory::Count: break;
    }
+
+   return false;
 }
