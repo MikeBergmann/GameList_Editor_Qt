@@ -11,23 +11,15 @@
 
 #include <memory>
 
-// screenscraper.fr's jeuInfos.php, replacing GetGameXml/ParseXml/GetPictures/
-// GetPicture/ThreadTerminated/DisplayPictures (F_Main 3510-3805) and all of
-// U_DownloadThread.pas. QNetworkAccessManager is already asynchronous, so the
-// Delphi's worker-thread pool - one TDOwnThread per download, a
-// TCriticalSection-guarded counter, FreeOnTerminate - collapses into one
-// QNetworkAccessManager and a completion count kept on the main thread: there
-// is only one thread, so nothing needs locking.
+// Client for screenscraper.fr's jeuInfos.php. Asynchronous (QNetworkAccessManager); everything
+// runs on the calling thread, so nothing needs locking.
 
-// One requested lookup. GetGameXml computed Crc32/Size itself from a mix of
-// widget state (Chk_ManualCRC) and Game fields; here the caller (ScrapePanel)
-// hands over the result, via Game::crc32 or the user's override, and
-// QFileInfo( romPath ).size() for romSize - so this stays free of widgets.
+// One requested lookup. The caller supplies crc32 and romSize, so this stays free of widgets.
 struct ScrapeRequest
 {
    QString systemId;
    QString crc32;
-   bool manualCrc = false;  // Chk_ManualCRC.Checked: send only the crc, no rom name/size
+   bool manualCrc = false;  // send only the crc, no rom name/size
    QString romName;
    qint64 romSize = 0;
 
@@ -36,23 +28,20 @@ struct ScrapeRequest
 
 };
 
-// One <medias><media> the user can choose to download. TMediaInfo, minus the
-// leak (3739 never freed one on the success path).
+// One <medias><media> the user can choose to download.
 struct MediaInfo
 {
    QString fileExt;
    QString fileLink;
 };
 
-// FillFields' targets (Edt_ScrapeName...Edt_ScrapeRating), already resolved
-// for aLanguage - the per-language dictionary fallback chains run once, here,
-// so a future ScrapePanel is nine plain assignments and nothing else.
+// The scraped text fields, already resolved for the requested language.
 struct ScrapedInfo
 {
    QString name;
    QString region;
    QString description;
-   QString releaseDate;  // dd/MM/yyyy, MM/yyyy or yyyy - GetFormatedDate's three forms
+   QString releaseDate;  // dd/MM/yyyy, MM/yyyy or yyyy
    QString genre;
    QString publisher;
    QString developer;
@@ -62,25 +51,18 @@ struct ScrapedInfo
    QVector<MediaInfo> pictures;  // already filtered to the requested media types
    QString videoLink;            // empty unless offered and requested
 
-   // ssuser/maxthreads, clamped to at least 1. The 0-threads deadlock (3708:
-   // an absent node left FMaxThreads at 0, so the fan-out loop ran zero times
-   // and the form stayed disabled forever) cannot happen here.
+   // ssuser/maxthreads, clamped to at least 1 (an absent node must not mean zero downloads).
    int maxThreads = 1;
 };
 
-// Parses one jeuInfos.php response. Free of QNetworkAccessManager, so it is
-// the part a test can exercise against a canned response with no network.
-// False (with a message in aError) when the reply holds no <jeu> node (3613:
-// an API error document raised out of ParseXml with the form still disabled).
+// Parses one jeuInfos.php response; needs no network. Returns false (message in aError) when
+// the XML is invalid or the reply holds no <jeu> node (an API error document).
 bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes, bool aWantVideo,
                           LangName aLanguage, ScrapedInfo& aInfo, QString* aError = nullptr );
 
-// WarnUserWithSafeUrl (3984) scrubbed only the constant &devpassword=..., not
-// the user's own &sspassword=... - so a failed scrape showed the user their
-// own password back. A generic value-after-key regex catches both. Callers
-// must run this over the *whole* error message, not just the request URL
-// they built: QNetworkReply::errorString() embeds its own copy of the
-// request URL, credentials included.
+// Strips the developer's and the user's ids and passwords from a message. Callers must pass
+// the whole error text, not just the URL they built: QNetworkReply::errorString() embeds its
+// own copy of the request URL, credentials included.
 QString sanitizeUrl( const QString& aUrl );
 
 // Decodes one of the XOR-encoded, NUL-terminated Cst_Dev*Xor arrays of DevCredentials.h.
@@ -102,24 +84,21 @@ class Scraper : public QObject
 public:
    explicit Scraper( QObject* aParent = nullptr );
 
-   // Empty aServer disables the proxy, matching TProxySettings.Create('',0,'','').
+   // Empty aServer disables the proxy.
    void setProxy( const QString& aServer, int aPort, const QString& aUser,
                   const QString& aPassword );
 
-   // aMediaTypes is the nine Chk_Box2D...Chk_Wheel checkboxes, as the set of
-   // Cst_Media* values still checked; aWantVideo is Chk_Video, kept separate
-   // because it is offered through a different button than the pictures are.
+   // aMediaTypes holds the Cst_Media* picture types to offer; aWantVideo is separate because
+   // the video is offered apart from the pictures.
    void requestGame( const ScrapeRequest& aRequest, const QSet<QString>& aMediaTypes,
                      bool aWantVideo, LangName aLanguage );
 
-   // Downloads aMedia, aMaxThreads at a time - the fixed-size pool GetPictures
-   // ran, preserved because the server states that limit and ignoring it risks
-   // a ban, not just a slowdown. mediaReady fires once per picture, in
-   // aMedia's order; mediaFinished fires once, after all have arrived or failed.
+   // Downloads aMedia, at most aMaxThreads at a time (the server states that limit; ignoring
+   // it risks a ban). mediaReady fires once per picture that arrives, mediaFinished once after
+   // all have arrived or failed.
    void requestMedia( const QVector<MediaInfo>& aMedia, int aMaxThreads = 1 );
 
-   // SaveLinkToFile (2473) - GetPictures' sibling for the one video link the
-   // user chose to keep.
+   // Downloads one file (the chosen video) to aDestPath; emits fileSaved or fileSaveFailed.
    void downloadToFile( const QString& aUrl, const QString& aDestPath );
 
 signals:
@@ -135,9 +114,7 @@ signals:
    void fileSaveFailed( const QString& aPath, const QString& aMessage );
 
 private:
-   // Fixed-size download pool state, one per requestMedia() call. A plain
-   // member would break if a second scrape started before the first finished;
-   // this way each batch is self-contained and needs no lock.
+   // State of one requestMedia() call, so overlapping batches cannot interfere.
    struct MediaBatch
    {
       QVector<MediaInfo> media;

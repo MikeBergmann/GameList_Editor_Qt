@@ -13,8 +13,7 @@
 
 namespace {
 
-// Matches the DFM's NumbersOnly. The upper bound is arbitrary but finite; no
-// game name is 1000 characters long.
+// The upper bound is arbitrary but finite; no game name is 1000 characters long.
 constexpr int Cst_MaxCharsToRemove = 999;
 
 QLineEdit* addCountRow( QVBoxLayout* aLayout, QWidget* aParent, const QString& aSuffix )
@@ -71,8 +70,7 @@ Frm_AdvNameEditor::Frm_AdvNameEditor( QWidget* aParent ) : QDialog( aParent )
    Grp_Case->setChecked( false );
    QVBoxLayout* caseLayout = new QVBoxLayout( Grp_Case );
 
-   // Ids are the Delphi's Rdg_Case.ItemIndex, so checkedId() returns -1 for
-   // "nothing picked" exactly as ItemIndex did.
+   // Ids are the case indices of NameEdit; checkedId() is -1 when nothing is picked.
    Rdg_Case = new QButtonGroup( this );
    const QString options[] = { QStringLiteral( "Capitalize the first character" ),
                                QStringLiteral( "Convert to Uppercase" ),
@@ -132,7 +130,7 @@ NameEdit Frm_AdvNameEditor::currentEdit() const
    NameEdit edit;
 
    edit.removeChars = Grp_Delete->isChecked();
-   // An empty field is 0, which is what the Delphi's explicit '' test produced.
+   // An empty field is 0.
    edit.nbStart = Edt_NbChars->text().toInt();
    edit.nbEnd = Edt_NbCharsEnd->text().toInt();
 

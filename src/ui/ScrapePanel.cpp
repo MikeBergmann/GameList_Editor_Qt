@@ -27,6 +27,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <memory>
+
 namespace {
 
 constexpr int Cst_ThumbnailSize = 120;
@@ -122,8 +124,6 @@ void ScrapePanel::buildLayout()
    left->addWidget( new QLabel( QStringLiteral( "Description" ), this ) );
    left->addWidget( Mmo_ScrapeDescription, 1 );
 
-   // Right column: the chosen picture, the result strip, the manual-CRC and
-   // save-selection controls.
    Img_Scrape = new QLabel( this );
    Img_Scrape->setObjectName( QStringLiteral( "Img_Scrape" ) );
    Img_Scrape->setAlignment( Qt::AlignCenter );
@@ -155,12 +155,12 @@ void ScrapePanel::buildLayout()
    connect( Chk_ManualCRC, &QCheckBox::toggled, Edt_ManualCRC, &QLineEdit::setEnabled );
 
    Btn_ScrapeUpper = new QPushButton( QStringLiteral( "To uppercase" ), this );
-      Btn_ScrapeUpper->setToolTip( QStringLiteral( "Convert all text to uppercase" ) );
+   Btn_ScrapeUpper->setToolTip( QStringLiteral( "Convert all text to uppercase" ) );
    Btn_ScrapeUpper->setObjectName( QStringLiteral( "Btn_ScrapeUpper" ) );
    connect( Btn_ScrapeUpper, &QPushButton::clicked, this, [this] { convertCase( true ); } );
 
    Btn_ScrapeLower = new QPushButton( QStringLiteral( "To lowercase" ), this );
-      Btn_ScrapeLower->setToolTip( QStringLiteral( "Convert all text to lowercase" ) );
+   Btn_ScrapeLower->setToolTip( QStringLiteral( "Convert all text to lowercase" ) );
    Btn_ScrapeLower->setObjectName( QStringLiteral( "Btn_ScrapeLower" ) );
    connect( Btn_ScrapeLower, &QPushButton::clicked, this, [this] { convertCase( false ); } );
 
@@ -201,7 +201,7 @@ void ScrapePanel::buildLayout()
    columns->addLayout( left, 1 );
    columns->addLayout( right );
 
-   // The showcase spans the full panel width above both columns.
+   // The thumbnail strip spans the full panel width above both columns.
    QVBoxLayout* outer = new QVBoxLayout( this );
    outer->addWidget( Scl_Pictures );
    outer->addLayout( columns, 1 );
@@ -222,8 +222,7 @@ void ScrapePanel::setSelection( int aIndex )
    const bool valid = FGamelist && aIndex >= 0 && aIndex < FGamelist->count();
    Edt_ScrapeRomPath->setText( valid ? FGamelist->at( aIndex ).romPath : QString() );
 
-   // Btn_Scrape.Enabled := FileExists( aGame.PhysicalRomPath ) (1551): a game
-   // whose ROM has vanished has nothing to hash.
+   // A game whose ROM has vanished has nothing to hash.
    const bool canScrape = valid && !FGamelist->at( aIndex ).isOrphan;
    Btn_Scrape->setEnabled( canScrape );
    Chk_ManualCRC->setEnabled( canScrape );
@@ -310,7 +309,6 @@ void ScrapePanel::emptyScrapeFields()
    enableScrapeComponents( false );
    updateSaveEnabled();
 
-   // FImgList.Clear / FPictureLinks.Clear (1989-1990): drop every thumbnail.
    for ( QToolButton* button : Scl_Pictures->widget()->findChildren<QToolButton*>() )
       delete button;
 }
@@ -334,8 +332,7 @@ void ScrapePanel::enableScrapeComponents( bool aEnabled )
       widget->setEnabled( aEnabled );
 }
 
-// Chk_ScrapeClick (4042) folded with EnableScrapeComponents' Btn_ScrapeSave
-// line: the button needs data to save and something checked to save it with.
+// The button needs scraped data to save and something ticked to save it with.
 void ScrapePanel::updateSaveEnabled()
 {
    Btn_ScrapeSave->setEnabled( FHasScrapedData &&
@@ -399,7 +396,6 @@ void ScrapePanel::requestScrape()
    request.romSize = QFileInfo( game.physicalRomPath ).size();
    request.ssLogin = FSSLogin;
    request.ssPassword = FSSPassword;
-
 
    FScraper.requestGame( request, mediaTypes(), Chk_Video->isChecked(), FLanguage );
 }
@@ -499,9 +495,8 @@ void ScrapePanel::save()
    setEnabled( false );
    QGuiApplication::setOverrideCursor( Qt::WaitCursor );
 
-   // The video is downloaded now, not at scrape time (FVideoScrapeLink was
-   // only ever a link until SaveChangesToGamelist called SaveLinkToFile) - so
-   // saving needs one round trip before there is a file to hand to Gamelist.
+   // The video is only a link until now, so it is downloaded here, which needs one
+   // round trip before there is a file to hand to Gamelist.
    if ( Chk_ScrapeVideo->isChecked() && !FLastInfo.videoLink.isEmpty() ) {
       const QString temp =
          QDir::temp().filePath( QStringLiteral( "gamelisteditor-scrape-video-%1.mp4" )
@@ -552,8 +547,7 @@ void ScrapePanel::finishSave( const QString& aVideoPath )
       QFile::remove( aVideoPath );
    }
 
-   // setFields() alone does not save - that is the point of the one open
-   // document - so an infos-only save has to ask for it explicitly.
+   // setFields() alone does not save, so an infos-only save has to ask for it.
    if ( ok && which && !savedAlready )
       ok = FGamelist->save( &error );
 

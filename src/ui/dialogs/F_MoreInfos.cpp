@@ -10,8 +10,6 @@
 
 namespace {
 
-// The five Lbl_* members of the DFM are gone: QFormLayout owns its labels, and
-// nothing outside the form ever referred to them.
 QLineEdit* addField( QFormLayout* aLayout, const QString& aLabel )
 {
    QLineEdit* edit = new QLineEdit( aLayout->parentWidget() );

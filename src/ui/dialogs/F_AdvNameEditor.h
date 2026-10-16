@@ -27,10 +27,7 @@ private:
 
    QString FPreviewStr;
 
-   // The Delphi put a bare TCheckBox on top of each group's caption to gate it,
-   // then hand-toggled Enabled on every child. A checkable QGroupBox is the
-   // same control, so Chk_DeleteChars/Chk_Add/Chk_Case and their three click
-   // handlers are gone, as are the four Lbl_* the handlers existed to grey out.
+   // Each group's check box enables or disables its contents.
    QGroupBox* Grp_Delete = nullptr;
    QLineEdit* Edt_NbChars = nullptr;
    QLineEdit* Edt_NbCharsEnd = nullptr;

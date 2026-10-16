@@ -1,8 +1,8 @@
 #pragma once
 
 // A ROM root on disk, shared by the Gamelist and GamelistModel tests: two system
-// folders with the same gamelist, some media present and some not, and the case
-// mismatches
+// folders with the same gamelist, some media present and some not, and links whose
+// case does not match the file on disk.
 
 #include "Gamelist.h"
 
@@ -74,7 +74,7 @@ inline const QByteArray Cst_Gamelist = R"(<?xml version="1.0"?>
 </gameList>
 )";
 
-// Neither system folder has a dot in its name, which is what trap 1 is about.
+// Neither system folder has a dot in its name: a scan using a "*.*" glob would miss them.
 struct Fixture
 {
    QTemporaryDir dir;

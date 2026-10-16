@@ -11,13 +11,11 @@
 #include <QStringList>
 #include <QVector>
 
-// The data half of F_Main: the root folder scan, and one system's gamelist.xml.
+// One system's gamelist.xml held open as a DOM, plus the root folder scan.
 //
-// The Delphi loaded and saved that file several separate times through a single
-// TXMLDocument used as a scratch buffer, re-running the linear <path> scan after
-// each load. Here the document is parsed once by load() and held open for the
-// lifetime of the selection, and each Game carries the index of the <game>
-// element it came from.
+// load() parses the document once; setFields() and the media actions edit it in
+// memory and save() writes it out. Games and their <game> elements are
+// index-aligned (see gameNode()).
 
 // One system folder under the ROM root that holds a gamelist.xml.
 struct SystemEntry
@@ -134,8 +132,7 @@ class Gamelist
 public:
    // Parses aSystem's gamelist.xml and keeps the document open. False (with a
    // message in aError, if given) when the file cannot be read or parsed, or
-   // holds no <game> element - the Delphi dropped such a system silently, with
-   // the document left active and the cursor stuck on the hourglass.
+   // holds no <game> element.
    bool load( const SystemEntry& aSystem, QString* aError = nullptr );
 
    const SystemEntry& system() const { return FSystem; }
@@ -161,8 +158,8 @@ public:
 
    // God mode's delete: drops the <game> and indices after aIndex shift down, so
    // callers must reset their views. The ROM, picture and video go too, except
-   // any another game still points at. False, with the gamelist untouched, if the
-   // write failed; true with aError set if only some file could not be removed.
+   // any that another game still points at. False, with the gamelist untouched, if
+   // the write failed; true with aError set if only some file could not be removed.
    bool removeGame( int aIndex, QString* aError = nullptr );
 
    // Actions > System > Delete orphans / duplicates: drops the <game>s only, no
@@ -225,14 +222,14 @@ public:
    QDomElement gameNode( int aIndex ) const { return FNodes.value( aIndex ); }
 
    // The folder new media goes into, taken at load from the first game that has
-   // any - which is what GetImageFolder / GetVideoFolder did.
+   // any, else ./media/images/ and ./media/videos/.
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 
    // The filter predicate, category and search text together.
    bool accepts( int aIndex, const FilterSpec& aFilter ) const;
 
-   // What Lbx_Games shows for that game, and what the search text matches.
+   // What the list shows for that game, and what the search text matches.
    QString displayName( int aIndex, const FilterSpec& aFilter ) const;
 
 private:

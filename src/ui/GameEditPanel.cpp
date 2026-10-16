@@ -28,14 +28,12 @@ namespace {
 constexpr int Cst_ImageTab = 0;
 constexpr int Cst_VideoTab = 1;
 
-// The bundled generic picture. The per-system <system>-default.png lookup that
-// used to come first (1621-1630, 1646-1655) is statically dead now that only the
-// generic is in the .qrc, so it is not ported.
+// The bundled generic picture.
 const QString Cst_DefaultPicture =
    QLatin1String( Cst_DefaultPicsFolderPath ) + QLatin1String( Cst_DefaultImageName );
 
-// Both flag combos of the DFM, and the third one. -1 is "no answer", which is
-// what several selected games show and what the batch save reads as "leave it".
+// A No/Yes combo. -1 is "no answer", which is what several selected games show and
+// what the batch save reads as "leave it".
 QComboBox* flagCombo( QWidget* aParent, const char* aName )
 {
    QComboBox* combo = new QComboBox( aParent );
@@ -105,8 +103,6 @@ void GameEditPanel::buildLayout()
    fields->addRow( QStringLiteral( "Hidden" ), Cbx_Hidden );
    fields->addRow( QStringLiteral( "Favorite" ), Cbx_Favorite );
 
-   // Img_BackGround was a picture whose only job was to say "this game has
-   // none", so it is the placeholder text of the label that shows the art.
    Img_Game = new QLabel( this );
    Img_Game->setObjectName( QStringLiteral( "Img_Game" ) );
    Img_Game->setAlignment( Qt::AlignCenter );
@@ -171,7 +167,7 @@ void GameEditPanel::buildLayout()
    Tbs_Media->setObjectName( QStringLiteral( "Tbs_Media" ) );
    Tbs_Media->addTab( Img_Game, QStringLiteral( "Image" ) );
    Tbs_Media->addTab( videoPage, QStringLiteral( "Video" ) );
-   // Sized by the window alone, like the label was: Ignored drops the content's
+   // Sized by the window alone, like the picture label: Ignored drops the content's
    // own minimum too, so pin the one the pages need (the video must not spill
    // over the buttons below).
    Tbs_Media->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
@@ -315,9 +311,8 @@ void GameEditPanel::showPicture( int aIndex )
 {
    const Game& game = FGamelist->at( aIndex );
 
-   // No extension test: QPixmap sniffs the content, which is what made an image
-   // called .PNG - or .jpeg where the Delphi only knew .jpg - fall through both
-   // branches of LoadGame and leave the previous game's art on screen.
+   // No extension test: QPixmap sniffs the content, so the extension's case or
+   // spelling (.PNG, .jpeg) does not matter.
    if ( game.missingImage || !FPicture.load( game.physicalImagePath ) ) {
       FPicture = QPixmap();
       Img_Game->setText( QStringLiteral( "No picture" ) );
@@ -477,9 +472,8 @@ void GameEditPanel::enableComponents()
    Btn_ChangeVideo->setEnabled( single );
    Btn_DeleteGame->setEnabled( single );
 
-   // Btn_ChangeAll is the system's, not the selection's. The Delphi only let it
-   // through on filter "Missing Picture", because it had no missing test of its
-   // own and would otherwise overwrite every game's art; it has one now.
+   // Btn_ChangeAll is the system's, not the selection's. It is safe to leave enabled
+   // because setDefaultImageForMissing only touches games that have no picture.
    Btn_ChangeAll->setEnabled( FGamelist != nullptr );
 
    const bool hasPicture = single && !FGamelist->at( FSelection.first() ).missingImage;
@@ -496,8 +490,7 @@ bool GameEditPanel::save()
 
    const GameFields values = fields();
 
-   // The one difference between the 263-line single save and the 211-line batch
-   // one: which fields count. Everything after this is the same operation.
+   // Which fields count is the only difference between a single and a batch save.
    const GameFieldSet which = FSelection.size() > 1
                                  ? filledFields( values )
                                  : changedFields( FGamelist->at( FSelection.first() ), values );
@@ -531,9 +524,8 @@ bool GameEditPanel::save()
 
 void GameEditPanel::reload()
 {
-   // Reload before announcing: a date that would not parse has come back blank
-   // (2326 did that by hand, to the widget), and the filter may now reject the
-   // game, which moves the selection.
+   // Reload before announcing: a date that would not parse has come back blank,
+   // and the filter may now reject the game, which moves the selection.
    setSelection( FSelection );
    emit gamesChanged();
 }

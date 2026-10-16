@@ -2,15 +2,10 @@
 
 #include <QString>
 
-// Lookup tables ported from U_Resources.pas.
+// Lookup tables and constants: system kinds, countries, languages, gamelist.xml node names,
+// settings keys and screenscraper.fr request/reply names.
 //
-// Names are kept verbatim - Cst_ for the tables and constants, sk/ln/cn for the
-// enumerators - so that porting F_Main stays a mechanical 1:1 map.
-//
-// The UI resourcestrings deliberately did *not* come along, apart from the 82
-// system display names below, which Cst_SystemKindStr was built out of. With
-// gettext gone the rest are plain literals with one use site each, so they land
-// at that site when their form is ported.
+// Cst_ prefixes tables and constants; sk/ln/cn prefix the enumerators.
 
 // Unscoped on purpose: every enumerator below is used as an array subscript.
 enum SystemKind
@@ -158,7 +153,7 @@ enum CountryName
 // const char*, not QString: Qt6 decodes those as UTF-8, which the accented
 // entries of Cst_CountryNameFull need, and they cost no static construction.
 
-// Display names for Cbx_Systems.
+// Display names of the systems.
 extern const char* const Cst_SystemKindStr[skCount];
 // Names of the per-system folders under the ROM root. Empty for skOther.
 extern const char* const Cst_SystemKindFolderNames[skCount];
@@ -169,8 +164,7 @@ extern const char* const Cst_SystemKindId[skCount];
 
 // Two-letter codes as screenscraper.fr writes them. Cst_CountryName[cnUnd] is "".
 extern const char* const Cst_CountryName[cnCount];
-// Country name per UI language. Indexed [country][lang] - 0-based, so the
-// Succ(FLanguage) the Delphi needed for its [1..5] array is gone.
+// Country name per UI language, indexed [country][lang].
 extern const char* const Cst_CountryNameFull[cnCount][lnCount];
 
 // Language codes, as sent to screenscraper.fr and matched against its replies.
@@ -223,7 +217,7 @@ inline constexpr const char* Cst_DefaultPicsFolderPath = ":/DefaultPictures/";
 inline constexpr const char* Cst_LogoPicsFolder = ":/SystemsLogos/";
 inline constexpr const char* Cst_DefaultImageName = "default.png";
 
-// --- QSettings: group and the 13 keys -------------------------------------
+// --- QSettings: group and keys --------------------------------------------
 
 inline constexpr const char* Cst_IniOptions = "Options";
 inline constexpr const char* Cst_IniGodMode = "GodMode";
@@ -245,8 +239,7 @@ inline constexpr const char* Cst_IniLastFolder = "LastFolder";
 // for folders the tables do not recognise. Actions > System > Set system type.
 inline constexpr const char* Cst_IniSystemMap = "SystemMap";
 
-// Language is the one key whose default is not the zero value: TLangName counts
-// from French, and the ini this replaces always shipped Language=2 (English).
+// Language is the one key whose default is not the zero value (lnFrench is 0).
 inline constexpr int Cst_IniLanguageDefault = lnEnglish;
 
 // --- screenscraper.fr -----------------------------------------------------
@@ -255,7 +248,7 @@ inline constexpr const char* Cst_ScraperAddress = "https://www.screenscraper.fr/
 inline constexpr const char* Cst_Category = "jeuInfos.php";
 inline constexpr const char* Cst_ScrapeLogin = "?devid=";
 inline constexpr const char* Cst_ScrapePwd = "&devpassword=";
-inline constexpr const char* Cst_ScrapePwdSafe = "&devpassword=";
+
 inline constexpr const char* Cst_DevSoftName = "&softname=GameListEditorQtv1";
 inline constexpr const char* Cst_Output = "&output=xml";
 inline constexpr const char* Cst_SSId = "&ssid=";
@@ -264,7 +257,7 @@ inline constexpr const char* Cst_Crc = "&crc=";
 inline constexpr const char* Cst_SystemId = "&systemid=";
 inline constexpr const char* Cst_RomName = "&romnom=";
 inline constexpr const char* Cst_RomSize = "&romtaille=";
-inline constexpr const char* Cst_TempXml = "temp.xml";
+
 
 // Reply nodes. French, because the API is.
 inline constexpr const char* Cst_DataNode = "Data";
@@ -288,7 +281,7 @@ inline constexpr const char* Cst_AttLang = "langue";
 inline constexpr const char* Cst_AttId = "id";
 inline constexpr const char* Cst_PngExt = "png";
 
-// <media type="..."> values the scraper offers, in the order Scl_Pictures shows.
+// <media type="..."> values the scraper offers, in the order the scrape panel shows them.
 inline constexpr const char* Cst_MediaBox2d = "box-2D";
 inline constexpr const char* Cst_MediaScreenShot = "ss";
 inline constexpr const char* Cst_MediaSsTitle = "sstitle";

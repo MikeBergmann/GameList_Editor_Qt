@@ -1,7 +1,5 @@
-// The transformation behind the Advanced Name Editor. Worth its own checks
-// because the Delphi had two copies of it - the dialog's live preview and
-// F_Main.TransformGamesNames - and because both of them could be driven out of
-// bounds from the UI.
+// The name transformation behind the Advanced Name Editor, including the
+// out-of-range values the UI can feed it.
 
 #include "NameEdit.h"
 #include "QtPrinters.h"
@@ -27,14 +25,13 @@ TEST( NameEdit, RemovesCharactersFromEitherEnd )
    edit.nbEnd = 5;
    EXPECT_EQ( applyNameEdit( Cst_Name, edit ), QStringLiteral( "Sonic The Hedgehog 2" ) );
 
-   // The flag gates both fields, as the checkbox did.
+   // The flag gates both fields.
    edit.removeChars = false;
    EXPECT_EQ( applyNameEdit( Cst_Name, edit ), Cst_Name );
 }
 
-// The Delphi's Copy/SetLength pair was unguarded: removing more than the name
-// holds called SetLength with a negative length. Reachable by typing 99 into a
-// field, so it has to clamp to empty instead.
+// Removing more characters than the name holds (easy to type into the field) clamps
+// to an empty name.
 TEST( NameEdit, ClampsRemovalToTheLengthOfTheName )
 {
    NameEdit edit;
@@ -69,9 +66,7 @@ TEST( NameEdit, ChangesCase )
    EXPECT_EQ( applyNameEdit( QStringLiteral( "SONIC" ), edit ), QStringLiteral( "sonic" ) );
 }
 
-// Chk_Case could be ticked with no radio selected, and the Delphi's case
-// statement then fell through. Keep that: the group is on, nothing is picked,
-// nothing happens.
+// The case group can be on with no option picked; that leaves the name alone.
 TEST( NameEdit, LeavesCaseAloneWhenNoOptionIsPicked )
 {
    NameEdit edit;
@@ -81,8 +76,7 @@ TEST( NameEdit, LeavesCaseAloneWhenNoOptionIsPicked )
    EXPECT_EQ( applyNameEdit( Cst_Name, edit ), Cst_Name );
 }
 
-// The Delphi wrote TmpStr[1] without checking, which on an empty string is a
-// write past the end - and "delete everything, then capitalise" gets there.
+// "Delete everything, then capitalise" must not index into an empty name.
 TEST( NameEdit, CapitalisingAnEmptyNameIsSafe )
 {
    NameEdit edit;

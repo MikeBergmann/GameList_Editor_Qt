@@ -1,6 +1,6 @@
-// Gamelist: the root scan, the parse, and the filter predicate that replaces
-// LoadGamesList. Everything here runs against a real gamelist.xml written into a
-// QTemporaryDir, because the three filesystem-backed flags are the point.
+// Gamelist: the root scan, the parse, and the filter predicate. Everything here runs
+// against a real gamelist.xml written into a QTemporaryDir, because the three
+// filesystem-backed flags are the point.
 
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
@@ -15,7 +15,7 @@ TEST( ScanSystems, FindsExtensionlessFolders )
 
    const QVector<SystemEntry> systems = scanSystems( fixture.dir.path() );
 
-   // Trap: FindFirst( '*.*' ) found these on Windows and would find none here.
+   // System folders have no dot in their name, so a "*.*" glob would find none.
    ASSERT_EQ( systems.size(), 2 );
    EXPECT_EQ( systems.at( 0 ).folderName, QStringLiteral( "megadrive" ) );
    EXPECT_EQ( systems.at( 0 ).kind, skMegaDrive );
@@ -58,7 +58,7 @@ TEST( Gamelist, ParsesGamesAndSkipsEmptyNodes )
    EXPECT_EQ( list.at( 1 ).hidden, 0 );
    EXPECT_EQ( list.at( 1 ).kidGame, 1 );
 
-   // Absent nodes read as empty rather than raising - F_Main 1839/1896 did not.
+   // A missing node reads as empty, not an error.
    EXPECT_TRUE( list.at( 2 ).imagePath.isEmpty() );
    EXPECT_TRUE( list.at( 2 ).physicalImagePath.isEmpty() );
 }
@@ -78,10 +78,10 @@ TEST( Gamelist, NodesStayAlignedWithGames )
    }
 }
 
-// Traps: the ROM and the picture are on disk under a different case than
-// the gamelist spells them. On Windows that always worked; here it has to be
-// resolved, or every such game is an orphan - and "delete orphans from gamelist"
-// would then offer to delete the user's library.
+// The ROM and the picture are on disk under a different case than the gamelist
+// spells them. That has to resolve on a case-sensitive filesystem, or every such game
+// is an orphan - and "delete orphans from gamelist" would then offer to delete the
+// user's library.
 TEST( Gamelist, ResolvesPathsWhoseCaseDoesNotMatchTheDisk )
 {
    SKIP_ON_CASE_INSENSITIVE_FS();
@@ -107,8 +107,7 @@ TEST( Gamelist, ResolvesPathsWhoseCaseDoesNotMatchTheDisk )
    EXPECT_TRUE( list.at( 2 ).missingVideo );
 }
 
-// The Delphi dropped an unreadable or gameless system silently, leaving the
-// document active and the cursor on the hourglass.
+// An unreadable, malformed or gameless gamelist is reported, not silently dropped.
 TEST( Gamelist, ReportsWhatItCannotLoad )
 {
    Fixture fixture;
@@ -173,8 +172,7 @@ TEST( FilterCategories, OnlyTheSameAsCategoriesDependOnTheSelection )
       EXPECT_EQ( filterDependsOnSelection( category ), sameAs ) << value;
    }
 
-   // The numbering the Delphi's Cbx_Filter.ItemIndex used, which saved settings or
-   // anything else that stored an index would still rely on.
+   // The numbering is fixed: anything that stored a combo index would rely on it.
    EXPECT_EQ( static_cast<int>( FilterCategory::Orphan ), 14 );
    EXPECT_EQ( static_cast<int>( FilterCategory::SameRegion ), 15 );
    EXPECT_EQ( static_cast<int>( FilterCategory::SameRom ), 28 );
@@ -191,7 +189,7 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    FilterSpec filter;
    filter.category = FilterCategory::SamePublisher;
 
-   // No reference game: the Delphi's Assigned(ReferenceGame) guard, so nothing.
+   // No reference game, so nothing matches.
    EXPECT_FALSE( list.accepts( 0, filter ) );
 
    filter.reference = 0;
@@ -235,7 +233,7 @@ TEST( Gamelist, SearchMatchesWhateverTheListShows )
    filter.fullRomName = true;
    EXPECT_EQ( list.displayName( 1, filter ), QStringLiteral( "sub/Sonic.zip" ) );
 
-   // ContainsText was case-insensitive, and only the rom path holds "sub".
+   // The search is case-insensitive, and only the rom path holds "sub".
    filter.search = QStringLiteral( "SUB/" );
    EXPECT_TRUE( list.accepts( 1, filter ) );
    EXPECT_FALSE( list.accepts( 0, filter ) );
@@ -279,8 +277,7 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
 
 // --- write ------------------------------------------------------
 
-// What a second reader sees after a save, which is the only thing that matters:
-// the Delphi's reload sites all went back to the file.
+// What a second reader sees after a save, which is the only thing that matters.
 Gamelist reload( const Fixture& aFixture )
 {
    Gamelist list;
@@ -316,8 +313,8 @@ TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
    EXPECT_EQ( saved.count(), 3 );
 }
 
-// The node did not exist: NodeExists + AddChild, three copies of it in the
-// Delphi, and the reason an absent <image> could crash DeleteGamePicture.
+// A node that does not exist yet is created (an absent <image>, say, must not be
+// an error).
 TEST( Gamelist, SetFieldsCreatesMissingNodes )
 {
    Fixture fixture;
@@ -366,7 +363,7 @@ TEST( Gamelist, BatchSetFieldsLeavesTheBlanksAlone )
 }
 
 // The hint under Edt_ReleaseDate promises that anything outside the three
-// accepted forms is saved as blank
+// accepted forms is saved as blank.
 TEST( Gamelist, AnUnparseableDateIsStoredBlank )
 {
    Fixture fixture;
@@ -422,8 +419,7 @@ TEST( Gamelist, ChangeAllOnlyTouchesGamesWithNoPicture )
    const QString kept = list.at( 0 ).physicalImagePath;
    QString error;
 
-   // Two of the three have no picture. Btn_ChangeAll was captioned for exactly
-   // this and had no such test, so it overwrote the third one's art as well.
+   // Two of the three have no picture; the third one's art must not be overwritten.
    EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
                                               &error ),
               2 );
@@ -630,7 +626,7 @@ TEST( Gamelist, HashesAreComputedOnDemandAndAnOrphanHashesToNothing )
    EXPECT_EQ( list.at( 0 ).md5.size(), 32 );
    EXPECT_EQ( list.at( 0 ).sha1.size(), 40 );
 
-   // GetFileSize raised on a ROM that had vanished; this just comes back empty.
+   // A ROM that has vanished hashes to an empty string rather than failing.
    list.ensureHashes( 2 );
    EXPECT_TRUE( list.at( 2 ).crc32.isEmpty() );
 }
