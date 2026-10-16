@@ -13,9 +13,7 @@ struct HelpSection
    const char* body;
 };
 
-// Was 150 lines of Red_Help.SelAttributes juggling over Rst_Title1..15 /
-// Rst_Help1..15. The order is the Delphi's; "Disable Pi prompts" (4) and
-// "SSH / Configuration" (13) are gone with the features they documented.
+// Sections in display order, rendered into one HTML document.
 constexpr HelpSection Cst_HelpSections[] = {
    { "Choose your folder:", "Select the folder where your systems folders are stored.<br>"
                             "<br>"

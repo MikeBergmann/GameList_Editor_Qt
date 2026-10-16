@@ -16,14 +16,13 @@ class QProgressBar;
 class QPushButton;
 class QScrollArea;
 
-// Tbs_Scrape: the ~30 widgets of the scrape tab, and the picture the user
-// chose out of the results. Scrapes only ever apply to the one game currently
-// selected in the main tab (FScrapedGame), so this addresses that one index
-// into the Gamelist rather than taking a selection like GameEditPanel does.
+// The scrape tab: its widgets, and the picture the user chose out of the results.
+// Scrapes only ever apply to the one game currently selected in the main tab
+// (FIndex), so this addresses that one index into the Gamelist rather than taking a
+// selection like GameEditPanel does.
 //
-// It owns its own Scraper - the network request, unlike the gamelist edits,
-// has no other consumer - and produces the same GameFields shape
-// GameEditPanel does, so Gamelist::setFields needs no aScrape flag.
+// It owns its own Scraper - the network request, unlike the gamelist edits, has no
+// other consumer - and produces the same GameFields shape GameEditPanel does.
 class ScrapePanel : public QWidget
 {
    Q_OBJECT
@@ -34,13 +33,13 @@ public:
    // Borrowed, not owned. Null means no system is loaded.
    void setGamelist( Gamelist* aGamelist );
 
-   // Index into the Gamelist of the game to scrape, or -1 for none - which is
-   // what Tbs_Scrape.TabVisible used to hide for a batch selection.
+   // Index into the Gamelist of the game to scrape, or -1 for none (e.g. a batch
+   // selection).
    void setSelection( int aIndex );
 
-   // Tbs_ScrapeShow (3460): reads the same QSettings Frm_Network writes -
-   // proxy, ScreenScraper credentials, scrape language - and clears the Save
-   // Picture/Save Video checkboxes left over from whatever was scraped last.
+   // Reads the same QSettings Frm_Network writes - proxy, ScreenScraper credentials,
+   // scrape language - and clears the Save Picture/Save Video checkboxes left over from
+   // whatever was scraped last.
    void activate();
 
    // Exposed so a test can emit these directly - the way tst_scraper.cpp
@@ -55,15 +54,15 @@ signals:
 
 private:
    void buildLayout();
-   void requestScrape();  // Btn_ScrapeClick (4013)
-   void save();           // Btn_ScrapeSaveClick (4036)
+   void requestScrape();
+   void save();
    void finishSave( const QString& aVideoPath );
-   void selectPicture( const QImage& aImage );  // ImgScrapedClick (4075)
-   void convertCase( bool aUpper );             // ConvertScrapeToUpOrLow (3927)
-   void emptyScrapeFields();                    // EmptyScrapeFields (1972)
-   void clearScrapeMedia();                     // ClearScrapeMedia (3498)
-   void enableScrapeComponents( bool aEnabled ); // EnableScrapeComponents (3948)
-   void updateSaveEnabled();  // Chk_ScrapeClick (4042) folded with the above
+   void selectPicture( const QImage& aImage );
+   void convertCase( bool aUpper );
+   void emptyScrapeFields();
+   void clearScrapeMedia();
+   void enableScrapeComponents( bool aEnabled );
+   void updateSaveEnabled();
    void showSelectedPicture();
    void report( bool aOk, const QString& aError );
 
@@ -118,11 +117,8 @@ private:
    QCheckBox* Chk_ScrapeVideo = nullptr;
    QCheckBox* Chk_ScrapeInfos = nullptr;
 
-   // Img_ScrapeBackground folds into this label's placeholder text, the way
-   // GameEditPanel's Img_Game already absorbed Img_BackGround. Img_ScreenScraper
-   // was decorative chrome and is dropped outright, per the Assets decision.
    QLabel* Img_Scrape = nullptr;
-   QProgressBar* Img_Loading = nullptr;  // busy indicator; Delphi's was a spinning icon
+   QProgressBar* Img_Loading = nullptr;  // busy indicator
    QScrollArea* Scl_Pictures = nullptr;
    QHBoxLayout* FPicturesLayout = nullptr;
 

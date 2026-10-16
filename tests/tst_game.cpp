@@ -9,7 +9,7 @@
 
 namespace {
 
-// Delphi split on the path separator, then dropped the last extension.
+// The ROM name is the last path component; the extension-less form drops only the last extension.
 TEST( Game, RomNameIsTheFileNameOfRomPath )
 {
    Game game;
@@ -70,9 +70,9 @@ TEST( Game, HashesAreEmptyForAnUnreadableFile )
    EXPECT_TRUE( fileCrc32( missing ).isEmpty() );
 }
 
-// <lastplayed> and <releasedate> are basic ISO 8601 without separators. Delphi
-// went through ISO8601ToDate, which is lenient about a lot; this is not, so a
-// value it cannot parse has to come back invalid rather than as a wrong date.
+// <lastplayed> and <releasedate> are basic ISO 8601 without separators. Parsing is
+// strict, so a value that cannot be parsed has to come back invalid rather than as a
+// wrong date.
 TEST( Game, ParsesGamelistDateTimes )
 {
    const QDateTime parsed = gamelistDateTime( QStringLiteral( "20130101T180000" ) );

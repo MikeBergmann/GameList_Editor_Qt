@@ -56,22 +56,21 @@ TEST( GamelistModel, IsEmptyWithoutAGamelist )
    EXPECT_FALSE( model.index( 0, 0 ).data().isValid() );
 }
 
-// Setting the filter has to reach the proxy on its own: the Delphi rebuilt the
-// listbox by hand from four separate handlers instead.
+// Setting the filter has to reach the proxy on its own.
 TEST( GamelistModel, ReFiltersWhenTheSpecChanges )
 {
    ModelFixture fixture;
 
    FilterSpec filter;
-   filter.index = 14;  // orphan
+   filter.category = FilterCategory::Orphan;
    fixture.setFilter( filter );
    EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Vanished" ) } ) );
 
-   filter.index = 13;  // favorite
+   filter.category = FilterCategory::Favorite;
    fixture.setFilter( filter );
    EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Sonic The Hedgehog" ) } ) );
 
-   filter.index = 0;
+   filter.category = FilterCategory::All;
    filter.search = QStringLiteral( "vanish" );
    fixture.setFilter( filter );
    EXPECT_EQ( fixture.shown(), QStringList( { QStringLiteral( "Vanished" ) } ) );
@@ -110,7 +109,7 @@ TEST( GamelistModel, ProxyRowsMapBackToGamelistIndices )
    ModelFixture fixture;
 
    FilterSpec filter;
-   filter.index = 29;  // duplicate names: drops "Vanished"
+   filter.category = FilterCategory::DuplicateNames;  // drops "Vanished"
    fixture.setFilter( filter );
    ASSERT_EQ( fixture.proxy.rowCount(), 2 );
 
@@ -119,7 +118,7 @@ TEST( GamelistModel, ProxyRowsMapBackToGamelistIndices )
    EXPECT_EQ( reference, 1 );
    EXPECT_EQ( fixture.list.at( reference ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
 
-   filter.index = 26;  // same folder
+   filter.category = FilterCategory::SameFolder;
    filter.reference = reference;
    fixture.setFilter( filter );
 

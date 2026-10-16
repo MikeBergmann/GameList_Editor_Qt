@@ -11,13 +11,11 @@
 #include <QStringList>
 #include <QVector>
 
-// The data half of F_Main: the root folder scan, and one system's gamelist.xml.
+// One system's gamelist.xml held open as a DOM, plus the root folder scan.
 //
-// The Delphi loaded and saved that file several separate times through a single
-// TXMLDocument used as a scratch buffer, re-running the linear <path> scan after
-// each load. Here the document is parsed once by load() and held open for the
-// lifetime of the selection, and each Game carries the index of the <game>
-// element it came from.
+// load() parses the document once; setFields() and the media actions edit it in
+// memory and save() writes it out. Games and their <game> elements are
+// index-aligned (see gameNode()).
 
 // One system folder under the ROM root that holds a gamelist.xml.
 struct SystemEntry
@@ -33,11 +31,16 @@ Q_DECLARE_METATYPE( SystemEntry )
 
 QString resolvePath( const QString& aPath );
 
+// The file aRelative (a link as the gamelist writes it) names under aSystemDir, with
+// its case settled against the disk. Empty for an empty link.
+QString physicalPath( const QString& aSystemDir, const QString& aRelative );
+
 QString gamelistDateToDisplay( const QString& aValue );
 QString displayDateToGamelist( const QString& aDate );
 
 // A picture or video that sits in the media folder under the ROM's name but that
 // the <game> does not point at (no link, or a link to a file that is not there).
+// Found by unlinkedMedia(), applied by Gamelist::linkMedia.
 struct MediaLink
 {
    int index = -1;  // the game
@@ -47,6 +50,7 @@ struct MediaLink
 
 // A linked picture or video that does not carry its ROM's name. A non-empty
 // problem means it must not be renamed (and why), so the review can show it.
+// Found by misnamedMedia(), applied by Gamelist::renameMedia.
 struct MediaRename
 {
    int index = -1;  // the game
@@ -56,31 +60,61 @@ struct MediaRename
    QString problem;
 };
 
-// A linked picture that is bigger than the limit the user set.
-struct OversizedImage
+// What the filter combo offers. The enumerators are in the order the combo lists them.
+// SameRegion..SameRom are "same as the selected game", and must stay contiguous:
+// filterDependsOnSelection() is a range check.
+enum class FilterCategory
 {
-   int index = -1;  // the first game that links it
-   QString path;    // absolute path
-   qint64 size = 0;  // bytes
+   All,
+   MissingImage,
+   MissingVideo,
+   MissingDate,
+   MissingPlayers,
+   MissingRating,
+   MissingDeveloper,
+   MissingPublisher,
+   MissingDescription,
+   MissingGenre,
+   MissingRegion,
+   KidGame,
+   Hidden,
+   Favorite,
+   Orphan,
+   SameRegion,
+   SameDate,
+   SameOrEarlierDate,
+   SameOrLaterDate,
+   SamePlayers,
+   SameRating,
+   SameOrLowerRating,
+   SameOrHigherRating,
+   SamePublisher,
+   SameDeveloper,
+   SameGenre,
+   SameFolder,
+   SameName,
+   SameRom,
+   DuplicateNames,
+   DuplicateRoms,
+   Count,  // not a category: the number of them
 };
 
-// Re-encodes the picture in place, in its own format and under the same name, at
-// the largest size that fits aMaxBytes (a little under it, so "ca." holds).
-// The aspect ratio is kept and it is never enlarged. Returns the new size in
-// bytes, or -1 with aError set and the file untouched: unreadable, animated, a
-// format Qt cannot write, or one that will not get that small.
-qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError = nullptr );
+// Whether the answer depends on which game is selected, so a view must re-run the
+// filter when the selection changes.
+inline bool filterDependsOnSelection( FilterCategory aCategory )
+{
+   return aCategory >= FilterCategory::SameRegion && aCategory <= FilterCategory::SameRom;
+}
 
 struct FilterSpec
 {
-   // Cbx_Filter.ItemIndex, 0..30. See matchesCategory for what each one means.
-   int index = 0;
+   FilterCategory category = FilterCategory::All;
    QString search;
    bool listByRom = false;
    bool fullRomName = false;
 
-   // Index of the selected game. Filters 15-28 are "same as this one", so a view
-   // must re-run the filter when the selection changes.
+   // Index of the selected game. The "same as" categories compare against it, so a
+   // view must re-run the filter when the selection changes.
    int reference = -1;
 };
 
@@ -89,8 +123,7 @@ class Gamelist
 public:
    // Parses aSystem's gamelist.xml and keeps the document open. False (with a
    // message in aError, if given) when the file cannot be read or parsed, or
-   // holds no <game> element - the Delphi dropped such a system silently, with
-   // the document left active and the cursor stuck on the hourglass.
+   // holds no <game> element.
    bool load( const SystemEntry& aSystem, QString* aError = nullptr );
 
    const SystemEntry& system() const { return FSystem; }
@@ -116,8 +149,8 @@ public:
 
    // God mode's delete: drops the <game> and indices after aIndex shift down, so
    // callers must reset their views. The ROM, picture and video go too, except
-   // any another game still points at. False, with the gamelist untouched, if the
-   // write failed; true with aError set if only some file could not be removed.
+   // any that another game still points at. False, with the gamelist untouched, if
+   // the write failed; true with aError set if only some file could not be removed.
    bool removeGame( int aIndex, QString* aError = nullptr );
 
    // Actions > System > Delete orphans / duplicates: drops the <game>s only, no
@@ -144,34 +177,19 @@ public:
 
    int setDefaultImageForMissing( const QString& aSourcePath, QString* aError = nullptr );
 
-   // Files in the image and video folders named after a game's ROM (case-blind,
-   // optional -image/-video suffix) for games whose link is empty or dead.
-   // Named after it with or without the ROM's extension ("x.scummvm.png"), in the
-   // gamelist's own media folders and in ./media/images|videos and ./images|videos.
-   // A link that works is never proposed for replacement.
-   QVector<MediaLink> unlinkedMedia() const;
-
    // Points the games at the files, in place, then writes the gamelist once.
    // Returns how many links were set, or -1 with aError set and the gamelist
    // as it was: a failed write.
    int linkMedia( const QVector<MediaLink>& aLinks, QString* aError = nullptr );
-
-   // Linked files that exist but are not named after their ROM: the ROM's name
-   // (with or without its extension) plus nothing, "-image" or "-video", in the
-   // same case. Those are the names unlinkedMedia accepts, so the two agree.
-   // Files another game also links, or whose proper name is taken, carry a problem.
-   // aStrict: only the plain ROM name is right, so "x-image.png" becomes "x.png".
-   QVector<MediaRename> misnamedMedia( bool aStrict = false ) const;
 
    // Renames the files without a problem and repoints the games at them, then
    // writes the gamelist once. Returns how many were renamed, or -1 with aError
    // set, the gamelist as it was and the files back under their old names.
    int renameMedia( const QVector<MediaRename>& aRenames, QString* aError = nullptr );
 
-   // Linked pictures that exist and are bigger than aMaxBytes, each file once even
-   // when several games share it. The gamelist is not touched by shrinking them:
-   // the file keeps its name and format, so the links stay right.
-   QVector<OversizedImage> oversizedImages( qint64 aMaxBytes ) const;
+   // Whether a game other than aIndex resolves to the same file on disk. Compared
+   // by resolved path, not link text: links differing only in case are one file.
+   bool fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const;
 
    void ensureHashes( int aIndex );
 
@@ -180,14 +198,14 @@ public:
    QDomElement gameNode( int aIndex ) const { return FNodes.value( aIndex ); }
 
    // The folder new media goes into, taken at load from the first game that has
-   // any - which is what GetImageFolder / GetVideoFolder did.
+   // any, else ./media/images/ and ./media/videos/.
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 
    // The filter predicate, category and search text together.
    bool accepts( int aIndex, const FilterSpec& aFilter ) const;
 
-   // What Lbx_Games shows for that game, and what the search text matches.
+   // What the list shows for that game, and what the search text matches.
    QString displayName( int aIndex, const FilterSpec& aFilter ) const;
 
 private:
@@ -199,9 +217,6 @@ private:
    void setChildText( QDomElement aNode, const char* aName, const QString& aText );
 
    bool applyImage( int aIndex, const QImage& aPicture, QString* aError );
-   // Whether a game other than aIndex resolves to the same file on disk. Compared
-   // by resolved path, not link text: links differing only in case are one file.
-   bool fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const;
 
    void countDuplicates();
 

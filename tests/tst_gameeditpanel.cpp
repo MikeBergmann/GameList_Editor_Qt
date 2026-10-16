@@ -1,8 +1,4 @@
 // GameEditPanel: the dirty flag and the two save paths it chooses between.
-//
-// CheckIfChangesToSave compared 12 widgets against the TGame on every keystroke
-// and left the answer in Btn_SaveChanges.Enabled, so none of it could be checked
-// without a window. It is a comparison of two GameFields values now.
 
 #include "GameEditPanel.h"
 #include "GamelistFixture.h"
@@ -53,7 +49,7 @@ TEST( GameEditPanel, LoadsTheSelectedGameAndIsNotDirtyForIt )
    EXPECT_EQ( panel.edit( "Edt_RomPath" )->text(), QStringLiteral( "./Sonic.zip" ) );
    EXPECT_EQ( panel.panel.fields().favorite, 1 );
 
-   // Loading is not editing: FIsLoading was form-wide state for exactly this.
+   // Loading is not editing.
    EXPECT_FALSE( panel.panel.isDirty() );
    EXPECT_FALSE( panel.button( "Btn_SaveChanges" )->isEnabled() );
 }
@@ -143,8 +139,7 @@ TEST( GameEditPanel, AFailedSaveKeepsTheEditAndLeavesTheGamelistAlone )
    EXPECT_TRUE( panel.panel.isDirty() );
 }
 
-// Several games: the fields start blank and only the filled-in ones are written,
-// which is the whole difference between SaveChangesToGamelist and its batch twin.
+// Several games: the fields start blank and only the filled-in ones are written.
 TEST( GameEditPanel, SeveralGamesStartBlankAndWriteOnlyWhatIsFilledIn )
 {
    Panel panel;
@@ -188,8 +183,8 @@ TEST( GameEditPanel, NoSelectionMeansNothingToEditAndNothingToSave )
    panel.panel.save();
 }
 
-// The three Delete buttons are the only ones that are not simply "is one game
-// selected": they are also "is there anything to delete".
+// The remove-media buttons are not simply "is one game selected": they are also "is
+// there anything to remove".
 TEST( GameEditPanel, TheDeleteMediaButtonsFollowWhatTheGameHas )
 {
    Panel panel;

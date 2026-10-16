@@ -2,8 +2,7 @@
 
 #include <QString>
 
-// What the batch rename dialog collected: the Delphi returned this as eight
-// out-parameters.
+// What the batch rename dialog collected.
 struct NameEdit
 {
    bool removeChars = false;
@@ -18,8 +17,6 @@ struct NameEdit
    QString endString;
 };
 
-// The transformation itself. It lived twice in the Delphi - once as
-// F_AdvNameEditor.ProcessPreview for the live preview, once as
-// F_Main.TransformGamesNames to apply it - so the preview could disagree with
-// the result. One implementation, used by both.
+// Applies the edit to one name: remove characters, change case, then add text.
+// Shared by the dialog's preview and the real rename, so they cannot disagree.
 QString applyNameEdit( const QString& aName, const NameEdit& aEdit );

@@ -1,6 +1,6 @@
-// Gamelist: the root scan, the parse, and the filter predicate that replaces
-// LoadGamesList. Everything here runs against a real gamelist.xml written into a
-// QTemporaryDir, because the three filesystem-backed flags are the point.
+// Gamelist: the root scan, the parse, and the filter predicate. Everything here runs
+// against a real gamelist.xml written into a QTemporaryDir, because the three
+// filesystem-backed flags are the point.
 
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
@@ -15,7 +15,7 @@ TEST( ScanSystems, FindsExtensionlessFolders )
 
    const QVector<SystemEntry> systems = scanSystems( fixture.dir.path() );
 
-   // Trap: FindFirst( '*.*' ) found these on Windows and would find none here.
+   // System folders have no dot in their name, so a "*.*" glob would find none.
    ASSERT_EQ( systems.size(), 2 );
    EXPECT_EQ( systems.at( 0 ).folderName, QStringLiteral( "megadrive" ) );
    EXPECT_EQ( systems.at( 0 ).kind, skMegaDrive );
@@ -58,7 +58,7 @@ TEST( Gamelist, ParsesGamesAndSkipsEmptyNodes )
    EXPECT_EQ( list.at( 1 ).hidden, 0 );
    EXPECT_EQ( list.at( 1 ).kidGame, 1 );
 
-   // Absent nodes read as empty rather than raising - F_Main 1839/1896 did not.
+   // A missing node reads as empty, not an error.
    EXPECT_TRUE( list.at( 2 ).imagePath.isEmpty() );
    EXPECT_TRUE( list.at( 2 ).physicalImagePath.isEmpty() );
 }
@@ -78,10 +78,10 @@ TEST( Gamelist, NodesStayAlignedWithGames )
    }
 }
 
-// Traps: the ROM and the picture are on disk under a different case than
-// the gamelist spells them. On Windows that always worked; here it has to be
-// resolved, or every such game is an orphan - and "delete orphans from gamelist"
-// would then offer to delete the user's library.
+// The ROM and the picture are on disk under a different case than the gamelist
+// spells them. That has to resolve on a case-sensitive filesystem, or every such game
+// is an orphan - and "delete orphans from gamelist" would then offer to delete the
+// user's library.
 TEST( Gamelist, ResolvesPathsWhoseCaseDoesNotMatchTheDisk )
 {
    SKIP_ON_CASE_INSENSITIVE_FS();
@@ -107,8 +107,7 @@ TEST( Gamelist, ResolvesPathsWhoseCaseDoesNotMatchTheDisk )
    EXPECT_TRUE( list.at( 2 ).missingVideo );
 }
 
-// The Delphi dropped an unreadable or gameless system silently, leaving the
-// document active and the cursor on the hourglass.
+// An unreadable, malformed or gameless gamelist is reported, not silently dropped.
 TEST( Gamelist, ReportsWhatItCannotLoad )
 {
    Fixture fixture;
@@ -140,26 +139,45 @@ TEST( Gamelist, FiltersOnTheGameItself )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   const auto matches = [&list]( int aFilterIndex ) {
+   const auto matches = [&list]( FilterCategory aCategory ) {
       QVector<int> kept;
       FilterSpec filter;
-      filter.index = aFilterIndex;
+      filter.category = aCategory;
       for ( int index = 0; index < list.count(); ++index )
          if ( list.accepts( index, filter ) )
             kept.append( index );
       return kept;
    };
 
-   EXPECT_EQ( matches( 0 ), QVector<int>( { 0, 1, 2 } ) );
-   EXPECT_EQ( matches( 1 ), QVector<int>( { 1, 2 } ) );   // missing picture
-   EXPECT_EQ( matches( 2 ), QVector<int>( { 1, 2 } ) );   // missing video
-   EXPECT_EQ( matches( 3 ), QVector<int>( { 2 } ) );      // no release date
-   EXPECT_EQ( matches( 7 ), QVector<int>( { 1 } ) );      // no publisher
-   EXPECT_EQ( matches( 11 ), QVector<int>( { 1 } ) );     // kid game
-   EXPECT_EQ( matches( 13 ), QVector<int>( { 0 } ) );     // favorite
-   EXPECT_EQ( matches( 14 ), QVector<int>( { 2 } ) );     // orphan
-   EXPECT_EQ( matches( 29 ), QVector<int>( { 0, 1 } ) );  // duplicate names
-   EXPECT_EQ( matches( 30 ), QVector<int>( { 0, 1 } ) );  // duplicate rom names
+   EXPECT_EQ( matches( FilterCategory::All ), QVector<int>( { 0, 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingImage ), QVector<int>( { 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingVideo ), QVector<int>( { 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingDate ), QVector<int>( { 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingPublisher ), QVector<int>( { 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::KidGame ), QVector<int>( { 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::Favorite ), QVector<int>( { 0 } ) );
+   EXPECT_EQ( matches( FilterCategory::Orphan ), QVector<int>( { 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::DuplicateNames ), QVector<int>( { 0, 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::DuplicateRoms ), QVector<int>( { 0, 1 } ) );
+}
+
+// The combo is built from this order, and filterDependsOnSelection is a range check on
+// it: a category added in the wrong place would silently change what an item filters.
+TEST( FilterCategories, OnlyTheSameAsCategoriesDependOnTheSelection )
+{
+   for ( int value = 0; value < static_cast<int>( FilterCategory::Count ); ++value ) {
+      const FilterCategory category = static_cast<FilterCategory>( value );
+      const bool sameAs = category >= FilterCategory::SameRegion &&
+                          category <= FilterCategory::SameRom;
+      EXPECT_EQ( filterDependsOnSelection( category ), sameAs ) << value;
+   }
+
+   // The numbering is fixed: anything that stored a combo index would rely on it.
+   EXPECT_EQ( static_cast<int>( FilterCategory::Orphan ), 14 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::SameRegion ), 15 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::SameRom ), 28 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::DuplicateRoms ), 30 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::Count ), 31 );
 }
 
 TEST( Gamelist, SameAsSelectedNeedsASelection )
@@ -169,9 +187,9 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    FilterSpec filter;
-   filter.index = 23;  // same publisher
+   filter.category = FilterCategory::SamePublisher;
 
-   // No reference game: the Delphi's Assigned(ReferenceGame) guard, so nothing.
+   // No reference game, so nothing matches.
    EXPECT_FALSE( list.accepts( 0, filter ) );
 
    filter.reference = 0;
@@ -179,24 +197,24 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Ratings compare numerically, and "0,8" is the same number as "0.8".
-   filter.index = 21;  // rating <= reference
+   filter.category = FilterCategory::SameOrLowerRating;
    EXPECT_TRUE( list.accepts( 1, filter ) );
    EXPECT_FALSE( list.accepts( 2, filter ) );  // no rating at all, so never
-   filter.index = 22;                           // rating >= reference
+   filter.category = FilterCategory::SameOrHigherRating;
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Release date <= reference, over the shortened display forms: "1991" is the
    // 1st of January, which is before the reference's 23rd of June.
-   filter.index = 17;
+   filter.category = FilterCategory::SameOrEarlierDate;
    EXPECT_TRUE( list.accepts( 1, filter ) );
-   filter.index = 18;
+   filter.category = FilterCategory::SameOrLaterDate;
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Same folder, and same ROM file name across different folders.
-   filter.index = 26;
+   filter.category = FilterCategory::SameFolder;
    EXPECT_TRUE( list.accepts( 2, filter ) );
    EXPECT_FALSE( list.accepts( 1, filter ) );
-   filter.index = 28;
+   filter.category = FilterCategory::SameRom;
    EXPECT_TRUE( list.accepts( 1, filter ) );
 }
 
@@ -215,7 +233,7 @@ TEST( Gamelist, SearchMatchesWhateverTheListShows )
    filter.fullRomName = true;
    EXPECT_EQ( list.displayName( 1, filter ), QStringLiteral( "sub/Sonic.zip" ) );
 
-   // ContainsText was case-insensitive, and only the rom path holds "sub".
+   // The search is case-insensitive, and only the rom path holds "sub".
    filter.search = QStringLiteral( "SUB/" );
    EXPECT_TRUE( list.accepts( 1, filter ) );
    EXPECT_FALSE( list.accepts( 0, filter ) );
@@ -224,7 +242,7 @@ TEST( Gamelist, SearchMatchesWhateverTheListShows )
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // The search narrows the category; it does not widen it.
-   filter.index = 14;  // orphan
+   filter.category = FilterCategory::Orphan;
    filter.search = QStringLiteral( "sonic" );
    EXPECT_FALSE( list.accepts( 0, filter ) );
 }
@@ -259,15 +277,6 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
 
 // --- write ------------------------------------------------------
 
-// What a second reader sees after a save, which is the only thing that matters:
-// the Delphi's reload sites all went back to the file.
-Gamelist reload( const Fixture& aFixture )
-{
-   Gamelist list;
-   EXPECT_TRUE( list.load( aFixture.snes ) );
-   return list;
-}
-
 TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
 {
    Fixture fixture;
@@ -296,8 +305,8 @@ TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
    EXPECT_EQ( saved.count(), 3 );
 }
 
-// The node did not exist: NodeExists + AddChild, three copies of it in the
-// Delphi, and the reason an absent <image> could crash DeleteGamePicture.
+// A node that does not exist yet is created (an absent <image>, say, must not be
+// an error).
 TEST( Gamelist, SetFieldsCreatesMissingNodes )
 {
    Fixture fixture;
@@ -346,7 +355,7 @@ TEST( Gamelist, BatchSetFieldsLeavesTheBlanksAlone )
 }
 
 // The hint under Edt_ReleaseDate promises that anything outside the three
-// accepted forms is saved as blank
+// accepted forms is saved as blank.
 TEST( Gamelist, AnUnparseableDateIsStoredBlank )
 {
    Fixture fixture;
@@ -402,8 +411,7 @@ TEST( Gamelist, ChangeAllOnlyTouchesGamesWithNoPicture )
    const QString kept = list.at( 0 ).physicalImagePath;
    QString error;
 
-   // Two of the three have no picture. Btn_ChangeAll was captioned for exactly
-   // this and had no such test, so it overwrote the third one's art as well.
+   // Two of the three have no picture; the third one's art must not be overwritten.
    EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
                                               &error ),
               2 );
@@ -610,7 +618,7 @@ TEST( Gamelist, HashesAreComputedOnDemandAndAnOrphanHashesToNothing )
    EXPECT_EQ( list.at( 0 ).md5.size(), 32 );
    EXPECT_EQ( list.at( 0 ).sha1.size(), 40 );
 
-   // GetFileSize raised on a ROM that had vanished; this just comes back empty.
+   // A ROM that has vanished hashes to an empty string rather than failing.
    list.ensureHashes( 2 );
    EXPECT_TRUE( list.at( 2 ).crc32.isEmpty() );
 }
@@ -681,223 +689,6 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
    // must not write the refused batch's first file too.
    ASSERT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ) } ), 1 );
    EXPECT_EQ( reload( fixture ).count(), 4 );
-}
-
-TEST( Gamelist, UnlinkedMediaFindsFilesByRomNameAndLinkMediaPointsTheGamesAtThem )
-{
-   Fixture fixture;
-   writeFile( fixture.path( "snes/media/images/Vanished-image.jpg" ), "jpg" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   // Game 0 links working files; game 1 has a dead image link and no video, and
-   // sonic.PNG / Sonic.mp4 sit there under its ROM name; game 2 has a -image.
-   const QVector<MediaLink> found = list.unlinkedMedia();
-   ASSERT_EQ( found.size(), 3 );
-   EXPECT_EQ( found[0].index, 1 );
-   EXPECT_TRUE( found[0].isImage );
-   EXPECT_EQ( found[0].path, fixture.path( "snes/media/images/sonic.PNG" ) );
-   EXPECT_EQ( found[1].index, 2 );
-   EXPECT_EQ( found[1].path, fixture.path( "snes/media/images/Vanished-image.jpg" ) );
-   EXPECT_EQ( found[2].index, 1 );
-   EXPECT_FALSE( found[2].isImage );
-
-   QString error;
-   ASSERT_EQ( list.linkMedia( found, &error ), 3 ) << error.toStdString();
-   EXPECT_FALSE( list.at( 1 ).missingImage );
-   EXPECT_FALSE( list.at( 1 ).missingVideo );
-   EXPECT_TRUE( list.unlinkedMedia().isEmpty() );
-
-   // The link keeps the file's real case, and survives a reload.
-   const Gamelist saved = reload( fixture );
-   EXPECT_EQ( saved.at( 1 ).imagePath, QStringLiteral( "./media/images/sonic.PNG" ) );
-   EXPECT_EQ( saved.at( 1 ).videoPath, QStringLiteral( "./media/videos/Sonic.mp4" ) );
-   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished-image.jpg" ) );
-   EXPECT_EQ( saved.at( 0 ).imagePath, QStringLiteral( "./media/images/Sonic.png" ) );
-}
-
-TEST( Gamelist, MisnamedMediaProposesRomNamesAndRenameMediaRelinksThem )
-{
-   SKIP_ON_CASE_INSENSITIVE_FS();
-   Fixture fixture;
-   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );
-   writeFile( fixture.path( "snes/media/images/Sonic.PNG" ), "png" );  // blocks game 1's rename
-   writeFile( fixture.path( "snes/media/images/Renamed.jpg" ), "jpg" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   // Game 1 links sonic.PNG, whose proper name Sonic.PNG is taken; game 2 links Renamed.jpg.
-   ASSERT_EQ( list.linkMedia( { { 1, true, fixture.path( "snes/media/images/sonic.PNG" ) },
-                                { 2, true, fixture.path( "snes/media/images/Renamed.jpg" ) } } ),
-              2 );
-
-   // Game 0's Sonic.png / Sonic.mp4 are already right.
-   const QVector<MediaRename> found = list.misnamedMedia();
-   ASSERT_EQ( found.size(), 2 );
-   EXPECT_EQ( found[0].index, 1 );
-   EXPECT_FALSE( found[0].problem.isEmpty() );
-   EXPECT_EQ( found[1].index, 2 );
-   EXPECT_TRUE( found[1].problem.isEmpty() );
-   EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
-
-   QString error;
-   ASSERT_EQ( list.renameMedia( found, &error ), 1 ) << error.toStdString();
-   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Renamed.jpg" ) ) );
-   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.jpg" ) ) );
-   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/sonic.PNG" ) ) );
-   EXPECT_FALSE( list.at( 2 ).missingImage );
-
-   const Gamelist saved = reload( fixture );
-   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
-   EXPECT_EQ( saved.at( 1 ).imagePath, QStringLiteral( "./media/images/sonic.PNG" ) );
-
-   // Nothing left to propose but the blocked one.
-   EXPECT_EQ( list.misnamedMedia().size(), 1 );
-}
-
-TEST( Gamelist, StrictMisnamedMediaAlsoRenamesDashImageAndDashVideoFiles )
-{
-   SKIP_ON_CASE_INSENSITIVE_FS();
-   Fixture fixture;
-   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );
-   writeFile( fixture.path( "snes/media/images/Vanished-image.jpg" ), "jpg" );
-   writeFile( fixture.path( "snes/media/videos/Vanished-video.mp4" ), "mp4" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-   ASSERT_EQ( list.linkMedia( { { 2, true, fixture.path( "snes/media/images/Vanished-image.jpg" ) },
-                                { 2, false, fixture.path( "snes/media/videos/Vanished-video.mp4" ) } } ),
-              2 );
-
-   // Scraper-style names are fine by default ...
-   EXPECT_TRUE( list.misnamedMedia().isEmpty() );
-
-   // ... and wrong when asked for the plain ROM name.
-   const QVector<MediaRename> found = list.misnamedMedia( true );
-   ASSERT_EQ( found.size(), 2 );
-   EXPECT_EQ( found[0].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
-   EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/videos/Vanished.mp4" ) );
-
-   QString error;
-   ASSERT_EQ( list.renameMedia( found, &error ), 2 ) << error.toStdString();
-   const Gamelist saved = reload( fixture );
-   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
-   EXPECT_EQ( saved.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.mp4" ) );
-   EXPECT_TRUE( list.misnamedMedia( true ).isEmpty() );
-}
-
-TEST( Gamelist, UnlinkedMediaAlsoFindsFullRomNamesInPlainImagesAndVideosFolders )
-{
-   // A ScummVM system: no media links yet, art in ./images and ./videos, named
-   // after the whole ROM name.
-   Fixture fixture;
-   writeFile( fixture.path( "snes/images/Vanished.zip.png" ), "png" );
-   writeFile( fixture.path( "snes/videos/Vanished.zip.mp4" ), "mp4" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   bool image = false;
-   bool video = false;
-   for ( const MediaLink& link : list.unlinkedMedia() ) {
-      if ( link.index != 2 )
-         continue;
-      ( link.isImage ? image : video ) = true;
-      EXPECT_TRUE( link.path.contains( link.isImage ? QStringLiteral( "/images/Vanished.zip.png" )
-                                                    : QStringLiteral( "/videos/Vanished.zip.mp4" ) ) );
-   }
-   EXPECT_TRUE( image );
-   EXPECT_TRUE( video );
-}
-
-TEST( Gamelist, UnlinkedMediaGoesByMimeTypeNotAnExtensionList )
-{
-   // .webp and .webm are in no list of ours, and a .txt of the same name is not media.
-   Fixture fixture;
-   writeFile( fixture.path( "snes/media/images/Vanished.txt" ), "notes" );
-   writeFile( fixture.path( "snes/media/images/Vanished.webp" ), "webp" );
-   writeFile( fixture.path( "snes/media/videos/Vanished.txt" ), "notes" );
-   writeFile( fixture.path( "snes/media/videos/Vanished.webm" ), "webm" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   QStringList paths;
-   for ( const MediaLink& link : list.unlinkedMedia() )
-      if ( link.index == 2 )
-         paths << link.path;
-   paths.sort();
-   EXPECT_EQ( paths, QStringList( { fixture.path( "snes/media/images/Vanished.webp" ),
-                                    fixture.path( "snes/media/videos/Vanished.webm" ) } ) );
-}
-
-TEST( Gamelist, UnlinkedMediaDoesNotSearchTheWorkingDirectoryForAnEmptyMediaFolder )
-{
-   // A link with no '/' leaves the media folder empty; QDir("") is the working directory.
-   Fixture fixture;
-   writeFile( fixture.path( "snes/gamelist.xml" ),
-              "<gameList><game><path>./Lost.zip</path><image>Lost.png</image></game></gameList>" );
-   writeFile( fixture.path( "elsewhere/Lost.png" ), "png" );
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   const QString previous = QDir::currentPath();
-   ASSERT_TRUE( QDir::setCurrent( fixture.path( "elsewhere" ) ) );
-   const QVector<MediaLink> found = list.unlinkedMedia();
-   QDir::setCurrent( previous );
-
-   EXPECT_TRUE( found.isEmpty() );
-}
-
-TEST( Gamelist, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
-{
-   Fixture fixture;
-
-   // Noise does not compress, so this PNG is big and the test does not depend on the encoder.
-   QImage noise( 600, 400, QImage::Format_RGB32 );
-   quint32 state = 12345;
-   for ( int y = 0; y < noise.height(); ++y )
-      for ( int x = 0; x < noise.width(); ++x ) {
-         state = state * 1664525u + 1013904223u;
-         noise.setPixel( x, y, state | 0xFF000000u );
-      }
-   const QString big = fixture.path( "snes/media/images/Sonic.png" );
-   ASSERT_TRUE( noise.save( big ) );
-   const qint64 before = QFileInfo( big ).size();
-   const qint64 limit = before / 3;
-
-   Gamelist list;
-   ASSERT_TRUE( list.load( fixture.snes ) );
-
-   // Game 0 links the big file; game 1 links a missing one, game 2 none.
-   const QVector<OversizedImage> found = list.oversizedImages( limit );
-   ASSERT_EQ( found.size(), 1 );
-   EXPECT_EQ( found.at( 0 ).index, 0 );
-   EXPECT_EQ( found.at( 0 ).size, before );
-   EXPECT_TRUE( list.oversizedImages( before ).isEmpty() );
-
-   QString error;
-   const qint64 after = shrinkImageFile( big, limit, &error );
-   ASSERT_GT( after, 0 ) << error.toStdString();
-   EXPECT_LE( after, limit );
-   EXPECT_GT( after, limit / 2 );  // "ca.": close to the limit, not shrunk to a thumbnail
-   EXPECT_EQ( QFileInfo( big ).size(), after );
-
-   const QImage result( big );
-   EXPECT_LT( result.width(), 600 );
-   EXPECT_NEAR( static_cast<double>( result.width() ) / result.height(), 1.5, 0.02 );
-   EXPECT_TRUE( list.oversizedImages( limit ).isEmpty() );
-
-   // Already small enough: left alone, and an unreadable file is an error that leaves it be.
-   EXPECT_EQ( shrinkImageFile( big, limit ), after );
-   const QString junk = fixture.path( "snes/media/images/junk.png" );
-   writeFile( junk, QByteArray( 5000, 'x' ) );
-   EXPECT_EQ( shrinkImageFile( junk, 100, &error ), -1 );
-   EXPECT_FALSE( error.isEmpty() );
-   EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
 }
 
 }  // namespace

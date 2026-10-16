@@ -8,6 +8,7 @@
 #include "F_MoreInfos.h"
 #include "GameEditPanel.h"
 #include "GamelistModel.h"
+#include "MediaOps.h"
 #include "Resources.h"
 #include "ScrapePanel.h"
 
@@ -75,16 +76,21 @@ const char* const Cst_FilterNames[] = {
    "Duplicate ROMs",
 };
 
-// Filters 15-28 compare each game against the selected one, so re-filtering has
-// to follow the selection. Everything else is independent of it.
-bool dependsOnSelection( int aFilterIndex )
+static_assert( sizeof( Cst_FilterNames ) / sizeof( Cst_FilterNames[0] ) ==
+                  static_cast<size_t>( FilterCategory::Count ),
+               "one name per FilterCategory, in enum order" );
+
+// The category of the combo's current item. It is stored as the item's data rather
+// than read from the position, so reordering the list cannot change what an item means.
+// No selection (an empty combo) reads as All.
+FilterCategory currentCategory( const QComboBox* aFilterCombo )
 {
-   return aFilterIndex >= 15 && aFilterIndex <= 28;
+   const QVariant data = aFilterCombo->currentData();
+   return data.isValid() ? static_cast<FilterCategory>( data.toInt() ) : FilterCategory::All;
 }
 
-// The entries of Actions that operate on a whole system or on a selection. They
-// exist here because the menu is this unit's; their handlers are step 4.4's.
-// An empty item is a separator.
+// A submenu of placeholder entries with no handler yet, shown disabled. An empty item is a
+// separator.
 QMenu* addPendingMenu( QMenu* aParent, const QString& aTitle, const QStringList& aItems )
 {
    QMenu* menu = aParent->addMenu( aTitle );
@@ -143,6 +149,7 @@ void Frm_Editor::buildMenu()
                                               &Frm_Editor::setSystemType );
    Mnu_SetSystemType->setEnabled( false );
    Mnu_System->addSeparator();
+   // Not implemented yet, so always disabled.
    for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
                               "Remove region from games names" } )
       Mnu_System->addAction( QLatin1String( text ) )->setEnabled( false );
@@ -192,9 +199,8 @@ void Frm_Editor::buildMenu()
          Mnu_DeleteWoPrompt->setChecked( false );
    } );
 
-   // The Megadrive is the Genesis in North America, and the logo differs. The
-   // Delphi rewrote the combo item and then set ItemIndex to the loop counter,
-   // which jumped the selection to that system (or past the end of the list).
+   // The Megadrive is the Genesis in North America, and the logo differs. Only the item's
+   // text and the logo change; the selection stays where it is.
    connect( Mnu_Genesis, &QAction::toggled, this, [this] {
       for ( int item = 0; item < Cbx_Systems->count(); ++item ) {
          const SystemEntry system = Cbx_Systems->itemData( item ).value<SystemEntry>();
@@ -255,8 +261,8 @@ void Frm_Editor::buildCentralWidget()
 
    Cbx_Filter = new QComboBox( central );
    Cbx_Filter->setObjectName( QStringLiteral( "Cbx_Filter" ) );
-   for ( const char* name : Cst_FilterNames )
-      Cbx_Filter->addItem( QLatin1String( name ) );
+   for ( int category = 0; category < static_cast<int>( FilterCategory::Count ); ++category )
+      Cbx_Filter->addItem( QLatin1String( Cst_FilterNames[category] ), category );
    Cbx_Filter->setEnabled( false );
    choices->addRow( QStringLiteral( "Select your filter" ), Cbx_Filter );
 
@@ -266,8 +272,7 @@ void Frm_Editor::buildCentralWidget()
    Edt_Search->setEnabled( false );
    choices->addRow( QStringLiteral( "Search" ), Edt_Search );
 
-   // The object names are the Delphi component names, so that findChild can
-   // reach these from a test the way FindComponent would have.
+   // Object names match the member names so a test can reach these with findChild.
    Chk_ListByRom = new QCheckBox( QStringLiteral( "List by Rom name" ), central );
    Chk_ListByRom->setObjectName( QStringLiteral( "Chk_ListByRom" ) );
    Chk_FullRomName = new QCheckBox( QStringLiteral( "Show full Rom name" ), central );
@@ -288,8 +293,7 @@ void Frm_Editor::buildCentralWidget()
    Lbl_NbGamesFound->setObjectName( QStringLiteral( "Lbl_NbGamesFound" ) );
    left->addWidget( Lbl_NbGamesFound );
 
-   // Tbs_Main gets the editor, Tbs_Scrape gets ScrapePanel. Object names match
-   // the Delphi TTabSheets.
+
    Pgc_Editor = new QTabWidget( central );
    Pgc_Editor->setObjectName( QStringLiteral( "Pgc_Editor" ) );
 
@@ -314,7 +318,7 @@ void Frm_Editor::buildCentralWidget()
    connect( Chk_FullRomName, &QCheckBox::toggled, this, &Frm_Editor::refreshFilter );
 
    connect( Lbx_Games->selectionModel(), &QItemSelectionModel::currentChanged, this, [this] {
-      if ( dependsOnSelection( Cbx_Filter->currentIndex() ) )
+      if ( filterDependsOnSelection( currentCategory( Cbx_Filter ) ) )
          refreshFilter();
    } );
 
@@ -374,8 +378,6 @@ void Frm_Editor::buildCentralWidget()
    } );
 }
 
-// Defaults live here now, as the second argument to value(): the ini that used
-// to ship them is gone, and so is its migration.
 void Frm_Editor::LoadFromIni()
 {
    QSettings settings;
@@ -414,7 +416,7 @@ void Frm_Editor::showTipsAtStart()
 
 void Frm_Editor::closeEvent( QCloseEvent* aEvent )
 {
-   // FormCloseQuery (4106) never asked, so quitting mid-edit lost the edit.
+   // Quitting mid-edit must not lose the edit silently.
    if ( !confirmLeaveEdits() ) {
       aEvent->ignore();
       return;
@@ -584,8 +586,7 @@ void Frm_Editor::Cbx_SystemsChange()
    const SystemEntry system = systemData.value<SystemEntry>();
    LoadSystemLogo( system.kind );
 
-   // 964 blanked the search box, whose OnChange then ran the whole list rebuild
-   // a second time. Blocked, because the filter is applied below anyway.
+   // Blocked: clearing the box would re-run the filter, which is applied below anyway.
    {
       const QSignalBlocker blocked( Edt_Search );
       Edt_Search->clear();
@@ -653,7 +654,7 @@ void Frm_Editor::linkExistingMedia()
    if ( !confirmLeaveEdits() )
       return;
 
-   const QVector<MediaLink> candidates = FGamelist.unlinkedMedia();
+   const QVector<MediaLink> candidates = unlinkedMedia( FGamelist );
    if ( candidates.isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No unlinked picture or video found." ) );
@@ -682,7 +683,7 @@ void Frm_Editor::renameMediaAfterRoms()
       return;
 
    // Strict is the superset: if it finds nothing, no checkbox state can.
-   if ( FGamelist.misnamedMedia( true ).isEmpty() ) {
+   if ( misnamedMedia( FGamelist, true ).isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "Every picture and video is named after its ROM." ) );
       return;
@@ -716,7 +717,7 @@ void Frm_Editor::shrinkLargeImages()
       return;
    const qint64 maxBytes = qRound64( megabytes * 1024 * 1024 );
 
-   const QVector<OversizedImage> candidates = FGamelist.oversizedImages( maxBytes );
+   const QVector<OversizedImage> candidates = oversizedImages( FGamelist, maxBytes );
    if ( candidates.isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No picture is over that size." ) );
@@ -839,8 +840,7 @@ void Frm_Editor::LoadSystemLogo( SystemKind aKind )
 {
    const SystemKind kind = ( aKind == skMegaDrive && FGenesisLogo ) ? skGenesis : aKind;
 
-   // LoadSystemLogo had no FileExists guard and no except, so a missing logo
-   // raised. QPixmap says so in its return value instead.
+   // A missing logo file just clears the label.
    if ( !FSystemLogo.load( QLatin1String( Cst_LogoPicsFolder ) +
                            QLatin1String( Cst_SystemKindImageNames[kind] ) ) ) {
       FSystemLogo = QPixmap();
@@ -953,7 +953,7 @@ void Frm_Editor::refreshFilter()
    FIsLoading = true;
 
    FilterSpec filter;
-   filter.index = qMax( 0, Cbx_Filter->currentIndex() );
+   filter.category = currentCategory( Cbx_Filter );
    filter.search = Edt_Search->text();
    filter.listByRom = Chk_ListByRom->isChecked();
    filter.fullRomName = Chk_FullRomName->isChecked();
@@ -970,7 +970,7 @@ void Frm_Editor::updateCount()
    const int shown = FProxy->rowCount();
 
    Lbl_NbGamesFound->setText(
-      Cbx_Filter->currentIndex() <= 0
+      currentCategory( Cbx_Filter ) == FilterCategory::All
          ? QStringLiteral( "%1 game(s) found." ).arg( shown )
          : QStringLiteral( "%1 / %2 game(s) found." ).arg( shown ).arg( FModel->rowCount() ) );
 }

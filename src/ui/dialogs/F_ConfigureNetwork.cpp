@@ -15,7 +15,7 @@
 namespace {
 
 // Only used to fill the combo below, so it stays here rather than in Resources.
-// Order is TLangName's, which makes the combo index the stored value.
+// Order is LangName's, which makes the combo index the stored value.
 constexpr const char* Cst_LangNameFull[lnCount] = { "French", "German", "English", "Spanish",
                                                     "Portuguese (BR)" };
 
@@ -33,9 +33,7 @@ Frm_Network::Frm_Network( QWidget* aParent ) : QDialog( aParent )
    Edt_ScreenLogin = new QLineEdit( scraper );
    Edt_ScreenPwd = new QLineEdit( scraper );
 
-   // The DFM showed both passwords in clear. They are still stored in clear -
-   // that is a separate decision - but there is no reason to put them on screen
-   // for anyone standing behind you.
+   // Passwords are stored in clear in the settings, but need not be shown on screen.
    Edt_ScreenPwd->setEchoMode( QLineEdit::PasswordEchoOnEdit );
 
    Cbx_ScrapeLanguage = new QComboBox( scraper );
@@ -110,8 +108,8 @@ void Frm_Network::saveToSettings()
 
    settings.setValue( QLatin1String( Cst_IniProxyUse ), Grp_Proxy->isChecked() );
    settings.setValue( QLatin1String( Cst_IniProxyServer ), Edt_ProxyServer->text() );
-   // An empty port is stored as 0, as the Delphi did: the scraper treats it as
-   // "no port given" and a missing key would read back as an empty string.
+   // An empty port is stored as 0: the scraper treats it as "no port given" and a missing
+   // key would read back as an empty string.
    settings.setValue( QLatin1String( Cst_IniProxyPort ), Edt_ProxyPort->text().isEmpty()
                                                             ? QStringLiteral( "0" )
                                                             : Edt_ProxyPort->text() );

@@ -1,100 +1,30 @@
 #include "Gamelist.h"
 
-#include <QBuffer>
 #include <QDate>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
-#include <QImageReader>
-#include <QImageWriter>
-#include <QMimeDatabase>
 #include <QSaveFile>
 #include <QSet>
 
-#include <cmath>
-
 namespace {
 
-// Where new media lands when the system has none yet to copy the layout from.
-// The Delphi left both empty in that case, which dropped scraped art straight
-// into the ROM folder; this is the layout EmulationStation itself writes.
+// Where new media lands when the system has none yet to copy the layout from:
+// the layout EmulationStation itself writes.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
-
-// Media already on disk is looked for in the gamelist's own folder, then in these:
-// ES writes ./media/..., older setups and ScummVM keep plain ./images.
-const QStringList Cst_ImageSearchFolders = { QStringLiteral( "./media/images/" ),
-                                             QStringLiteral( "./images/" ) };
-const QStringList Cst_VideoSearchFolders = { QStringLiteral( "./media/videos/" ),
-                                             QStringLiteral( "./videos/" ) };
-
-// What scrapers append to the ROM name, in order of preference: the plain name first.
-const QStringList Cst_ImageStems = { QString(), QStringLiteral( "-image" ) };
-const QStringList Cst_VideoStems = { QString(), QStringLiteral( "-video" ) };
-
-// Kind of file by MIME type, so no extension list to keep.
-const QString Cst_ImageMime = QStringLiteral( "image/" );
-const QString Cst_VideoMime = QStringLiteral( "video/" );
-
-// The files of aDir whose MIME type starts with aMimePrefix, by lower-cased name
-// without the extension ("x.scummvm.png" is "x.scummvm") -> the real name. Judged
-// by file name alone: nothing is opened. Of several files with the same name
-// (Sonic.png, Sonic.jpg) the first in name order wins.
-QHash<QString, QString> mediaIndex( const QDir& aDir, const QString& aMimePrefix )
-{
-   const QMimeDatabase mimes;
-   QHash<QString, QString> index;
-   for ( const QString& name : aDir.entryList( QDir::Files ) ) {
-      if ( !mimes.mimeTypeForFile( name, QMimeDatabase::MatchExtension )
-              .name()
-              .startsWith( aMimePrefix ) )
-         continue;
-
-      const QString key = QFileInfo( name ).completeBaseName().toLower();
-      if ( !index.contains( key ) )
-         index.insert( key, name );
-   }
-   return index;
-}
-
-// The file name for the first base+stem that aIndex holds, or empty.
-QString findMedia( const QHash<QString, QString>& aIndex, const QStringList& aBases,
-                   const QStringList& aStems )
-{
-   for ( const QString& base : aBases ) {
-      for ( const QString& stem : aStems ) {
-         const QString name = aIndex.value( base + stem );
-         if ( !name.isEmpty() )
-            return name;
-      }
-   }
-   return {};
-}
 
 QString folderOf( const QString& aLink )
 {
    return aLink.left( aLink.lastIndexOf( QLatin1Char( '/' ) ) + 1 );
 }
 
-// The Delphi's GetNodeValue: a missing node reads as empty rather
-// than raising, which is what made the unguarded FindNode(...).Text calls
-// stand out as bugs.
+// A missing node reads as empty.
 QString childText( const QDomElement& aNode, const char* aName )
 {
    return aNode.firstChildElement( QLatin1String( aName ) ).text();
-}
-
-// GetPhysicalRomPath / GetPhysicalMediaPath, minus the six
-// hardcoded backslashes: gamelist paths are relative to the system folder and
-// start with "./", which cleanPath folds away.
-QString physicalPath( const QString& aSystemDir, const QString& aRelative )
-{
-   if ( aRelative.isEmpty() )
-      return {};
-
-   return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
 }
 
 // Where a file about to be written should land. The directory follows an existing
@@ -107,8 +37,8 @@ QString writeTarget( const QString& aSystemDir, const QString& aLink )
    return QDir( resolvePath( info.path() ) ).filePath( info.fileName() );
 }
 
-// CheckIfFileMissing. Snapshot at load: the proxy must not stat a
-// file per row on every keystroke.
+// Evaluated once at load, so filtering does not stat a file per row on every
+// keystroke. An empty link counts as missing.
 bool fileMissing( const QString& aPath )
 {
    return aPath.isEmpty() || !QFileInfo::exists( aPath );
@@ -121,8 +51,7 @@ bool fail( QString* aError, const QString& aMessage )
    return false;
 }
 
-// AdjustDecimalSeparator + StrToFloatDef (F_Main 1104, 1283). Ratings are
-// written with either separator; an unparseable one counts as 0, as it did.
+// Ratings are written with either decimal separator; an unparseable one counts as 0.
 double ratingValue( const QString& aRating )
 {
    QString text = aRating;
@@ -141,12 +70,22 @@ QDate releaseDateValue( const QString& aDisplayDate )
 
 }  // namespace
 
+// Gamelist paths are relative to the system folder and start with "./", which
+// cleanPath folds away. Always joined with '/', which Qt accepts on every platform.
+QString physicalPath( const QString& aSystemDir, const QString& aRelative )
+{
+   if ( aRelative.isEmpty() )
+      return {};
+
+   return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
+}
+
 QVector<SystemEntry> scanSystems( const QString& aRootPath )
 {
    QVector<SystemEntry> systems;
 
-   // Dirs by attribute, not by a '*.*' mask
-   // Hidden folders stay out, which is what Info.Name[1] <> '.' was for.
+   // Folders by attribute, not by a '*.*' name filter, which needs a literal dot and
+   // so would miss folder names like "snes". Hidden folders are left out.
    const QDir root( aRootPath );
    const QStringList folders = root.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
 
@@ -179,8 +118,8 @@ QString resolvePath( const QString& aPath )
    else if ( resolved.size() == 2 && resolved.at( 1 ) == QLatin1Char( ':' ) )
       resolved += QLatin1Char( '/' );
 
-   // re-lists the containing directory on every component that misses,
-   // so a ROM folder that is absent altogether costs one listing per game. That
+   // ponytail: a miss re-lists the containing directory for each component, so a
+   // ROM folder that is absent altogether costs one listing per game. That
    // only happens on the orphan path; cache listings per directory if it shows.
    for ( int index = 0; index < parts.size(); ++index ) {
       const QString& part = parts.at( index );
@@ -210,8 +149,8 @@ QString resolvePath( const QString& aPath )
    return resolved;
 }
 
-// I do not use Qt's date parsing because this would be a behavior change
-// (previously-accepted garbage dates would now render as empty
+// Hand-rolled: a partly-known date carries "00" for the unknown month or day, and the
+// display form leaves those parts out.
 QString gamelistDateToDisplay( const QString& aValue )
 {
    if ( aValue.size() < 8 )
@@ -472,8 +411,7 @@ bool Gamelist::save( QString* aError )
       return fail( aError, QStringLiteral( "Cannot write %1: %2" )
                               .arg( FSystem.gamelistPath, file.errorString() ) );
 
-   // The whole document is re-indented, where the Delphi reformatted only when
-   // it had added a node. Three spaces is what EmulationStation writes.
+   // The whole document is re-indented; three spaces is what EmulationStation writes.
    const QByteArray content = FDocument.toByteArray( 3 );
    if ( file.write( content ) != content.size() ) {
       file.cancelWriting();
@@ -544,7 +482,7 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
 
       if ( aWhich & gfReleaseDate ) {
          // A date in none of the three accepted forms is stored blank and comes
-         // back blank, which is what the hint under Edt_ReleaseDate promises.
+         // back blank.
          const QString stored = displayDateToGamelist( aValues.releaseDate );
          setChildText( node, Cst_ReleaseDate, stored );
          game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
@@ -576,8 +514,7 @@ bool Gamelist::applyImage( int aIndex, const QImage& aPicture, QString* aError )
       return fail( aError,
                    QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
 
-   // The suffix picks the format, so this re-encodes to PNG the way
-   // Picture.SaveToFile did
+   // The suffix picks the format, so this always re-encodes to PNG.
    if ( !aPicture.save( target ) )
       return fail( aError, QStringLiteral( "Cannot write %1." ).arg( target ) );
 
@@ -622,7 +559,6 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
 
    int changed = 0;
    for ( int index = 0; index < FGames.size(); ++index ) {
-      // The missing-image test the caption always claimed and the code never had.
       if ( !FGames.at( index ).missingImage )
          continue;
       if ( !applyImage( index, picture, aError ) )
@@ -634,67 +570,6 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
       return 0;
 
    return changed;
-}
-
-QVector<MediaLink> Gamelist::unlinkedMedia() const
-{
-   struct Kind
-   {
-      bool isImage;
-      const QString& mime;
-      QStringList folders;  // the gamelist's own first, then the usual ones
-      const QStringList& stems;
-   };
-   const Kind kinds[] = {
-      { true, Cst_ImageMime, QStringList( FImageFolder ) + Cst_ImageSearchFolders, Cst_ImageStems },
-      { false, Cst_VideoMime, QStringList( FVideoFolder ) + Cst_VideoSearchFolders, Cst_VideoStems },
-   };
-
-   QVector<MediaLink> found;
-   for ( const Kind& kind : kinds ) {
-      // One index per folder: the match is case-blind but the link keeps the
-      // file's real case, which a case-sensitive FS needs.
-      struct Folder
-      {
-         QDir dir;
-         QHash<QString, QString> index;
-      };
-      QVector<Folder> folders;
-      QStringList seen;
-      for ( const QString& link : kind.folders ) {
-         // An empty folder (a link with no '/') would be QDir(""): the working directory.
-         const QString path = physicalPath( FSystemDir, link );
-         if ( path.isEmpty() || seen.contains( path ) )
-            continue;
-         seen << path;
-
-         Folder folder{ QDir( path ), {} };
-         folder.index = mediaIndex( folder.dir, kind.mime );
-         if ( !folder.index.isEmpty() )
-            folders.append( folder );
-      }
-      if ( folders.isEmpty() )
-         continue;
-
-      for ( int index = 0; index < FGames.size(); ++index ) {
-         const Game& game = FGames.at( index );
-         if ( !( kind.isImage ? game.missingImage : game.missingVideo ) || game.romPath.isEmpty() )
-            continue;
-
-         // "Sonic" for Sonic.zip, and "Sonic.zip" itself: ES names the media of a
-         // ScummVM "game" folder, wetlands-us.scummvm, after the whole name.
-         const QStringList bases = { game.romNameWoExt().toLower(), game.romName().toLower() };
-         for ( const Folder& folder : folders ) {
-            const QString name = findMedia( folder.index, bases, kind.stems );
-            if ( !name.isEmpty() ) {
-               found.append( { index, kind.isImage, folder.dir.filePath( name ) } );
-               break;
-            }
-         }
-      }
-   }
-
-   return found;
 }
 
 int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
@@ -732,59 +607,6 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
    }
 
    return linked;
-}
-
-QVector<MediaRename> Gamelist::misnamedMedia( bool aStrict ) const
-{
-   QVector<MediaRename> found;
-   QSet<QString> claimed;  // lower-cased new paths, so two games cannot take one name
-
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      const Game& game = FGames.at( index );
-      if ( game.romPath.isEmpty() )
-         continue;
-
-      for ( const bool isImage : { true, false } ) {
-         if ( isImage ? game.missingImage : game.missingVideo )
-            continue;
-
-         const QString path = isImage ? game.physicalImagePath : game.physicalVideoPath;
-         const QFileInfo info( path );
-         const QString stem = info.completeBaseName();
-
-         bool named = false;
-         const QStringList lenient = isImage ? Cst_ImageStems : Cst_VideoStems;
-         for ( const QString& base : { game.romNameWoExt(), game.romName() } ) {
-            for ( const QString& suffix : aStrict ? QStringList( QString() ) : lenient )
-               named = named || stem == base + suffix;
-         }
-         if ( named )
-            continue;
-
-         MediaRename rename{ index, isImage, path, {}, {} };
-         rename.newPath = info.dir().filePath(
-            info.suffix().isEmpty() ? game.romNameWoExt()
-                                    : game.romNameWoExt() + QLatin1Char( '.' ) + info.suffix() );
-
-         // ponytail: a case-only rename on a case-folding filesystem is offered but
-         // QFile::rename may refuse it; the whole batch then rolls back. Upgrade: two
-         // steps through a temporary name.
-         if ( fileShared( index, path, isImage ) ) {
-            rename.problem = QStringLiteral( "shared with another game" );
-         } else if ( QFileInfo::exists( rename.newPath ) &&
-                     QFileInfo( rename.newPath ).canonicalFilePath() != info.canonicalFilePath() ) {
-            rename.problem = QStringLiteral( "a file with that name exists" );
-         } else if ( claimed.contains( rename.newPath.toLower() ) ) {
-            rename.problem = QStringLiteral( "another game is renamed to that name" );
-         } else {
-            claimed.insert( rename.newPath.toLower() );
-         }
-
-         found.append( rename );
-      }
-   }
-
-   return found;
 }
 
 int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError )
@@ -847,8 +669,8 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
       return fail( aError,
                    QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
 
-   // Picking the game's own video would otherwise be remove-then-copy, i.e. a
-   // deletion. TFile.Copy raised instead; either way, do not lose the file.
+   // Choosing the game's own video would otherwise remove the file and then copy
+   // from it, i.e. a deletion; the copy is skipped when source and target are one file.
    const QString source = QFileInfo( aSourcePath ).canonicalFilePath();
    if ( source.isEmpty() )
       return fail( aError, QStringLiteral( "%1 cannot be read." ).arg( aSourcePath ) );
@@ -881,87 +703,6 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
    }
 
    return false;
-}
-
-QVector<OversizedImage> Gamelist::oversizedImages( qint64 aMaxBytes ) const
-{
-   QVector<OversizedImage> found;
-   QSet<QString> seen;
-
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      const QString& path = FGames.at( index ).physicalImagePath;
-      if ( path.isEmpty() || seen.contains( path ) )
-         continue;
-      seen.insert( path );
-
-      const qint64 size = QFileInfo( path ).size();
-      if ( size > aMaxBytes )
-         found.append( { index, path, size } );
-   }
-
-   return found;
-}
-
-qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError )
-{
-   const auto failed = [&]( const QString& aMessage ) {
-      fail( aError, QStringLiteral( "%1: %2" ).arg( QFileInfo( aPath ).fileName(), aMessage ) );
-      return qint64( -1 );
-   };
-
-   // The reader is scoped so its file handle is closed before QSaveFile renames over
-   // aPath: Windows refuses to replace a file that is still open.
-   QByteArray format;
-   QImage picture;
-   {
-      QImageReader reader( aPath );
-      reader.setAutoTransform( false );
-      format = reader.format();
-      if ( reader.imageCount() > 1 )
-         return failed( QStringLiteral( "animated pictures are left alone." ) );
-
-      picture = reader.read();
-      if ( picture.isNull() )
-         return failed( reader.errorString() );
-   }
-
-   const qint64 original = QFileInfo( aPath ).size();
-   if ( original <= aMaxBytes )
-      return original;
-
-   // Size follows the pixel count, so aim at the area ratio and correct from what
-   // the encoder really produced. Always scaled from the original: scaling the
-   // scaled copy over and over would blur it. 0.95 aims a little under the limit.
-   double factor = std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( original ) ) * 0.95;
-   QByteArray encoded;
-   for ( int pass = 0; pass < 8; ++pass ) {
-      const QSize size( qMax( 1, qRound( picture.width() * factor ) ),
-                        qMax( 1, qRound( picture.height() * factor ) ) );
-      const QImage scaled = picture.scaled( size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation );
-
-      encoded.clear();
-      QBuffer buffer( &encoded );
-      buffer.open( QIODevice::WriteOnly );
-      QImageWriter writer( &buffer, format );
-      if ( !writer.write( scaled ) )
-         return failed( writer.errorString() );
-
-      if ( encoded.size() <= aMaxBytes )
-         break;
-
-      factor *= std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( encoded.size() ) ) * 0.95;
-      encoded.clear();
-   }
-
-   if ( encoded.isEmpty() )
-      return failed( QStringLiteral( "cannot be made that small." ) );
-
-   QSaveFile file( aPath );
-   if ( !file.open( QIODevice::WriteOnly ) || file.write( encoded ) != encoded.size() ||
-        !file.commit() )
-      return failed( file.errorString() );
-
-   return encoded.size();
 }
 
 bool Gamelist::removeImage( int aIndex, QString* aError )
@@ -1144,7 +885,7 @@ void Gamelist::ensureHashes( int aIndex )
 
    Game& game = FGames[aIndex];
 
-   // An orphan hashes to nothing rather than raising
+   // An orphan (unreadable ROM) hashes to the empty string.
    if ( game.md5.isEmpty() )
       game.md5 = fileHash( game.physicalRomPath, QCryptographicHash::Md5 );
    if ( game.sha1.isEmpty() )
@@ -1161,7 +902,7 @@ bool Gamelist::accepts( int aIndex, const FilterSpec& aFilter ) const
    if ( !matchesCategory( FGames.at( aIndex ), aFilter ) )
       return false;
 
-   // ContainsText was case-insensitive, and matched whatever the list displays.
+   // Case-insensitive, against whatever the list displays.
    return aFilter.search.isEmpty() ||
           displayName( aIndex, aFilter ).contains( aFilter.search, Qt::CaseInsensitive );
 }
@@ -1183,65 +924,71 @@ QString Gamelist::displayName( int aIndex, const FilterSpec& aFilter ) const
 
 bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) const
 {
-   switch ( aFilter.index ) {
-      case 0: return true;
-      case 1: return aGame.missingImage;
-      case 2: return aGame.missingVideo;
-      case 3: return aGame.releaseDate.isEmpty();
-      case 4: return aGame.players.isEmpty();
-      case 5: return aGame.rating.isEmpty();
-      case 6: return aGame.developer.isEmpty();
-      case 7: return aGame.publisher.isEmpty();
-      case 8: return aGame.description.isEmpty();
-      case 9: return aGame.genre.isEmpty();
-      case 10: return aGame.region.isEmpty();
-      case 11: return aGame.kidGame == 1;
-      case 12: return aGame.hidden == 1;
-      case 13: return aGame.favorite == 1;
-      case 14: return aGame.isOrphan;
-      case 29: return FNameCounts.value( aGame.name ) > 1;
-      case 30: return FRomCounts.value( aGame.romName() ) > 1;
-      default: break;
-   }
-
-   if ( aFilter.reference < 0 || aFilter.reference >= FGames.size() )
+   // The "same as" categories compare against the selected game; with none selected
+   // nothing matches.
+   const bool needsReference = filterDependsOnSelection( aFilter.category );
+   if ( needsReference && ( aFilter.reference < 0 || aFilter.reference >= FGames.size() ) )
       return false;
 
-   const Game& reference = FGames.at( aFilter.reference );
+   // Only read by the categories above, for which it is valid. No default in the
+   // switch below, so the compiler flags a category added to the enum and not handled.
+   const Game& reference = needsReference ? FGames.at( aFilter.reference ) : aGame;
 
-   switch ( aFilter.index ) {
-      case 15: return aGame.region == reference.region;
-      case 16: return aGame.releaseDate == reference.releaseDate;
-      case 17:
-      case 18: {
+   switch ( aFilter.category ) {
+      case FilterCategory::All: return true;
+      case FilterCategory::MissingImage: return aGame.missingImage;
+      case FilterCategory::MissingVideo: return aGame.missingVideo;
+      case FilterCategory::MissingDate: return aGame.releaseDate.isEmpty();
+      case FilterCategory::MissingPlayers: return aGame.players.isEmpty();
+      case FilterCategory::MissingRating: return aGame.rating.isEmpty();
+      case FilterCategory::MissingDeveloper: return aGame.developer.isEmpty();
+      case FilterCategory::MissingPublisher: return aGame.publisher.isEmpty();
+      case FilterCategory::MissingDescription: return aGame.description.isEmpty();
+      case FilterCategory::MissingGenre: return aGame.genre.isEmpty();
+      case FilterCategory::MissingRegion: return aGame.region.isEmpty();
+      case FilterCategory::KidGame: return aGame.kidGame == 1;
+      case FilterCategory::Hidden: return aGame.hidden == 1;
+      case FilterCategory::Favorite: return aGame.favorite == 1;
+      case FilterCategory::Orphan: return aGame.isOrphan;
+      case FilterCategory::DuplicateNames: return FNameCounts.value( aGame.name ) > 1;
+      case FilterCategory::DuplicateRoms: return FRomCounts.value( aGame.romName() ) > 1;
+
+      case FilterCategory::SameRegion: return aGame.region == reference.region;
+      case FilterCategory::SameDate: return aGame.releaseDate == reference.releaseDate;
+      case FilterCategory::SameOrEarlierDate:
+      case FilterCategory::SameOrLaterDate: {
          if ( aGame.releaseDate.isEmpty() )
             return false;
-         // An unset reference date meant "today" in the Delphi, via StrToDateDef.
+         // An unset reference date counts as today.
          QDate referenceDate = releaseDateValue( reference.releaseDate );
          if ( !referenceDate.isValid() )
             referenceDate = QDate::currentDate();
          const QDate date = releaseDateValue( aGame.releaseDate );
-         return aFilter.index == 17 ? date <= referenceDate : date >= referenceDate;
+         return aFilter.category == FilterCategory::SameOrEarlierDate ? date <= referenceDate
+                                                                      : date >= referenceDate;
       }
-      case 19: return aGame.players == reference.players;
-      case 20: return aGame.rating == reference.rating;
-      case 21:
+      case FilterCategory::SamePlayers: return aGame.players == reference.players;
+      case FilterCategory::SameRating: return aGame.rating == reference.rating;
+      case FilterCategory::SameOrLowerRating:
          return !aGame.rating.isEmpty() &&
                 ratingValue( aGame.rating ) <= ratingValue( reference.rating );
-      case 22:
+      case FilterCategory::SameOrHigherRating:
          return !aGame.rating.isEmpty() &&
                 ratingValue( aGame.rating ) >= ratingValue( reference.rating );
-      case 23: return aGame.publisher == reference.publisher;
-      case 24: return aGame.developer == reference.developer;
-      case 25: return aGame.genre == reference.genre;
-      // Trap: AnsiSameText here was a case-insensitive compare of two paths,
-      // which on Linux would call two distinct directories the same one. The
-      // case is already settled against the disk by resolvePath, so compare it.
-      case 26:
+      case FilterCategory::SamePublisher: return aGame.publisher == reference.publisher;
+      case FilterCategory::SameDeveloper: return aGame.developer == reference.developer;
+      case FilterCategory::SameGenre: return aGame.genre == reference.genre;
+      // Compared as written, not case-insensitively: on Linux two distinct directories
+      // can differ only in case. The case is already settled against the disk by
+      // resolvePath.
+      case FilterCategory::SameFolder:
          return QFileInfo( aGame.physicalRomPath ).path() ==
                 QFileInfo( reference.physicalRomPath ).path();
-      case 27: return aGame.name == reference.name;
-      case 28: return aGame.romName() == reference.romName();
-      default: return false;
+      case FilterCategory::SameName: return aGame.name == reference.name;
+      case FilterCategory::SameRom: return aGame.romName() == reference.romName();
+
+      case FilterCategory::Count: break;
    }
+
+   return false;
 }

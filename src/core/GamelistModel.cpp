@@ -11,8 +11,8 @@ void GamelistModel::setGamelist( const Gamelist* aGamelist )
 
 void GamelistModel::setFilter( const FilterSpec& aFilter )
 {
-   // Chk_ListByRom and Chk_FullRomName change what every row reads, not which
-   // rows there are - so they are a repaint, and the selection survives them.
+   // listByRom and fullRomName change what every row reads, not which rows there
+   // are - so they are a repaint, and the selection survives them.
    const bool displayChanged =
       aFilter.listByRom != FFilter.listByRom || aFilter.fullRomName != FFilter.fullRomName;
 
@@ -62,8 +62,8 @@ QVariant GamelistModel::data( const QModelIndex& aIndex, int aRole ) const
 
 GamelistFilter::GamelistFilter( QObject* aParent ) : QSortFilterProxyModel( aParent )
 {
-   // Sorted by what the row displays, so it follows Chk_ListByRom / Chk_FullRomName
-   // and edits (dataChanged re-sorts while dynamicSortFilter is on, the default).
+   // Sorted by what the row displays, so it follows listByRom / fullRomName and
+   // edits (dataChanged re-sorts while dynamicSortFilter is on, the default).
    setSortCaseSensitivity( Qt::CaseInsensitive );
 
    sort( 0 );

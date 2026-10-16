@@ -17,14 +17,10 @@ class QPushButton;
 class QShowEvent;
 class QTabWidget;
 
-// The 12 editable fields, the picture and the media buttons - the right-hand
-// half of Tbs_Main.
+// The 12 editable fields, the picture and the media buttons.
 //
-// The Delphi had no such thing: SaveChangesToGamelist read 15 widgets inline,
-// CheckIfChangesToSave compared 12 of them against the TGame on every keystroke
-// and stored the answer in Btn_SaveChanges.Enabled, and FIsLoading was form-wide
-// state guarding the round trip. Here the widgets produce one GameFields value,
-// the dirty flag is a comparison of two of those, and FIsLoading is private.
+// The widgets produce one GameFields value, and the dirty flag is a comparison of two of
+// those.
 //
 // It addresses games by index into the Gamelist, never by pointer, and it drives
 // both save paths: one game compares against what is stored, several compare
@@ -47,12 +43,12 @@ public:
    GameFields fields() const;
    void setFields( const GameFields& aFields );
 
-   // CheckIfChangesToSave (1039), as one comparison instead of twelve.
+   // True if the fields differ from what is stored.
    bool isDirty() const;
 
-   // Btn_SaveChangesClick (1958). Writes the gamelist and reloads the fields
-   // from it, so what is on screen is what was actually stored. False if the
-   // write failed: the Gamelist is then left as it was and the edit stays dirty.
+   // Writes the gamelist and reloads the fields from it, so what is on screen is what
+   // was actually stored. False if the write failed: the Gamelist is then left as it
+   // was and the edit stays dirty.
    bool save();
 
    // God mode shows Delete Game; aSkipPrompt drops its confirmation.
@@ -69,8 +65,8 @@ signals:
    // looks at. The form re-runs the filter and repaints.
    void gamesChanged();
 
-   // Btn_MoreInfos. The hash prompt reads a setting the form owns, so it stays
-   // there; the panel only says which game.
+   // The hash prompt reads a setting the form owns, so it stays there; the panel only
+   // says which game.
    void moreInfosRequested( int aIndex );
 
    // A game is gone from the Gamelist and every index above it moved, so the
@@ -87,9 +83,9 @@ protected:
 
 private:
    void buildLayout();
-   void loadGame( int aIndex );  // LoadGame (1511)
+   void loadGame( int aIndex );
    void updateDirty();
-   void enableComponents();  // EnableComponents (1400)
+   void enableComponents();
    void showPicture( int aIndex );
    void scalePicture();
    void reload();
@@ -99,8 +95,8 @@ private:
    void syncVideo();
    void updateVideoTab( bool aHasVideo );
 
-   // The five picture/video buttons (1585-1815). Each one is a file dialog and a
-   // call into Gamelist, which owns the gamelist document and the media folders.
+   // Each of these is a file dialog and a call into Gamelist, which owns the gamelist
+   // document and the media folders.
    void chooseImage();
    void chooseVideo();
    void setDefaultPicture();

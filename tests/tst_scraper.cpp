@@ -1,12 +1,14 @@
-// Scraper: the XML parsing half of jeuInfos.php, against a canned response -
-// no network in this test. Covers the per-language fallback chains FillFields
-// used to run inline, the media-type filter that replaced the nine
-// checkboxes, and the two failure paths (no <jeu>, malformed XML).
+// Scraper: parsing of the ScreenScraper response against a canned reply (no network),
+// covering the per-language fallback chains, the media-type filter, the failure paths,
+// password scrubbing and query encoding.
 
 #include "QtPrinters.h"
 #include "Scraper.h"
 
 #include <gtest/gtest.h>
+
+#include <QUrl>
+#include <QUrlQuery>
 
 namespace {
 
@@ -65,7 +67,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
       << error.toStdString();
 
    // Name is keyed by region, not language: English has no "en" region entry,
-   // so this falls through to the "eu" region exactly as FillFields did.
+   // so this falls through to the "eu" region.
    EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball (Europe)" ) );
    EXPECT_EQ( info.region, QStringLiteral( "Europe - USA" ) );
    EXPECT_EQ( info.description, QStringLiteral( "Sonic and Tails team up." ) );
@@ -76,7 +78,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
    EXPECT_EQ( info.players, QStringLiteral( "2" ) );
    EXPECT_EQ( info.rating, QStringLiteral( "18" ) );
 
-   // "wheel" was not in aMediaTypes, so only box-2D and ss made it through.
+   // "wheel" was not in mediaTypes, so only box-2D and ss made it through.
    ASSERT_EQ( info.pictures.size(), 2 );
    EXPECT_EQ( info.pictures.at( 0 ).fileLink,
               QStringLiteral( "https://example.invalid/box2d.png" ) );
@@ -162,9 +164,45 @@ TEST( SanitizeUrl, ScrubsBothDevAndUserPasswordAnywhereInTheMessage )
    EXPECT_TRUE( safe.contains( QStringLiteral( "sspassword=&" ) ) );
 }
 
-// Self-check for the unconfigured build: must fail fast, offline, with a hint.
-// Bytes worked out by hand from key(i) = (0xA5 + 31*i) & 0xFF, not by calling the encoder, so a
-// change to either side of the CMake/C++ pair shows up here.
+// A password such as p&ss#w+rd%41 used to go into the URL raw: '&' ended the value,
+// '#' started a fragment and dropped everything after it (crc, systemid, romnom), '+'
+// read as a space. The only reliable check is to parse the URL back the way the server
+// does and compare every value with what went in.
+TEST( Scraper, QueryRoundTripsValuesWithReservedCharacters )
+{
+   ScrapeRequest request;
+   request.systemId = QStringLiteral( "64" );
+   request.crc32 = QStringLiteral( "BCD9EC52" );
+   request.romName = QStringLiteral( "Sonic & Knuckles #2 (v1+2) 100%.zip" );
+   request.romSize = 901120;
+   request.ssLogin = QStringLiteral( "user&name=x" );
+   request.ssPassword = QStringLiteral( "p&ss#w+rd%41 \u00e4" );
+
+   const QUrl url( buildGameQuery( request ) );
+   const QUrlQuery query( url );
+   const auto value = [&]( const char* aKey ) {
+      return query.queryItemValue( QLatin1String( aKey ), QUrl::FullyDecoded );
+   };
+
+   EXPECT_TRUE( url.fragment().isEmpty() );
+   EXPECT_EQ( value( "ssid" ), request.ssLogin );
+   EXPECT_EQ( value( "sspassword" ), request.ssPassword );
+   EXPECT_EQ( value( "crc" ), request.crc32 );
+   EXPECT_EQ( value( "systemid" ), request.systemId );
+   EXPECT_EQ( value( "romnom" ), request.romName );
+   EXPECT_EQ( value( "romtaille" ), QStringLiteral( "901120" ) );
+}
+
+TEST( Scraper, QueryOmitsUserLoginWhenEitherHalfIsMissing )
+{
+   ScrapeRequest request;
+   request.ssLogin = QStringLiteral( "user" );
+
+   EXPECT_FALSE( QUrlQuery( QUrl( buildGameQuery( request ) ) ).hasQueryItem( QStringLiteral( "ssid" ) ) );
+}
+
+// Bytes worked out by hand from key(i) = (0xA5 + 31*i) & 0xFF, not by calling the encoder,
+// so a change to either side of the CMake/C++ pair shows up here.
 TEST( Scraper, DecodesXorEncodedDevSecret )
 {
    const unsigned char abc[] = { 0xC4, 0xA6, 0x80, 0x02 };
@@ -174,6 +212,7 @@ TEST( Scraper, DecodesXorEncodedDevSecret )
    EXPECT_TRUE( decodeDevSecret( empty ).isEmpty() );
 }
 
+// An unconfigured build must fail fast, offline, with a hint.
 TEST( Scraper, FailsWithoutDevCredentials )
 {
    if ( devCredentialsConfigured() )

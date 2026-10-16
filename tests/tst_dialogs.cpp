@@ -1,7 +1,4 @@
-// Construction smoke tests for the step-3 dialogs, plus the one behaviour in
-// them that is not just widget plumbing. Building a dialog exercises every
-// layout, parenting and signal connection in its constructor, which is where
-// a code-built UI actually breaks.
+// Construction smoke tests for the dialogs, plus the Help dialog's opt-out behaviour.
 
 #include "F_About.h"
 #include "F_AdvNameEditor.h"
@@ -49,10 +46,8 @@ TEST( Dialogs, MoreInfosShowsAGamesFields )
    SUCCEED();
 }
 
-// The Delphi's menu caller passed FShowTips straight in and assigned the
-// negated result back, so every visit to Help from the menu silently flipped
-// "show tips at start". With the opt-out hidden the setting must come back
-// untouched - both ways round.
+// With the opt-out hidden, opening Help must hand the "show tips" setting back
+// unchanged, in both states.
 TEST( Dialogs, HelpLeavesTheSettingAloneWhenTheOptOutIsHidden )
 {
    Frm_Help dialog;
@@ -64,8 +59,7 @@ TEST( Dialogs, HelpLeavesTheSettingAloneWhenTheOptOutIsHidden )
    EXPECT_FALSE( dialog.Execute( false, false ) );
 }
 
-// The startup caller does offer the opt-out. Left alone, the checkbox stays
-// clear and tips stay on.
+// With the opt-out offered but not ticked, tips stay on.
 TEST( Dialogs, HelpKeepsTipsOnWhenTheOptOutIsNotTaken )
 {
    Frm_Help dialog;

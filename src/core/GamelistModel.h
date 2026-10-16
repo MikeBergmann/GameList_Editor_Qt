@@ -5,9 +5,7 @@
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
 
-// Lbx_Games, as a model instead of as the store.
-//
-// Here a row is an index into the Gamelist and nothing else.
+// List model over a Gamelist: a row is an index into it and nothing else.
 class GamelistModel : public QAbstractListModel
 {
    Q_OBJECT
@@ -15,7 +13,7 @@ class GamelistModel : public QAbstractListModel
 public:
    explicit GamelistModel( QObject* aParent = nullptr );
 
-   // Borrowed, not owned: Editor holds the Gamelist of the chosen system.
+   // Borrowed, not owned: the caller keeps the Gamelist alive.
    // Null is legal and means "no system loaded", not an error.
    void setGamelist( const Gamelist* aGamelist );
 
