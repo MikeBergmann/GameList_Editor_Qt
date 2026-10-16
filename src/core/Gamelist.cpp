@@ -51,6 +51,40 @@ bool fail( QString* aError, const QString& aMessage )
    return false;
 }
 
+// New media is written next to its target under this name, then swapped in, so a
+// half-written file never replaces a good one. The old file waits under the other
+// name until the gamelist has been saved.
+constexpr const char* Cst_StagedSuffix = ".gle-new";
+constexpr const char* Cst_BackupSuffix = ".gle-bak";
+
+// Moves aStaged to aTarget. An existing aTarget is moved aside first and its new name
+// returned in aBackup (empty if there was none). On false, aTarget is as it was and
+// aStaged is gone.
+bool swapIn( const QString& aStaged, const QString& aTarget, QString& aBackup, QString* aError )
+{
+   aBackup.clear();
+
+   if ( QFileInfo::exists( aTarget ) ) {
+      const QString backup = aTarget + QLatin1String( Cst_BackupSuffix );
+      QFile::remove( backup );
+      if ( !QFile::rename( aTarget, backup ) ) {
+         QFile::remove( aStaged );
+         return fail( aError, QStringLiteral( "Cannot replace %1." ).arg( aTarget ) );
+      }
+      aBackup = backup;
+   }
+
+   if ( !QFile::rename( aStaged, aTarget ) ) {
+      if ( !aBackup.isEmpty() )
+         QFile::rename( aBackup, aTarget );
+      aBackup.clear();
+      QFile::remove( aStaged );
+      return fail( aError, QStringLiteral( "Cannot write %1." ).arg( aTarget ) );
+   }
+
+   return true;
+}
+
 // Ratings are written with either decimal separator; an unparseable one counts as 0.
 double ratingValue( const QString& aRating )
 {
@@ -504,7 +538,8 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       countDuplicates();
 }
 
-bool Gamelist::applyImage( int aIndex, const QImage& aPicture, QString* aError )
+bool Gamelist::applyImage( int aIndex, const QImage& aPicture, MediaWrite& aWrite,
+                          QString* aError )
 {
    Game& game = FGames[aIndex];
    const QString link = FImageFolder + game.romNameWoExt() + QLatin1String( Cst_ImageSuffixPng );
@@ -514,15 +549,62 @@ bool Gamelist::applyImage( int aIndex, const QImage& aPicture, QString* aError )
       return fail( aError,
                    QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
 
-   // The suffix picks the format, so this always re-encodes to PNG.
-   if ( !aPicture.save( target ) )
+   // The suffix would pick the format, but the staged name has a foreign one: always PNG.
+   const QString staged = target + QLatin1String( Cst_StagedSuffix );
+   QFile::remove( staged );
+   if ( !aPicture.save( staged, "PNG" ) ) {
+      QFile::remove( staged );
       return fail( aError, QStringLiteral( "Cannot write %1." ).arg( target ) );
+   }
+
+   MediaWrite write;
+   write.index = aIndex;
+   write.isImage = true;
+   write.target = target;
+   write.before = game;
+   if ( !swapIn( staged, target, write.backup, aError ) )
+      return false;
 
    setChildText( FNodes[aIndex], Cst_ImageLink, link );
    game.imagePath = link;
    game.physicalImagePath = target;
    game.missingImage = false;
 
+   aWrite = write;
+   return true;
+}
+
+void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
+{
+   // ponytail: a game that had no <image>/<video> element ends up with an empty one;
+   // EmulationStation reads that as unset. Upgrade: remember the node and remove it.
+   FGames[aIndex] = aBefore;
+   setChildText( FNodes[aIndex], aIsImage ? Cst_ImageLink : Cst_VideoLink,
+                 aIsImage ? aBefore.imagePath : aBefore.videoPath );
+}
+
+void Gamelist::undoMedia( const MediaWrite& aWrite )
+{
+   if ( !aWrite.target.isEmpty() ) {
+      QFile::remove( aWrite.target );
+      if ( !aWrite.backup.isEmpty() )
+         QFile::rename( aWrite.backup, aWrite.target );
+   }
+   restoreLink( aWrite.index, aWrite.isImage, aWrite.before );
+}
+
+bool Gamelist::commitMedia( const QVector<MediaWrite>& aWrites, QString* aError )
+{
+   if ( !save( aError ) ) {
+      for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
+         undoMedia( *it );
+      return false;
+   }
+
+   for ( const MediaWrite& write : aWrites ) {
+      if ( !write.backup.isEmpty() )
+         QFile::remove( write.backup );
+   }
    return true;
 }
 
@@ -537,7 +619,7 @@ bool Gamelist::setImage( int aIndex, const QString& aSourcePath, QString* aError
          aError, QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) );
    }
 
-   return applyImage( aIndex, picture, aError ) && save( aError );
+   return setImage( aIndex, picture, aError );
 }
 
 bool Gamelist::setImage( int aIndex, const QImage& aPicture, QString* aError )
@@ -545,7 +627,11 @@ bool Gamelist::setImage( int aIndex, const QImage& aPicture, QString* aError )
    if ( aIndex < 0 || aIndex >= FGames.size() )
       return fail( aError, QStringLiteral( "No game selected." ) );
 
-   return applyImage( aIndex, aPicture, aError ) && save( aError );
+   MediaWrite write;
+   if ( !applyImage( aIndex, aPicture, write, aError ) )
+      return false;
+
+   return commitMedia( { write }, aError );
 }
 
 int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aError )
@@ -557,19 +643,25 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
       return 0;
    }
 
-   int changed = 0;
+   // All or nothing: half a batch of pictures with no way back is worse than none.
+   QVector<MediaWrite> writes;
    for ( int index = 0; index < FGames.size(); ++index ) {
       if ( !FGames.at( index ).missingImage )
          continue;
-      if ( !applyImage( index, picture, aError ) )
-         break;
-      ++changed;
+
+      MediaWrite write;
+      if ( !applyImage( index, picture, write, aError ) ) {
+         for ( auto it = writes.crbegin(); it != writes.crend(); ++it )
+            undoMedia( *it );
+         return 0;
+      }
+      writes.append( write );
    }
 
-   if ( changed > 0 && !save( aError ) )
+   if ( writes.isEmpty() || !commitMedia( writes, aError ) )
       return 0;
 
-   return changed;
+   return static_cast<int>( writes.size() );
 }
 
 int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
@@ -675,10 +767,23 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
    if ( source.isEmpty() )
       return fail( aError, QStringLiteral( "%1 cannot be read." ).arg( aSourcePath ) );
 
+   MediaWrite write;
+   write.index = aIndex;
+   write.isImage = false;
+   write.before = game;
+
    if ( source != QFileInfo( target ).canonicalFilePath() ) {
-      QFile::remove( target );
-      if ( !QFile::copy( source, target ) )
+      // Copy beside the target and swap, so a failed copy cannot cost the old video.
+      const QString staged = target + QLatin1String( Cst_StagedSuffix );
+      QFile::remove( staged );
+      if ( !QFile::copy( source, staged ) ) {
+         QFile::remove( staged );
          return fail( aError, QStringLiteral( "Cannot copy %1 to %2." ).arg( source, target ) );
+      }
+
+      if ( !swapIn( staged, target, write.backup, aError ) )
+         return false;
+      write.target = target;
    }
 
    setChildText( FNodes[aIndex], Cst_VideoLink, link );
@@ -686,7 +791,7 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
    game.physicalVideoPath = target;
    game.missingVideo = false;
 
-   return save( aError );
+   return commitMedia( { write }, aError );
 }
 
 bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
@@ -712,14 +817,17 @@ bool Gamelist::removeImage( int aIndex, QString* aError )
 
    Game& game = FGames[aIndex];
    const QString file = game.physicalImagePath;
+   const Game before = game;
 
    setChildText( FNodes[aIndex], Cst_ImageLink, QString() );
    game.imagePath.clear();
    game.physicalImagePath.clear();
    game.missingImage = true;
 
-   if ( !save( aError ) )
+   if ( !save( aError ) ) {
+      restoreLink( aIndex, true, before );
       return false;
+   }
 
    // Only once the gamelist has stopped pointing at it, and only if no other
    // game points at it either - several games can share one picture.
@@ -736,14 +844,17 @@ bool Gamelist::removeVideo( int aIndex, QString* aError )
 
    Game& game = FGames[aIndex];
    const QString file = game.physicalVideoPath;
+   const Game before = game;
 
    setChildText( FNodes[aIndex], Cst_VideoLink, QString() );
    game.videoPath.clear();
    game.physicalVideoPath.clear();
    game.missingVideo = true;
 
-   if ( !save( aError ) )
+   if ( !save( aError ) ) {
+      restoreLink( aIndex, false, before );
       return false;
+   }
 
    if ( !file.isEmpty() && !fileShared( aIndex, file, false ) )
       QFile::remove( file );
