@@ -75,11 +75,17 @@ const char* const Cst_FilterNames[] = {
    "Duplicate ROMs",
 };
 
-// Filters 15-28 compare each game against the selected one, so re-filtering has
-// to follow the selection. Everything else is independent of it.
-bool dependsOnSelection( int aFilterIndex )
+static_assert( sizeof( Cst_FilterNames ) / sizeof( Cst_FilterNames[0] ) ==
+                  static_cast<size_t>( FilterCategory::Count ),
+               "one name per FilterCategory, in enum order" );
+
+// The category of the combo's current item. It is stored as the item's data rather
+// than read from the position, so reordering the list cannot change what an item means.
+// No selection (an empty combo) reads as All.
+FilterCategory currentCategory( const QComboBox* aFilterCombo )
 {
-   return aFilterIndex >= 15 && aFilterIndex <= 28;
+   const QVariant data = aFilterCombo->currentData();
+   return data.isValid() ? static_cast<FilterCategory>( data.toInt() ) : FilterCategory::All;
 }
 
 // The entries of Actions that operate on a whole system or on a selection. They
@@ -255,8 +261,8 @@ void Frm_Editor::buildCentralWidget()
 
    Cbx_Filter = new QComboBox( central );
    Cbx_Filter->setObjectName( QStringLiteral( "Cbx_Filter" ) );
-   for ( const char* name : Cst_FilterNames )
-      Cbx_Filter->addItem( QLatin1String( name ) );
+   for ( int category = 0; category < static_cast<int>( FilterCategory::Count ); ++category )
+      Cbx_Filter->addItem( QLatin1String( Cst_FilterNames[category] ), category );
    Cbx_Filter->setEnabled( false );
    choices->addRow( QStringLiteral( "Select your filter" ), Cbx_Filter );
 
@@ -314,7 +320,7 @@ void Frm_Editor::buildCentralWidget()
    connect( Chk_FullRomName, &QCheckBox::toggled, this, &Frm_Editor::refreshFilter );
 
    connect( Lbx_Games->selectionModel(), &QItemSelectionModel::currentChanged, this, [this] {
-      if ( dependsOnSelection( Cbx_Filter->currentIndex() ) )
+      if ( filterDependsOnSelection( currentCategory( Cbx_Filter ) ) )
          refreshFilter();
    } );
 
@@ -953,7 +959,7 @@ void Frm_Editor::refreshFilter()
    FIsLoading = true;
 
    FilterSpec filter;
-   filter.index = qMax( 0, Cbx_Filter->currentIndex() );
+   filter.category = currentCategory( Cbx_Filter );
    filter.search = Edt_Search->text();
    filter.listByRom = Chk_ListByRom->isChecked();
    filter.fullRomName = Chk_FullRomName->isChecked();
@@ -970,7 +976,7 @@ void Frm_Editor::updateCount()
    const int shown = FProxy->rowCount();
 
    Lbl_NbGamesFound->setText(
-      Cbx_Filter->currentIndex() <= 0
+      currentCategory( Cbx_Filter ) == FilterCategory::All
          ? QStringLiteral( "%1 game(s) found." ).arg( shown )
          : QStringLiteral( "%1 / %2 game(s) found." ).arg( shown ).arg( FModel->rowCount() ) );
 }

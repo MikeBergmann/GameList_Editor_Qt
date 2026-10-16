@@ -140,26 +140,46 @@ TEST( Gamelist, FiltersOnTheGameItself )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   const auto matches = [&list]( int aFilterIndex ) {
+   const auto matches = [&list]( FilterCategory aCategory ) {
       QVector<int> kept;
       FilterSpec filter;
-      filter.index = aFilterIndex;
+      filter.category = aCategory;
       for ( int index = 0; index < list.count(); ++index )
          if ( list.accepts( index, filter ) )
             kept.append( index );
       return kept;
    };
 
-   EXPECT_EQ( matches( 0 ), QVector<int>( { 0, 1, 2 } ) );
-   EXPECT_EQ( matches( 1 ), QVector<int>( { 1, 2 } ) );   // missing picture
-   EXPECT_EQ( matches( 2 ), QVector<int>( { 1, 2 } ) );   // missing video
-   EXPECT_EQ( matches( 3 ), QVector<int>( { 2 } ) );      // no release date
-   EXPECT_EQ( matches( 7 ), QVector<int>( { 1 } ) );      // no publisher
-   EXPECT_EQ( matches( 11 ), QVector<int>( { 1 } ) );     // kid game
-   EXPECT_EQ( matches( 13 ), QVector<int>( { 0 } ) );     // favorite
-   EXPECT_EQ( matches( 14 ), QVector<int>( { 2 } ) );     // orphan
-   EXPECT_EQ( matches( 29 ), QVector<int>( { 0, 1 } ) );  // duplicate names
-   EXPECT_EQ( matches( 30 ), QVector<int>( { 0, 1 } ) );  // duplicate rom names
+   EXPECT_EQ( matches( FilterCategory::All ), QVector<int>( { 0, 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingImage ), QVector<int>( { 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingVideo ), QVector<int>( { 1, 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingDate ), QVector<int>( { 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::MissingPublisher ), QVector<int>( { 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::KidGame ), QVector<int>( { 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::Favorite ), QVector<int>( { 0 } ) );
+   EXPECT_EQ( matches( FilterCategory::Orphan ), QVector<int>( { 2 } ) );
+   EXPECT_EQ( matches( FilterCategory::DuplicateNames ), QVector<int>( { 0, 1 } ) );
+   EXPECT_EQ( matches( FilterCategory::DuplicateRoms ), QVector<int>( { 0, 1 } ) );
+}
+
+// The combo is built from this order, and filterDependsOnSelection is a range check on
+// it: a category added in the wrong place would silently change what an item filters.
+TEST( FilterCategories, OnlyTheSameAsCategoriesDependOnTheSelection )
+{
+   for ( int value = 0; value < static_cast<int>( FilterCategory::Count ); ++value ) {
+      const FilterCategory category = static_cast<FilterCategory>( value );
+      const bool sameAs = category >= FilterCategory::SameRegion &&
+                          category <= FilterCategory::SameRom;
+      EXPECT_EQ( filterDependsOnSelection( category ), sameAs ) << value;
+   }
+
+   // The numbering the Delphi's Cbx_Filter.ItemIndex used, which saved settings or
+   // anything else that stored an index would still rely on.
+   EXPECT_EQ( static_cast<int>( FilterCategory::Orphan ), 14 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::SameRegion ), 15 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::SameRom ), 28 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::DuplicateRoms ), 30 );
+   EXPECT_EQ( static_cast<int>( FilterCategory::Count ), 31 );
 }
 
 TEST( Gamelist, SameAsSelectedNeedsASelection )
@@ -169,7 +189,7 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    FilterSpec filter;
-   filter.index = 23;  // same publisher
+   filter.category = FilterCategory::SamePublisher;
 
    // No reference game: the Delphi's Assigned(ReferenceGame) guard, so nothing.
    EXPECT_FALSE( list.accepts( 0, filter ) );
@@ -179,24 +199,24 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Ratings compare numerically, and "0,8" is the same number as "0.8".
-   filter.index = 21;  // rating <= reference
+   filter.category = FilterCategory::SameOrLowerRating;
    EXPECT_TRUE( list.accepts( 1, filter ) );
    EXPECT_FALSE( list.accepts( 2, filter ) );  // no rating at all, so never
-   filter.index = 22;                           // rating >= reference
+   filter.category = FilterCategory::SameOrHigherRating;
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Release date <= reference, over the shortened display forms: "1991" is the
    // 1st of January, which is before the reference's 23rd of June.
-   filter.index = 17;
+   filter.category = FilterCategory::SameOrEarlierDate;
    EXPECT_TRUE( list.accepts( 1, filter ) );
-   filter.index = 18;
+   filter.category = FilterCategory::SameOrLaterDate;
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // Same folder, and same ROM file name across different folders.
-   filter.index = 26;
+   filter.category = FilterCategory::SameFolder;
    EXPECT_TRUE( list.accepts( 2, filter ) );
    EXPECT_FALSE( list.accepts( 1, filter ) );
-   filter.index = 28;
+   filter.category = FilterCategory::SameRom;
    EXPECT_TRUE( list.accepts( 1, filter ) );
 }
 
@@ -224,7 +244,7 @@ TEST( Gamelist, SearchMatchesWhateverTheListShows )
    EXPECT_FALSE( list.accepts( 1, filter ) );
 
    // The search narrows the category; it does not widen it.
-   filter.index = 14;  // orphan
+   filter.category = FilterCategory::Orphan;
    filter.search = QStringLiteral( "sonic" );
    EXPECT_FALSE( list.accepts( 0, filter ) );
 }

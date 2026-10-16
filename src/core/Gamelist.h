@@ -71,16 +71,61 @@ struct OversizedImage
 // format Qt cannot write, or one that will not get that small.
 qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError = nullptr );
 
+// What the filter combo offers. The enumerators are in the order the combo lists them.
+// SameRegion..SameRom are "same as the selected game", and must stay contiguous:
+// filterDependsOnSelection() is a range check.
+enum class FilterCategory
+{
+   All,
+   MissingImage,
+   MissingVideo,
+   MissingDate,
+   MissingPlayers,
+   MissingRating,
+   MissingDeveloper,
+   MissingPublisher,
+   MissingDescription,
+   MissingGenre,
+   MissingRegion,
+   KidGame,
+   Hidden,
+   Favorite,
+   Orphan,
+   SameRegion,
+   SameDate,
+   SameOrEarlierDate,
+   SameOrLaterDate,
+   SamePlayers,
+   SameRating,
+   SameOrLowerRating,
+   SameOrHigherRating,
+   SamePublisher,
+   SameDeveloper,
+   SameGenre,
+   SameFolder,
+   SameName,
+   SameRom,
+   DuplicateNames,
+   DuplicateRoms,
+   Count,  // not a category: the number of them
+};
+
+// Whether the answer depends on which game is selected, so a view must re-run the
+// filter when the selection changes.
+inline bool filterDependsOnSelection( FilterCategory aCategory )
+{
+   return aCategory >= FilterCategory::SameRegion && aCategory <= FilterCategory::SameRom;
+}
+
 struct FilterSpec
 {
-   // Cbx_Filter.ItemIndex, 0..30. See matchesCategory for what each one means.
-   int index = 0;
+   FilterCategory category = FilterCategory::All;
    QString search;
    bool listByRom = false;
    bool fullRomName = false;
 
-   // Index of the selected game. Filters 15-28 are "same as this one", so a view
-   // must re-run the filter when the selection changes.
+   // Index of the selected game. The "same as" categories compare against it, so a
+   // view must re-run the filter when the selection changes.
    int reference = -1;
 };
 
