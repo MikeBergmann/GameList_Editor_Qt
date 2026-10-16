@@ -131,7 +131,7 @@ QVector<MediaRename> Frm_LinkMedia::ExecuteRename( const Gamelist& aGamelist )
 
    QVector<MediaRename> candidates;
    const auto rows = [&]() {
-      candidates = aGamelist.misnamedMedia( Chk_Strict->isChecked() );
+      candidates = misnamedMedia( aGamelist, Chk_Strict->isChecked() );
 
       QVector<Row> result;
       for ( const MediaRename& rename : candidates ) {

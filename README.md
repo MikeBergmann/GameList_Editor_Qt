@@ -51,7 +51,7 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Scrape using screenscraper.fr
 - [x] Manually adding new games
 - [x] Linking existing media, and renaming linked media after their ROM (both with a review before anything changes)
-- [x] Shrinking large pictures: e-encodes linked pictures over a chosen size.
+- [x] Shrinking large pictures: re-encodes linked pictures over a chosen size.
 - [x] Video playback
 - [x] Windows build (experimental)
 - [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
@@ -126,8 +126,6 @@ In detail, I used AI for:
 - Doing code review and refactoring, in the absence of a human reviewer.
 - Translating the original French comments to English.
 - Checking the grammar and spelling of my texts, because I'm not a native English speaker.
-
-The code comments still describe the port from the Delphi original, sometimes including line numbers. I plan to rewrite them (see [Analysis.md](Analysis.md#later)).
 
 This list is not final, and I will probably find more ways to use AI as I go along. Nevertheless, I will not use AI without steering and reviewing the result. I do this for fun and want to learn and understand.
 

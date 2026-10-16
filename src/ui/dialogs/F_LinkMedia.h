@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Gamelist.h"
+#include "MediaOps.h"
 
 #include <QDialog>
 #include <QVector>
@@ -9,9 +9,9 @@ class QCheckBox;
 class QLabel;
 class QListWidget;
 
-// Reviews the pictures and videos Gamelist::unlinkedMedia found: one ticked row
+// Reviews the pictures and videos unlinkedMedia() found: one ticked row
 // per file, so a wrong guess can be unticked before anything is written. The same
-// list reviews the renames Gamelist::misnamedMedia proposes.
+// list reviews the renames misnamedMedia() proposes.
 class Frm_LinkMedia : public QDialog
 {
    Q_OBJECT
