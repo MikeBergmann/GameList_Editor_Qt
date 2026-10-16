@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Game.h"
+#include "GamelistFilter.h"
 #include "Resources.h"
+#include "Systems.h"
 
 #include <QDomDocument>
 #include <QHash>
 #include <QImage>
-#include <QMetaType>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -15,28 +16,7 @@
 //
 // load() parses the document once; setFields() and the media actions edit it in
 // memory and save() writes it out. Games and their <game> elements are
-// index-aligned (see gameNode()).
-
-// One system folder under the ROM root that holds a gamelist.xml.
-struct SystemEntry
-{
-   QString folderName;
-   SystemKind kind = skOther;
-   QString gamelistPath;
-};
-
-QVector<SystemEntry> scanSystems( const QString& aRootPath );
-
-Q_DECLARE_METATYPE( SystemEntry )
-
-QString resolvePath( const QString& aPath );
-
-// The file aRelative (a link as the gamelist writes it) names under aSystemDir, with
-// its case settled against the disk. Empty for an empty link.
-QString physicalPath( const QString& aSystemDir, const QString& aRelative );
-
-QString gamelistDateToDisplay( const QString& aValue );
-QString displayDateToGamelist( const QString& aDate );
+// index-aligned (see domText()).
 
 // A picture or video that sits in the media folder under the ROM's name but that
 // the <game> does not point at (no link, or a link to a file that is not there).
@@ -58,64 +38,6 @@ struct MediaRename
    QString path;     // absolute path as it is now
    QString newPath;  // absolute path it should have, in the same folder
    QString problem;
-};
-
-// What the filter combo offers. The enumerators are in the order the combo lists them.
-// SameRegion..SameRom are "same as the selected game", and must stay contiguous:
-// filterDependsOnSelection() is a range check.
-enum class FilterCategory
-{
-   All,
-   MissingImage,
-   MissingVideo,
-   MissingDate,
-   MissingPlayers,
-   MissingRating,
-   MissingDeveloper,
-   MissingPublisher,
-   MissingDescription,
-   MissingGenre,
-   MissingRegion,
-   KidGame,
-   Hidden,
-   Favorite,
-   Orphan,
-   SameRegion,
-   SameDate,
-   SameOrEarlierDate,
-   SameOrLaterDate,
-   SamePlayers,
-   SameRating,
-   SameOrLowerRating,
-   SameOrHigherRating,
-   SamePublisher,
-   SameDeveloper,
-   SameGenre,
-   SameFolder,
-   SameName,
-   SameRom,
-   DuplicateNames,
-   DuplicateRoms,
-   Count,  // not a category: the number of them
-};
-
-// Whether the answer depends on which game is selected, so a view must re-run the
-// filter when the selection changes.
-inline bool filterDependsOnSelection( FilterCategory aCategory )
-{
-   return aCategory >= FilterCategory::SameRegion && aCategory <= FilterCategory::SameRom;
-}
-
-struct FilterSpec
-{
-   FilterCategory category = FilterCategory::All;
-   QString search;
-   bool listByRom = false;
-   bool fullRomName = false;
-
-   // Index of the selected game. The "same as" categories compare against it, so a
-   // view must re-run the filter when the selection changes.
-   int reference = -1;
 };
 
 class Gamelist
@@ -193,9 +115,10 @@ public:
 
    void ensureHashes( int aIndex );
 
-   // The <game> element aIndex was parsed from, for the save paths. QDomElement
-   // is a handle into FDocument, so this is a lookup, not a search.
-   QDomElement gameNode( int aIndex ) const { return FNodes.value( aIndex ); }
+   // The text of aName under the <game> aIndex was parsed from, as it is in the
+   // document (not the Game). Read-only on purpose: tests use it to check that the
+   // DOM and the games stay index-aligned. Empty for a bad index or a missing child.
+   QString domText( int aIndex, const char* aName ) const;
 
    // The folder new media goes into, taken at load from the first game that has
    // any, else ./media/images/ and ./media/videos/.

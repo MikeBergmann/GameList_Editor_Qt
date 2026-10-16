@@ -74,7 +74,9 @@ add_library( gle_core STATIC
    src/core/GamelistModel.cpp
    src/core/MediaOps.cpp
    src/core/NameEdit.cpp
+   src/core/PathUtil.cpp
    src/core/Resources.cpp
+   src/core/Systems.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
 target_link_libraries( gle_core PUBLIC Qt6::Core Qt6::Gui Qt6::Xml ZLIB::ZLIB )

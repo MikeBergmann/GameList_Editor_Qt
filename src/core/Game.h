@@ -100,6 +100,11 @@ int gamelistFlag( const QString& aValue );
 // back as local time. Invalid or empty input gives an invalid QDateTime.
 QDateTime gamelistDateTime( const QString& aValue );
 
+// <releasedate> as the gamelist stores it (yyyyMMdd'T'HHmmss) and as the editor shows it
+// (dd/MM/yyyy, shortened when month/day are "00"). Empty for input that is neither.
+QString gamelistDateToDisplay( const QString& aValue );
+QString displayDateToGamelist( const QString& aDate );
+
 // Uppercase hex, matching the values already stored in existing gamelists.
 // Empty if the file cannot be read.
 QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm );
