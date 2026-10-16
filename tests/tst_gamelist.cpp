@@ -691,4 +691,136 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
    EXPECT_EQ( reload( fixture ).count(), 4 );
 }
 
+// The next save() fails on every platform: a file cannot be renamed over a directory.
+// (A read-only gamelist would not do: on Linux the rename succeeds anyway.)
+void breakSave( const Fixture& aFixture, Gamelist& aList )
+{
+   ASSERT_TRUE( QFile::remove( aFixture.snes.gamelistPath ) );
+   ASSERT_TRUE( QDir().mkpath( aFixture.snes.gamelistPath ) );
+   ASSERT_FALSE( aList.save() );
+}
+
+QByteArray readAll( const QString& aPath )
+{
+   QFile file( aPath );
+   return file.open( QIODevice::ReadOnly ) ? file.readAll() : QByteArray( "<unreadable>" );
+}
+
+QString linkInDom( const Gamelist& aList, int aIndex, const char* aName )
+{
+   return aList.gameNode( aIndex ).firstChildElement( QLatin1String( aName ) ).text();
+}
+
+TEST( Gamelist, SetVideoFailedSaveRestoresFilesDocumentAndGame )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   writeFile( fixture.path( "new.mp4" ), "new" );
+   const QString video = fixture.path( "snes/media/videos/Sonic.mp4" );
+   const Game before = list.at( 0 );
+
+   breakSave( fixture, list );
+   QString error;
+
+   EXPECT_FALSE( list.setVideo( 0, fixture.path( "new.mp4" ), &error ) );
+   EXPECT_FALSE( error.isEmpty() );
+   EXPECT_EQ( readAll( video ), QByteArray( "mp4" ) );
+   EXPECT_FALSE( QFileInfo::exists( video + QStringLiteral( ".gle-new" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( video + QStringLiteral( ".gle-bak" ) ) );
+   EXPECT_EQ( list.at( 0 ).videoPath, before.videoPath );
+   EXPECT_EQ( list.at( 0 ).physicalVideoPath, before.physicalVideoPath );
+   EXPECT_EQ( linkInDom( list, 0, "video" ), before.videoPath );
+}
+
+TEST( Gamelist, SetVideoThatCannotBeCopiedKeepsTheOldVideo )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const QString video = fixture.path( "snes/media/videos/Sonic.mp4" );
+
+   EXPECT_FALSE( list.setVideo( 0, fixture.path( "absent.mp4" ) ) );
+   EXPECT_EQ( readAll( video ), QByteArray( "mp4" ) );
+}
+
+TEST( Gamelist, SetImageFailedSaveRestoresTheOldPicture )
+{
+   SKIP_ON_CASE_INSENSITIVE_FS();
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   // Game 1 has a dead link; game 0 has a picture on disk under another case.
+   const QString linkBefore = list.at( 1 ).imagePath;
+   const bool missingBefore = list.at( 1 ).missingImage;
+
+   breakSave( fixture, list );
+
+   EXPECT_FALSE( list.setImage( 1, QStringLiteral( ":/DefaultPictures/default.png" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Sonic.png.gle-new" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Sonic.png" ) ) );
+   EXPECT_EQ( list.at( 1 ).imagePath, linkBefore );
+   EXPECT_EQ( list.at( 1 ).missingImage, missingBefore );
+   EXPECT_EQ( linkInDom( list, 1, "image" ), linkBefore );
+}
+
+TEST( Gamelist, SetImageFailedSaveBringsBackAnOverwrittenPicture )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   // Game 0 links ./media/images/Sonic.png; make that exact file exist with known bytes.
+   const QString picture = fixture.path( "snes/media/images/Sonic.png" );
+   writeFile( picture, "old" );
+
+   breakSave( fixture, list );
+
+   EXPECT_FALSE( list.setImage( 0, QStringLiteral( ":/DefaultPictures/default.png" ) ) );
+   EXPECT_EQ( readAll( picture ), QByteArray( "old" ) );
+   EXPECT_FALSE( QFileInfo::exists( picture + QStringLiteral( ".gle-bak" ) ) );
+}
+
+TEST( Gamelist, ChangeAllIsAllOrNothing )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const QString written = fixture.path( "snes/media/images/Vanished.png" );
+
+   breakSave( fixture, list );
+   QString error;
+
+   EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
+                                              &error ),
+              0 );
+   EXPECT_FALSE( error.isEmpty() );
+   EXPECT_FALSE( QFileInfo::exists( written ) );
+   EXPECT_TRUE( list.at( 1 ).missingImage );
+   EXPECT_TRUE( list.at( 2 ).missingImage );
+   EXPECT_TRUE( list.at( 2 ).imagePath.isEmpty() );
+}
+
+TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const Game before = list.at( 0 );
+
+   breakSave( fixture, list );
+
+   EXPECT_FALSE( list.removeImage( 0 ) );
+   EXPECT_FALSE( list.removeVideo( 0 ) );
+   EXPECT_EQ( list.at( 0 ).imagePath, before.imagePath );
+   EXPECT_EQ( list.at( 0 ).videoPath, before.videoPath );
+   EXPECT_EQ( list.at( 0 ).physicalImagePath, before.physicalImagePath );
+   EXPECT_EQ( list.at( 0 ).physicalVideoPath, before.physicalVideoPath );
+   EXPECT_FALSE( list.at( 0 ).missingImage );
+   EXPECT_FALSE( list.at( 0 ).missingVideo );
+   EXPECT_EQ( linkInDom( list, 0, "image" ), before.imagePath );
+   EXPECT_EQ( linkInDom( list, 0, "video" ), before.videoPath );
+   EXPECT_TRUE( QFileInfo::exists( before.physicalImagePath ) );
+   EXPECT_TRUE( QFileInfo::exists( before.physicalVideoPath ) );
+}
+
 }  // namespace
