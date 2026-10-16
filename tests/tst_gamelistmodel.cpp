@@ -56,8 +56,7 @@ TEST( GamelistModel, IsEmptyWithoutAGamelist )
    EXPECT_FALSE( model.index( 0, 0 ).data().isValid() );
 }
 
-// Setting the filter has to reach the proxy on its own: the Delphi rebuilt the
-// listbox by hand from four separate handlers instead.
+// Setting the filter has to reach the proxy on its own.
 TEST( GamelistModel, ReFiltersWhenTheSpecChanges )
 {
    ModelFixture fixture;

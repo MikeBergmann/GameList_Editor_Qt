@@ -1,7 +1,6 @@
-// Scraper: the XML parsing half of jeuInfos.php, against a canned response -
-// no network in this test. Covers the per-language fallback chains FillFields
-// used to run inline, the media-type filter that replaced the nine
-// checkboxes, and the two failure paths (no <jeu>, malformed XML).
+// Scraper: parsing of the ScreenScraper response against a canned reply (no network),
+// covering the per-language fallback chains, the media-type filter, the failure paths,
+// password scrubbing and query encoding.
 
 #include "QtPrinters.h"
 #include "Scraper.h"
@@ -68,7 +67,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
       << error.toStdString();
 
    // Name is keyed by region, not language: English has no "en" region entry,
-   // so this falls through to the "eu" region exactly as FillFields did.
+   // so this falls through to the "eu" region.
    EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball (Europe)" ) );
    EXPECT_EQ( info.region, QStringLiteral( "Europe - USA" ) );
    EXPECT_EQ( info.description, QStringLiteral( "Sonic and Tails team up." ) );
@@ -79,7 +78,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
    EXPECT_EQ( info.players, QStringLiteral( "2" ) );
    EXPECT_EQ( info.rating, QStringLiteral( "18" ) );
 
-   // "wheel" was not in aMediaTypes, so only box-2D and ss made it through.
+   // "wheel" was not in mediaTypes, so only box-2D and ss made it through.
    ASSERT_EQ( info.pictures.size(), 2 );
    EXPECT_EQ( info.pictures.at( 0 ).fileLink,
               QStringLiteral( "https://example.invalid/box2d.png" ) );
@@ -202,9 +201,8 @@ TEST( Scraper, QueryOmitsUserLoginWhenEitherHalfIsMissing )
    EXPECT_FALSE( QUrlQuery( QUrl( buildGameQuery( request ) ) ).hasQueryItem( QStringLiteral( "ssid" ) ) );
 }
 
-// Self-check for the unconfigured build: must fail fast, offline, with a hint.
-// Bytes worked out by hand from key(i) = (0xA5 + 31*i) & 0xFF, not by calling the encoder, so a
-// change to either side of the CMake/C++ pair shows up here.
+// Bytes worked out by hand from key(i) = (0xA5 + 31*i) & 0xFF, not by calling the encoder,
+// so a change to either side of the CMake/C++ pair shows up here.
 TEST( Scraper, DecodesXorEncodedDevSecret )
 {
    const unsigned char abc[] = { 0xC4, 0xA6, 0x80, 0x02 };
@@ -214,6 +212,7 @@ TEST( Scraper, DecodesXorEncodedDevSecret )
    EXPECT_TRUE( decodeDevSecret( empty ).isEmpty() );
 }
 
+// An unconfigured build must fail fast, offline, with a hint.
 TEST( Scraper, FailsWithoutDevCredentials )
 {
    if ( devCredentialsConfigured() )

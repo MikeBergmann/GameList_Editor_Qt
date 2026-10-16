@@ -48,9 +48,7 @@ struct Game
    QString romNameWoExt() const { return QFileInfo( romPath ).completeBaseName(); }
 };
 
-// The 12 editable fields, as one value.
-//
-// This is the seam between the UI and the data.
+// The 12 editable fields as one value: what the editor panels hand to Gamelist::setFields.
 struct GameFields
 {
    QString name;
@@ -102,7 +100,7 @@ int gamelistFlag( const QString& aValue );
 // back as local time. Invalid or empty input gives an invalid QDateTime.
 QDateTime gamelistDateTime( const QString& aValue );
 
-// Uppercase hex to match the values Indy's HashStreamAsHex already wrote into
-// existing gamelists. Empty if the file cannot be read.
+// Uppercase hex, matching the values already stored in existing gamelists.
+// Empty if the file cannot be read.
 QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm );
 QString fileCrc32( const QString& aPath );

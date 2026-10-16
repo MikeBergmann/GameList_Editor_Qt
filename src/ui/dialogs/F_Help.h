@@ -13,13 +13,8 @@ class Frm_Help : public QDialog
 public:
    explicit Frm_Help( QWidget* aParent = nullptr );
 
-   // Shows the window and returns the new "show tips at start" setting.
-   //
-   // aAllowOptOut is what the Delphi expressed by hiding Chk_ShowTips from the
-   // menu caller, and getting wrong: that caller passed FShowTips straight in,
-   // so Execute returned its negation and every visit from the menu silently
-   // flipped the setting. With the opt-out hidden the answer can only be the
-   // value that came in, so this says so rather than computing it.
+   // Shows the window and returns the new "show tips at start" setting. With aAllowOptOut
+   // false the opt-out checkbox is hidden and aShowTips comes back unchanged.
    bool Execute( bool aShowTips, bool aAllowOptOut );
 
 private:

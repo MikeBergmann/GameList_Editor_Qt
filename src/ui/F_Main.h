@@ -20,10 +20,8 @@ class QTabWidget;
 
 // The main window: menus, the system combo, the game list and the settings.
 //
-// This is the orchestration half of F_Main.pas. It owns no game data - the
-// Gamelist below is the single loaded system, the model addresses it by index,
-// and the editing panels (steps 4.3 and 4.6) will take and return a GameFields
-// value rather than being read field by field from here.
+// It owns no game data: the Gamelist below is the single loaded system, the model
+// addresses it by index, and the editing panels take and return GameFields values.
 class Frm_Editor : public QMainWindow
 {
    Q_OBJECT
@@ -31,8 +29,7 @@ class Frm_Editor : public QMainWindow
 public:
    explicit Frm_Editor( QWidget* aParent = nullptr );
 
-   // FormShow's tips window (F_Main 651-659). Called once the window is up,
-   // because it is modal.
+   // Shows the tips window if enabled. Called once the window is up, because it is modal.
    void showTipsAtStart();
 
    // Scan aRootPath and select its first system. The folder picker is the only
@@ -80,15 +77,13 @@ private:
    // Puts the list back on the games the editor is showing, after a Cancel.
    void restoreSelection( const QVector<int>& aIndices );
 
-   // Cbx_FilterChange, Edt_SearchChange and both Chk_*Click were four handlers
-   // that each re-ran the whole list rebuild. One spec, handed to the model.
+   // Collects the filter widgets into one FilterSpec and hands it to the model.
    void refreshFilter();
    void updateCount();
    int currentGameIndex() const;
    QVector<int> selectedGameIndexes() const;
 
-   // Btn_MoreInfosClick (3175). The panel says which game; the hash prompt is
-   // here because FAutoHash is.
+   // The panel says which game; the hash prompt is here because FAutoHash is.
    void showMoreInfos( int aIndex );
 
    QString FRootPath;
@@ -138,8 +133,8 @@ private:
    QAction* Mnu_Genesis = nullptr;
    QAction* Mnu_AutoplayVideo = nullptr;
 
-   // Game and Selection operate on a game or the selection, so they stay disabled
-   // until step 4.4. System is live, minus its three text conversions.
+   // Game and Selection hold only disabled placeholder entries; System is live apart from
+   // its three text conversions.
    QMenu* Mnu_System = nullptr;
    QMenu* Mnu_Game = nullptr;
    QMenu* Mnu_Selection = nullptr;

@@ -7,9 +7,7 @@
 
 namespace {
 
-// Was Rst_Text. Markup rather than plain text because the Delphi got its links
-// from EM_AUTOURLDETECT, which has no Qt equivalent - and does not need one,
-// since the URLs are fixed and known here.
+// Markup rather than plain text so the fixed URLs become clickable links.
 constexpr const char* Cst_AboutHtml = R"html(
 <p>GameList Editor Qt manages the <code>gamelist.xml</code> of a
 <a href="https://www.recalbox.com/">Recalbox</a> or

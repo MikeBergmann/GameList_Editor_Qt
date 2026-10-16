@@ -4,9 +4,7 @@
 
 class QTextBrowser;
 
-// The "About..." box. The Delphi subclassed TRichEdit and hand-rolled URL
-// detection out of EM_AUTOURLDETECT, EN_LINK and ShellExecute; QTextBrowser
-// opens links on its own, so all of that is gone.
+// The "About..." box.
 class Frm_About : public QDialog
 {
    Q_OBJECT

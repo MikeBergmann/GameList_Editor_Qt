@@ -1,7 +1,5 @@
-// ScrapePanel: the save path and the Save button's arming logic, driven
-// through Scraper's own signals rather than a real network round trip -
-// firing gameInfoReady/mediaReady/mediaFinished directly is the same thing
-// tst_scraper.cpp does for parseScrapeResponse, one layer up.
+// ScrapePanel: the save path and the Save button's arming logic, driven through
+// Scraper's own signals rather than a real network round trip.
 
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
@@ -79,11 +77,9 @@ TEST( ScrapePanel, GameInfoFillsFieldsAndMediaFinishedArmsSave )
 
    EXPECT_EQ( panel.edit( "Edt_ScrapeName" )->text(), QStringLiteral( "Sonic the Hedgehog 2" ) );
 
-   // sampleInfo() has no pictures, so requestMedia's empty-batch shortcut
-   // fires mediaFinished synchronously, right inside gameInfoReady's handler -
-   // Chk_ScrapeInfos starts checked, so the button is armed at that same
-   // instant. EnableScrapeComponents(True) plus Chk_ScrapeClick folded into
-   // one flag.
+   // sampleInfo() has no pictures, so the empty-batch shortcut fires mediaFinished
+   // synchronously inside the gameInfoReady handler. Chk_ScrapeInfos starts checked,
+   // so the button is armed at that same instant.
    EXPECT_TRUE( panel.button( "Btn_ScrapeSave" )->isEnabled() );
 
    panel.check( "Chk_ScrapeInfos" )->setChecked( false );
@@ -130,8 +126,7 @@ TEST( ScrapePanel, SaveWritesTheCheckedFieldsAndReloadsTheGamelist )
    EXPECT_EQ( panel.list.at( 0 ).publisher, QStringLiteral( "Sega" ) );
    EXPECT_EQ( gamesChanged, 1 );
 
-   // And it reached the file, not just the vector - setFields() alone does
-   // not save, so this also covers finishSave() asking for one explicitly.
+   // And it reached the file, not just the vector.
    Gamelist saved;
    ASSERT_TRUE( saved.load( panel.fixture.snes ) );
    EXPECT_EQ( saved.at( 0 ).name, QStringLiteral( "Sonic the Hedgehog 2" ) );

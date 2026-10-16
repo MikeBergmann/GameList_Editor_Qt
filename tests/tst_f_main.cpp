@@ -1,6 +1,5 @@
 // Frm_Editor, driven the way a user would drive it: point it at a ROM root and
-// then work the four widgets that decide what the list shows. This is the chain
-// - scan, load, filter, display - that step 4.2 exists to prove.
+// then work the widgets that decide what the list shows and what the editor holds.
 
 #include "F_Main.h"
 #include "GamelistFixture.h"
@@ -48,8 +47,7 @@ TEST( MainWindow, ConstructsWithNothingLoaded )
    EXPECT_FALSE( editor.windowTitle().isEmpty() );
    EXPECT_EQ( editor.menuBar()->actions().size(), 4 );
 
-   // No folder chosen yet: the system and filter combos stay out of reach, as
-   // BuildSystemsList's opening block did by hand.
+   // No folder chosen yet: the system and filter combos stay out of reach.
    EXPECT_FALSE( editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->isEnabled() );
    EXPECT_TRUE( shown( editor ).isEmpty() );
 }
@@ -136,8 +134,7 @@ TEST( MainWindow, TheFourListWidgetsDriveTheFilter )
    EXPECT_EQ( shown( editor ).size(), 2 );
 
    // Show full Rom name is meaningless until the list is by ROM, so it is only
-   // reachable then - which is the one thing Chk_ListByRomClick did besides
-   // rebuilding the list.
+   // reachable then.
    EXPECT_FALSE( fullRomName->isEnabled() );
    listByRom->setChecked( true );
    EXPECT_TRUE( fullRomName->isEnabled() );
@@ -154,9 +151,8 @@ TEST( MainWindow, TheFourListWidgetsDriveTheFilter )
    EXPECT_EQ( shown( editor ), QStringList( { QStringLiteral( "sub/Sonic.zip" ) } ) );
 }
 
-// The "same as" categories compare against the selected game, so the list has to re-filter
-// when the selection moves. The Delphi only got this right by accident, by
-// reading the reference out of the listbox before it cleared it.
+// The "same as" categories compare against the selected game, so the list has to
+// re-filter when the selection moves.
 TEST( MainWindow, SameAsSelectedFollowsTheSelection )
 {
    Fixture fixture;
@@ -185,9 +181,7 @@ TEST( MainWindow, SameAsSelectedFollowsTheSelection )
    EXPECT_EQ( shown( editor ).size(), 2 );
 }
 
-// The two halves of step 4.3's wiring: the editor follows the selection, and the
-// list follows a save. The Delphi had the listbox itself hold the TGame and the
-// new name written into Items[] by hand, from inside the XML write.
+// The editor follows the selection, and the list follows a save.
 TEST( MainWindow, TheEditorFollowsTheSelectionAndTheListFollowsTheEditor )
 {
    Fixture fixture;

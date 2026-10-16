@@ -1,7 +1,5 @@
-// Table integrity for Resources. These are the invariants the Delphi relied on
-// silently: LoadSystemLogo has no FileExists guard, and BuildSystemsList maps a
-// folder name back to a kind, so a missing logo or a duplicate folder is a crash
-// or a wrong system rather than a compile error.
+// Table integrity for Resources. A missing logo or a duplicate folder name is a
+// missing picture or a wrong system at runtime, not a compile error.
 
 #include "QtPrinters.h"
 #include "Resources.h"
@@ -13,9 +11,8 @@
 
 namespace {
 
-// The counts the Delphi enums had. 82 systems, not the 76 of the Assets note -
-// that is the count of unique logo *files*, and six kinds share one.
-TEST( Resources, EnumCountsMatchTheDelphiTables )
+// 82 systems, not 76: 76 is the count of unique logo *files*, and six kinds share one.
+TEST( Resources, EnumCountsMatchTheTables )
 {
    EXPECT_EQ( skCount, 82 );
    EXPECT_EQ( cnCount, 40 );
@@ -31,7 +28,7 @@ TEST( Resources, EverySystemHasADisplayNameAndAScraperId )
    }
 }
 
-// LoadSystemLogo hands these straight to QPixmap with no guard.
+// The logo is loaded with no existence check, so every one has to be in the .qrc.
 TEST( Resources, EverySystemLogoResolvesInTheQrc )
 {
    for ( int i = 0; i < skCount; ++i ) {
@@ -41,8 +38,8 @@ TEST( Resources, EverySystemLogoResolvesInTheQrc )
    }
 }
 
-// A duplicate folder name would make BuildSystemsList pick the wrong kind, and
-// nothing downstream would notice.
+// A duplicate folder name would map to the wrong kind, and nothing downstream would
+// notice.
 TEST( Resources, FolderNamesAreUniqueAndRoundTrip )
 {
    QSet<QString> seen;
@@ -61,7 +58,7 @@ TEST( Resources, SystemKindFromFolderFallsBackToOther )
 {
    EXPECT_EQ( systemKindFromFolder( QStringLiteral( "no-such-system" ) ), skOther );
 
-   // Still case-sensitive, as the Delphi was. Real folders are lowercase.
+   // Case-sensitive: real folders are lowercase.
    EXPECT_EQ( systemKindFromFolder( QStringLiteral( "NES" ) ), skOther );
 
    // skOther is the catch-all and its own folder name is empty.

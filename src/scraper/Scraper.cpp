@@ -26,8 +26,8 @@ QString decodeDevSecret( const unsigned char* aData )
 
 namespace {
 
-// GetFormatedDate (F_Main 3810). The dates node holds ISO "yyyy-mm-dd",
-// shortened to "yyyy-mm" or "yyyy" when only part of it is known.
+// The dates node holds ISO "yyyy-mm-dd", shortened to "yyyy-mm" or "yyyy" when only part of it
+// is known.
 QString formatScrapedDate( const QString& aValue )
 {
    switch ( aValue.size() ) {
@@ -50,8 +50,7 @@ QHash<QString, QString> childDict( const QDomElement& aParent, const char* aAttr
    return dict;
 }
 
-// TryGetValue's fallback chain: the first key present, even if its value is
-// empty - which is what let the Delphi's `or` chain stop on an empty match.
+// The value of the first key present, even if that value is empty.
 QString pickLocalized( const QHash<QString, QString>& aDict, const QStringList& aFallbackKeys )
 {
    for ( const QString& key : aFallbackKeys ) {
@@ -90,8 +89,7 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    const QDomElement root = doc.documentElement();
    const QDomElement game = root.firstChildElement( QLatin1String( Cst_GameNode ) );
    if ( game.isNull() ) {
-      // 3613: an API error document (no <jeu>) used to raise out of ParseXml
-      // with the form left disabled. Report it as a failed scrape instead.
+      // An API error document has no <jeu>.
       if ( aError )
          *aError = QStringLiteral( "Game not found" );
       return false;
@@ -100,7 +98,7 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    const QString langStr = QString( QLatin1String( Cst_LangNameStr[aLanguage] ) ).left( 2 );
 
    // Name: keyed by region, not by language - "ss" is screenscraper's own
-   // generic entry and is tried last, exactly as FillFields did.
+   // generic entry and is tried last.
    const QDomElement names = game.firstChildElement( QLatin1String( Cst_NamesNode ) );
    aInfo.name =
       pickLocalized( childDict( names, Cst_AttRegion ),
@@ -128,9 +126,8 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
       { langStr, QLatin1String( Cst_CountryName[cnEu] ), QLatin1String( Cst_CountryName[cnWor] ),
         QLatin1String( Cst_CountryName[cnUs] ), QLatin1String( Cst_CountryName[cnJp] ) } ) );
 
-   // Genres: grouped by id, in the order the document lists them - the
-   // Delphi's CreateGenreDict only worked because same-id entries were
-   // already adjacent; grouping into a map keyed by id needs no such order.
+   // Genres: grouped by id, in the order the document lists them; same-id entries need not be
+   // adjacent.
    QStringList genreIds;
    QHash<QString, QHash<QString, QString>> genresById;
    const QDomElement genres = game.firstChildElement( QLatin1String( Cst_GenreNode ) );
@@ -151,8 +148,7 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    aInfo.players = game.firstChildElement( QLatin1String( Cst_PlayersNode ) ).text();
    aInfo.rating = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
 
-   // Media: only the checked types, video handled separately since it is
-   // offered through Chk_Video/Btn_SaveVideo rather than the picture strip.
+   // Media: only the requested types; video is handled separately from the pictures.
    const QDomElement medias = game.firstChildElement( QLatin1String( Cst_MediaNode ) );
    for ( QDomElement media = medias.firstChildElement(); !media.isNull();
          media = media.nextSiblingElement() ) {
@@ -252,9 +248,8 @@ void Scraper::setProxy( const QString& aServer, int aPort, const QString& aUser,
                                      static_cast<quint16>( aPort ), aUser, aPassword ) );
 }
 
-// What the server actually sent, for the "Show details" box of the error dialog
-// and its Export button. Not truncated: the export is the whole point. The request
-// comes first so the details show which systemid/crc/romnom were really sent.
+// What the server actually sent, for the error dialog's details box and its export. Not
+// truncated. The request comes first so the details show which systemid/crc/romnom were sent.
 static QString responseDetails( const QString& aQuery, const QByteArray& aBody )
 {
    return sanitizeUrl( QStringLiteral( "Request:\n%1\n\nReply:\n%2" )
@@ -285,8 +280,8 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                                           responseDetails( query, reply->readAll() ) );
                      return;
                   }
-         // errorString() embeds Qt's own copy of the request URL (credentials
-         // and all), so the whole message needs sanitizing, not just query.
+                  // errorString() embeds Qt's own copy of the request URL (credentials
+                  // and all), so the whole message needs sanitizing, not just query.
                   emit gameInfoFailed(
                      sanitizeUrl( query + QStringLiteral( "\n" ) + describeError( reply ) ),
                      responseDetails( query, reply->readAll() ) );
