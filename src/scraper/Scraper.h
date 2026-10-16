@@ -87,6 +87,10 @@ QString sanitizeUrl( const QString& aUrl );
 // aData must be terminated (the generated arrays always are).
 QString decodeDevSecret( const unsigned char* aData );
 
+// The jeuInfos.php URL for aRequest, every value percent-encoded. Exposed so a
+// test can check the encoding without a network.
+QString buildGameQuery( const ScrapeRequest& aRequest );
+
 // False when the build carries no developer credentials (devid/devpassword);
 // requestGame() then fails immediately instead of calling the API.
 bool devCredentialsConfigured();

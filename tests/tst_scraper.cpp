@@ -8,6 +8,9 @@
 
 #include <gtest/gtest.h>
 
+#include <QUrl>
+#include <QUrlQuery>
+
 namespace {
 
 // One <jeu>: two names keyed by region (not language - "ss" is
@@ -160,6 +163,43 @@ TEST( SanitizeUrl, ScrubsBothDevAndUserPasswordAnywhereInTheMessage )
    EXPECT_TRUE( safe.contains( QStringLiteral( "crc=DFCAE7E1" ) ) );
    EXPECT_TRUE( safe.contains( QStringLiteral( "devpassword=&" ) ) );
    EXPECT_TRUE( safe.contains( QStringLiteral( "sspassword=&" ) ) );
+}
+
+// A password such as p&ss#w+rd%41 used to go into the URL raw: '&' ended the value,
+// '#' started a fragment and dropped everything after it (crc, systemid, romnom), '+'
+// read as a space. The only reliable check is to parse the URL back the way the server
+// does and compare every value with what went in.
+TEST( Scraper, QueryRoundTripsValuesWithReservedCharacters )
+{
+   ScrapeRequest request;
+   request.systemId = QStringLiteral( "64" );
+   request.crc32 = QStringLiteral( "BCD9EC52" );
+   request.romName = QStringLiteral( "Sonic & Knuckles #2 (v1+2) 100%.zip" );
+   request.romSize = 901120;
+   request.ssLogin = QStringLiteral( "user&name=x" );
+   request.ssPassword = QStringLiteral( "p&ss#w+rd%41 \u00e4" );
+
+   const QUrl url( buildGameQuery( request ) );
+   const QUrlQuery query( url );
+   const auto value = [&]( const char* aKey ) {
+      return query.queryItemValue( QLatin1String( aKey ), QUrl::FullyDecoded );
+   };
+
+   EXPECT_TRUE( url.fragment().isEmpty() );
+   EXPECT_EQ( value( "ssid" ), request.ssLogin );
+   EXPECT_EQ( value( "sspassword" ), request.ssPassword );
+   EXPECT_EQ( value( "crc" ), request.crc32 );
+   EXPECT_EQ( value( "systemid" ), request.systemId );
+   EXPECT_EQ( value( "romnom" ), request.romName );
+   EXPECT_EQ( value( "romtaille" ), QStringLiteral( "901120" ) );
+}
+
+TEST( Scraper, QueryOmitsUserLoginWhenEitherHalfIsMissing )
+{
+   ScrapeRequest request;
+   request.ssLogin = QStringLiteral( "user" );
+
+   EXPECT_FALSE( QUrlQuery( QUrl( buildGameQuery( request ) ) ).hasQueryItem( QStringLiteral( "ssid" ) ) );
 }
 
 // Self-check for the unconfigured build: must fail fast, offline, with a hint.
