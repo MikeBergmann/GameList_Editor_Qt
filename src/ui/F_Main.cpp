@@ -1,14 +1,11 @@
 #include "F_Main.h"
 
 #include "F_About.h"
-#include "F_AddRoms.h"
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
-#include "F_LinkMedia.h"
 #include "F_MoreInfos.h"
 #include "GameEditPanel.h"
 #include "GamelistModel.h"
-#include "MediaOps.h"
 #include "Resources.h"
 #include "ScrapePanel.h"
 
@@ -24,13 +21,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
-#include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMessageLogger>
 #include <QPixmap>
-#include <QProgressDialog>
 #include <QSaveFile>
 #include <QSettings>
 #include <QSplitter>
@@ -133,37 +128,29 @@ void Frm_Editor::buildMenu()
 
    QMenu* actions = menuBar()->addMenu( QStringLiteral( "Actions" ) );
    Mnu_System = actions->addMenu( QStringLiteral( "System" ) );
-   Mnu_AddRoms = Mnu_System->addAction( QStringLiteral( "Add missing ROMs..." ), this,
-                                        &Frm_Editor::addMissingRoms );
-   Mnu_AddRoms->setEnabled( false );
-   Mnu_LinkMedia = Mnu_System->addAction( QStringLiteral( "Link existing media..." ), this,
-                                          &Frm_Editor::linkExistingMedia );
-   Mnu_LinkMedia->setEnabled( false );
-   Mnu_RenameMedia = Mnu_System->addAction( QStringLiteral( "Rename media after ROMs..." ), this,
-                                            &Frm_Editor::renameMediaAfterRoms );
-   Mnu_RenameMedia->setEnabled( false );
-   Mnu_ShrinkImages = Mnu_System->addAction( QStringLiteral( "Shrink large pictures..." ), this,
-                                             &Frm_Editor::shrinkLargeImages );
-   Mnu_ShrinkImages->setEnabled( false );
-   Mnu_SetSystemType = Mnu_System->addAction( QStringLiteral( "Set system type..." ), this,
-                                              &Frm_Editor::setSystemType );
-   Mnu_SetSystemType->setEnabled( false );
+   // Everything here works on the loaded system, so it starts disabled.
+   const auto addSystemAction = [this]( const QString& aText, auto aHandler ) {
+      QAction* action = Mnu_System->addAction( aText, this, aHandler );
+      action->setEnabled( false );
+      FSystemActions.append( action );
+   };
+   // A SystemAction is a free function, so it goes through runAction.
+   const auto command = [this]( SystemAction aAction ) { return [this, aAction] { runAction( aAction ); }; };
+   addSystemAction( QStringLiteral( "Add missing ROMs..." ), command( &addMissingRoms ) );
+   addSystemAction( QStringLiteral( "Link existing media..." ), command( &linkExistingMedia ) );
+   addSystemAction( QStringLiteral( "Rename media after ROMs..." ), command( &renameMediaAfterRoms ) );
+   addSystemAction( QStringLiteral( "Shrink large pictures..." ), command( &shrinkLargeImages ) );
+   addSystemAction( QStringLiteral( "Set system type..." ), &Frm_Editor::setSystemType );
    Mnu_System->addSeparator();
    // Not implemented yet, so always disabled.
    for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
                               "Remove region from games names" } )
       Mnu_System->addAction( QLatin1String( text ) )->setEnabled( false );
    Mnu_System->addSeparator();
-   Mnu_DeleteOrphans = Mnu_System->addAction( QStringLiteral( "Delete orphans from gamelist..." ),
-                                              this, &Frm_Editor::deleteOrphans );
-   Mnu_DeleteDuplicates = Mnu_System->addAction(
-      QStringLiteral( "Delete duplicates from gamelist..." ), this, &Frm_Editor::deleteDuplicates );
+   addSystemAction( QStringLiteral( "Delete orphans from gamelist..." ), command( &deleteOrphans ) );
+   addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) );
    Mnu_System->addSeparator();
-   Mnu_ExportList = Mnu_System->addAction( QStringLiteral( "Export games list to txt file..." ),
-                                           this, &Frm_Editor::exportGamesList );
-   Mnu_DeleteOrphans->setEnabled( false );
-   Mnu_DeleteDuplicates->setEnabled( false );
-   Mnu_ExportList->setEnabled( false );
+   addSystemAction( QStringLiteral( "Export games list to txt file..." ), &Frm_Editor::exportGamesList );
    Mnu_Game = addPendingMenu( actions, QStringLiteral( "Game" ),
                               { QStringLiteral( "Convert text to lowercase" ),
                                 QStringLiteral( "Convert text to uppercase" ) } );
@@ -368,12 +355,7 @@ void Frm_Editor::buildCentralWidget()
    } );
 
    connect( FScrapePanel, &ScrapePanel::gamesChanged, this, [this] {
-      // Reload the edit panel first: refresh() can move the selection, and
-      // confirmLeaveEdits() would find the stale widgets dirty against the
-      // values just saved.
-      FEditPanel->setSelection( selectedGameIndexes() );
-      FModel->refresh();
-      updateCount();
+      refreshViews();
       Pgc_Editor->setCurrentWidget( FEditPanel );
    } );
 }
@@ -534,11 +516,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    Mnu_Reload->setEnabled( found );
 
    if ( !found ) {
-      Mnu_AddRoms->setEnabled( false );
-      Mnu_LinkMedia->setEnabled( false );
-      Mnu_RenameMedia->setEnabled( false );
-      Mnu_ShrinkImages->setEnabled( false );
-      Mnu_SetSystemType->setEnabled( false );
+      setSystemActionsEnabled( false );
       FModel->setGamelist( nullptr );
       FEditPanel->setGamelist( nullptr );
       FScrapePanel->setGamelist( nullptr );
@@ -569,14 +547,7 @@ void Frm_Editor::Cbx_SystemsChange()
    FModel->setGamelist( nullptr );
    FEditPanel->setGamelist( nullptr );
    FScrapePanel->setGamelist( nullptr );
-   Mnu_AddRoms->setEnabled( false );
-   Mnu_LinkMedia->setEnabled( false );
-   Mnu_RenameMedia->setEnabled( false );
-   Mnu_ShrinkImages->setEnabled( false );
-   Mnu_SetSystemType->setEnabled( false );
-   Mnu_DeleteOrphans->setEnabled( false );
-   Mnu_DeleteDuplicates->setEnabled( false );
-   Mnu_ExportList->setEnabled( false );
+   setSystemActionsEnabled( false );
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
       updateCount();
@@ -599,214 +570,60 @@ void Frm_Editor::Cbx_SystemsChange()
       return;
    }
 
-   FModel->setGamelist( &FGamelist );
-   FEditPanel->setGamelist( &FGamelist );
-   FScrapePanel->setGamelist( &FGamelist );
-   Mnu_AddRoms->setEnabled( true );
-   Mnu_LinkMedia->setEnabled( true );
-   Mnu_RenameMedia->setEnabled( true );
-   Mnu_ShrinkImages->setEnabled( true );
-   Mnu_SetSystemType->setEnabled( true );
-   Mnu_DeleteOrphans->setEnabled( true );
-   Mnu_DeleteDuplicates->setEnabled( true );
-   Mnu_ExportList->setEnabled( true );
-   refreshFilter();
+   resetViews();
+   setSystemActionsEnabled( true );
 
    if ( FProxy->rowCount() > 0 )
       Lbx_Games->setCurrentIndex( FProxy->index( 0, 0 ) );
 }
 
-void Frm_Editor::addMissingRoms()
+void Frm_Editor::runAction( SystemAction aAction )
 {
    if ( !confirmLeaveEdits() )
       return;
 
-   const QStringList chosen =
-      Frm_AddRoms( this ).Execute( FGamelist.systemDir(), FGamelist.unlistedRoms() );
-   if ( chosen.isEmpty() )
-      return;
-
-   const int firstNew = FGamelist.count();
-   QString error;
-   const int added = FGamelist.addGames( chosen, &error );
-   if ( added < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
-      return;
+   const int before = FGamelist.count();
+   switch ( aAction( this, FGamelist ) ) {
+      case ViewUpdate::None: return;
+      case ViewUpdate::Refresh: refreshViews(); return;
+      case ViewUpdate::Reset: break;
    }
-   if ( added == 0 )
-      return;
 
-   // Rows are indices into the Gamelist; the model only knows how to reset for
-   // added games. The panels drop their selection with it.
+   resetViews();
+
+   // Added games come after the old ones, so the first new one is the row to show (a filter
+   // can hide it, so there may be no row to land on). After a removal, the first row.
+   QModelIndex row;
+   if ( FGamelist.count() > before )
+      row = FProxy->mapFromSource( FModel->index( before ) );
+   else if ( FProxy->rowCount() > 0 )
+      row = FProxy->index( 0, 0 );
+
+   if ( row.isValid() )
+      Lbx_Games->setCurrentIndex( row );
+}
+
+void Frm_Editor::resetViews()
+{
    FModel->setGamelist( &FGamelist );
    FEditPanel->setGamelist( &FGamelist );
    FScrapePanel->setGamelist( &FGamelist );
    refreshFilter();
-
-   // A filter can hide the new game, so there may be no row to land on.
-   const QModelIndex first = FProxy->mapFromSource( FModel->index( firstNew ) );
-   if ( first.isValid() )
-      Lbx_Games->setCurrentIndex( first );
 }
 
-void Frm_Editor::linkExistingMedia()
+void Frm_Editor::refreshViews()
 {
-   if ( !confirmLeaveEdits() )
-      return;
-
-   const QVector<MediaLink> candidates = unlinkedMedia( FGamelist );
-   if ( candidates.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral( "No unlinked picture or video found." ) );
-      return;
-   }
-
-   const QVector<MediaLink> chosen = Frm_LinkMedia( this ).Execute( FGamelist, candidates );
-   if ( chosen.isEmpty() )
-      return;
-
-   QString error;
-   if ( FGamelist.linkMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
-      return;
-   }
-
-   // Same refresh as after a scrape: the games are the same, only their media changed.
+   // Reload the editor first: refresh() can move the selection, and confirmLeaveEdits()
+   // would find the stale widgets dirty against the values just saved.
    FEditPanel->setSelection( selectedGameIndexes() );
    FModel->refresh();
    updateCount();
 }
 
-void Frm_Editor::renameMediaAfterRoms()
+void Frm_Editor::setSystemActionsEnabled( bool aEnabled )
 {
-   if ( !confirmLeaveEdits() )
-      return;
-
-   // Strict is the superset: if it finds nothing, no checkbox state can.
-   if ( misnamedMedia( FGamelist, true ).isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral( "Every picture and video is named after its ROM." ) );
-      return;
-   }
-
-   const QVector<MediaRename> chosen = Frm_LinkMedia( this ).ExecuteRename( FGamelist );
-   if ( chosen.isEmpty() )
-      return;
-
-   QString error;
-   if ( FGamelist.renameMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
-      return;
-   }
-
-   FEditPanel->setSelection( selectedGameIndexes() );
-   FModel->refresh();
-   updateCount();
-}
-
-void Frm_Editor::shrinkLargeImages()
-{
-   if ( !confirmLeaveEdits() )
-      return;
-
-   bool ok = false;
-   const double megabytes = QInputDialog::getDouble(
-      this, QStringLiteral( "Shrink large pictures" ),
-      QStringLiteral( "Shrink pictures larger than (MB):" ), 1.0, 0.1, 100.0, 1, &ok );
-   if ( !ok )
-      return;
-   const qint64 maxBytes = qRound64( megabytes * 1024 * 1024 );
-
-   const QVector<OversizedImage> candidates = oversizedImages( FGamelist, maxBytes );
-   if ( candidates.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral( "No picture is over that size." ) );
-      return;
-   }
-
-   const QVector<OversizedImage> chosen =
-      Frm_LinkMedia( this ).ExecuteShrink( FGamelist, maxBytes, candidates );
-   if ( chosen.isEmpty() )
-      return;
-
-   QProgressDialog progress( QStringLiteral( "Shrinking pictures..." ), QStringLiteral( "Cancel" ), 0,
-                             static_cast<int>( chosen.size() ), this );
-   progress.setWindowModality( Qt::WindowModal );
-   progress.setMinimumDuration( 0 );
-
-   int shrunk = 0;
-   qint64 saved = 0;
-   QStringList problems;
-   for ( int row = 0; row < chosen.size(); ++row ) {
-      progress.setValue( row );
-      if ( progress.wasCanceled() )
-         break;
-
-      QString error;
-      const qint64 size = shrinkImageFile( chosen.at( row ).path, maxBytes, &error );
-      if ( size < 0 ) {
-         problems << error;
-         continue;
-      }
-      ++shrunk;
-      saved += chosen.at( row ).size - size;
-   }
-   progress.setValue( static_cast<int>( chosen.size() ) );
-
-   QString text = QStringLiteral( "%1 picture(s) shrunk, %2 saved." )
-                     .arg( shrunk )
-                     .arg( QLocale().formattedDataSize( saved, 1, QLocale::DataSizeTraditionalFormat ) );
-   if ( !problems.isEmpty() )
-      text += QStringLiteral( "\n\nNot shrunk:\n%1" ).arg( problems.join( QLatin1Char( '\n' ) ) );
-   QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ), text );
-
-   // The links are unchanged, but the preview may be showing a file that just changed.
-   FEditPanel->setSelection( selectedGameIndexes() );
-}
-
-void Frm_Editor::deleteOrphans()
-{
-   if ( confirmLeaveEdits() )
-      confirmAndRemove( FGamelist.orphanIndexes(), QStringLiteral( "whose ROM is missing" ) );
-}
-
-void Frm_Editor::deleteDuplicates()
-{
-   if ( confirmLeaveEdits() )
-      confirmAndRemove( FGamelist.duplicateIndexes(),
-                        QStringLiteral( "that list a ROM already listed above them (the first stays)" ) );
-}
-
-void Frm_Editor::confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat )
-{
-   if ( aIndexes.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral( "Nothing to delete." ) );
-      return;
-   }
-
-   const auto answer = QMessageBox::question(
-      this, QStringLiteral( "GameList Editor Qt" ),
-      QStringLiteral( "Remove %1 game(s) %2 from the gamelist?\n\nNo ROM, picture or video file is deleted." )
-         .arg( aIndexes.size() )
-         .arg( aWhat ),
-      QMessageBox::Yes | QMessageBox::No, QMessageBox::No );
-   if ( answer != QMessageBox::Yes )
-      return;
-
-   QString error;
-   if ( !FGamelist.removeGames( aIndexes, &error ) ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
-      return;
-   }
-
-   // Indices shifted: same reset as after adding games.
-   FModel->setGamelist( &FGamelist );
-   FEditPanel->setGamelist( &FGamelist );
-   FScrapePanel->setGamelist( &FGamelist );
-   refreshFilter();
-   if ( FProxy->rowCount() > 0 )
-      Lbx_Games->setCurrentIndex( FProxy->index( 0, 0 ) );
+   for ( QAction* action : std::as_const( FSystemActions ) )
+      action->setEnabled( aEnabled );
 }
 
 void Frm_Editor::exportGamesList()
