@@ -1,5 +1,7 @@
 #include "Game.h"
 
+#include "Resources.h"
+
 #include <QFile>
 
 #include <zlib.h>
@@ -11,6 +13,53 @@ constexpr int Cst_ChunkSize = 64 * 1024;
 int gamelistFlag( const QString& aValue )
 {
    return aValue == QLatin1String( "true" ) ? 1 : 0;
+}
+
+// Hand-rolled: a partly-known date carries "00" for the unknown month or day, and the
+// display form leaves those parts out.
+QString gamelistDateToDisplay( const QString& aValue )
+{
+   if ( aValue.size() < 8 )
+      return {};
+
+   bool isNumber = false;
+   const int year = aValue.left( 4 ).toInt( &isNumber );
+   if ( !isNumber )
+      return {};
+   const int month = aValue.mid( 4, 2 ).toInt( &isNumber );
+   if ( !isNumber )
+      return {};
+   const int day = aValue.mid( 6, 2 ).toInt( &isNumber );
+   if ( !isNumber )
+      return {};
+
+   QString display;
+   if ( day > 0 )
+      display += aValue.mid( 6, 2 ) + QLatin1Char( '/' );
+   if ( month > 0 )
+      display += aValue.mid( 4, 2 ) + QLatin1Char( '/' );
+   if ( year > 0 )
+      display += aValue.left( 4 );
+
+   return display;
+}
+
+QString displayDateToGamelist( const QString& aDate )
+{
+   if ( aDate.isEmpty() || !aDate.at( 0 ).isDigit() )
+      return {};
+
+   switch ( aDate.size() ) {
+      case 4:  // yyyy
+         return aDate + QLatin1String( Cst_DateLongFill ) + QLatin1String( Cst_DateSuffix );
+      case 7:  // MM/yyyy
+         return aDate.mid( 3, 4 ) + aDate.left( 2 ) + QLatin1String( Cst_DateShortFill ) +
+                QLatin1String( Cst_DateSuffix );
+      case 10:  // dd/MM/yyyy
+         return aDate.mid( 6, 4 ) + aDate.mid( 3, 2 ) + aDate.left( 2 ) +
+                QLatin1String( Cst_DateSuffix );
+      default: return {};
+   }
 }
 
 GameFields gameFields( const Game& aGame )

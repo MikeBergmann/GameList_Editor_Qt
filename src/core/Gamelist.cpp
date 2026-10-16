@@ -1,5 +1,7 @@
 #include "Gamelist.h"
 
+#include "PathUtil.h"
+
 #include <QDate>
 #include <QDir>
 #include <QDirIterator>
@@ -104,130 +106,9 @@ QDate releaseDateValue( const QString& aDisplayDate )
 
 }  // namespace
 
-// Gamelist paths are relative to the system folder and start with "./", which
-// cleanPath folds away. Always joined with '/', which Qt accepts on every platform.
-QString physicalPath( const QString& aSystemDir, const QString& aRelative )
+QString Gamelist::domText( int aIndex, const char* aName ) const
 {
-   if ( aRelative.isEmpty() )
-      return {};
-
-   return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
-}
-
-QVector<SystemEntry> scanSystems( const QString& aRootPath )
-{
-   QVector<SystemEntry> systems;
-
-   // Folders by attribute, not by a '*.*' name filter, which needs a literal dot and
-   // so would miss folder names like "snes". Hidden folders are left out.
-   const QDir root( aRootPath );
-   const QStringList folders = root.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
-
-   for ( const QString& folder : folders ) {
-      const QString gamelist = resolvePath(
-         root.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
-      if ( !QFileInfo::exists( gamelist ) )
-         continue;
-
-      systems.append( { folder, systemKindFromFolder( folder ), gamelist } );
-   }
-
-   return systems;
-}
-
-QString resolvePath( const QString& aPath )
-{
-   if ( aPath.isEmpty() || QFileInfo::exists( aPath ) )
-      return aPath;
-
-   QStringList parts = QDir::cleanPath( aPath ).split( QLatin1Char( '/' ) );
-   if ( parts.isEmpty() )
-      return aPath;
-
-   // An absolute path splits with an empty first component; that one is "/".
-   QString resolved = parts.takeFirst();
-   if ( resolved.isEmpty() )
-      resolved = QStringLiteral( "/" );
-   // "C:" alone is the drive's current directory on Windows, not its root.
-   else if ( resolved.size() == 2 && resolved.at( 1 ) == QLatin1Char( ':' ) )
-      resolved += QLatin1Char( '/' );
-
-   // ponytail: a miss re-lists the containing directory for each component, so a
-   // ROM folder that is absent altogether costs one listing per game. That
-   // only happens on the orphan path; cache listings per directory if it shows.
-   for ( int index = 0; index < parts.size(); ++index ) {
-      const QString& part = parts.at( index );
-      QDir dir( resolved );
-      if ( QFileInfo::exists( dir.filePath( part ) ) ) {
-         resolved = dir.filePath( part );
-         continue;
-      }
-
-      QString match;
-      for ( const QString& name : dir.entryList( QDir::AllEntries | QDir::NoDotAndDotDot ) ) {
-         if ( name.compare( part, Qt::CaseInsensitive ) == 0 ) {
-            match = name;
-            break;
-         }
-      }
-
-      // Genuinely missing: keep the case found so far and the rest as written,
-      // so a file about to be created lands in the existing "Media/", not a new
-      // "media/". Still does not exist, so the caller still reports it.
-      if ( match.isEmpty() )
-         return dir.filePath( parts.mid( index ).join( QLatin1Char( '/' ) ) );
-
-      resolved = dir.filePath( match );
-   }
-
-   return resolved;
-}
-
-// Hand-rolled: a partly-known date carries "00" for the unknown month or day, and the
-// display form leaves those parts out.
-QString gamelistDateToDisplay( const QString& aValue )
-{
-   if ( aValue.size() < 8 )
-      return {};
-
-   bool isNumber = false;
-   const int year = aValue.left( 4 ).toInt( &isNumber );
-   if ( !isNumber )
-      return {};
-   const int month = aValue.mid( 4, 2 ).toInt( &isNumber );
-   if ( !isNumber )
-      return {};
-   const int day = aValue.mid( 6, 2 ).toInt( &isNumber );
-   if ( !isNumber )
-      return {};
-
-   QString display;
-   if ( day > 0 )
-      display += aValue.mid( 6, 2 ) + QLatin1Char( '/' );
-   if ( month > 0 )
-      display += aValue.mid( 4, 2 ) + QLatin1Char( '/' );
-   if ( year > 0 )
-      display += aValue.left( 4 );
-
-   return display;
-}
-
-QString displayDateToGamelist( const QString& aDate )
-{
-   if ( aDate.isEmpty() || !aDate.at( 0 ).isDigit() )
-      return {};
-
-   switch ( aDate.size() ) {
-      case 4:  // yyyy
-         return aDate + QLatin1String( Cst_DateLongFill ) + QLatin1String( Cst_DateSuffix );
-      case 7:  // MM/yyyy
-         return aDate.mid( 3, 4 ) + aDate.left( 2 ) + QLatin1String( Cst_DateShortFill ) +
-                QLatin1String( Cst_DateSuffix );
-      case 10:  // dd/MM/yyyy
-         return aDate.mid( 6, 4 ) + aDate.mid( 3, 2 ) + aDate.left( 2 ) +
-                QLatin1String( Cst_DateSuffix );
-      default: return {};
-   }
+   return childText( FNodes.value( aIndex ), aName );
 }
 
 bool Gamelist::load( const SystemEntry& aSystem, QString* aError )

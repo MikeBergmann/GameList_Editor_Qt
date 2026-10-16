@@ -1,5 +1,7 @@
 #include "MediaOps.h"
 
+#include "PathUtil.h"
+
 #include <QBuffer>
 #include <QDir>
 #include <QFile>

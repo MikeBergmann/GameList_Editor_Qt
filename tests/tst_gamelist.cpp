@@ -70,12 +70,11 @@ TEST( Gamelist, NodesStayAlignedWithGames )
 
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   for ( int index = 0; index < list.count(); ++index ) {
-      const QDomElement node = list.gameNode( index );
-      ASSERT_FALSE( node.isNull() );
-      EXPECT_EQ( node.firstChildElement( QStringLiteral( "path" ) ).text(),
-                 list.at( index ).romPath );
-   }
+   for ( int index = 0; index < list.count(); ++index )
+      EXPECT_EQ( list.domText( index, "path" ), list.at( index ).romPath );
+
+   EXPECT_TRUE( list.domText( list.count(), "path" ).isEmpty() );
+   EXPECT_TRUE( list.domText( -1, "path" ).isEmpty() );
 }
 
 // The ROM and the picture are on disk under a different case than the gamelist
@@ -325,8 +324,7 @@ TEST( Gamelist, SetFieldsCreatesMissingNodes )
    EXPECT_EQ( saved.at( 2 ).genre, QStringLiteral( "Shooter" ) );
    EXPECT_EQ( saved.at( 2 ).hidden, 1 );
    // Written as the literal "true", which is the only thing ES reads as true.
-   EXPECT_EQ( saved.gameNode( 2 ).firstChildElement( QStringLiteral( "hidden" ) ).text(),
-              QStringLiteral( "true" ) );
+   EXPECT_EQ( saved.domText( 2, "hidden" ), QStringLiteral( "true" ) );
 }
 
 TEST( Gamelist, BatchSetFieldsLeavesTheBlanksAlone )
@@ -489,8 +487,7 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
 
    // Written through, and the node list still lines up with the games.
    EXPECT_EQ( reload( fixture ).count(), 2 );
-   EXPECT_EQ( list.gameNode( 0 ).firstChildElement( QStringLiteral( "path" ) ).text(),
-              list.at( 0 ).romPath );
+   EXPECT_EQ( list.domText( 0, "path" ), list.at( 0 ).romPath );
 
    EXPECT_FALSE( list.removeGame( 2, &error ) );
 }
@@ -510,8 +507,7 @@ TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
 
    ASSERT_EQ( list.count(), 1 );
    EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
-   EXPECT_EQ( list.gameNode( 0 ).firstChildElement( QStringLiteral( "path" ) ).text(),
-              list.at( 0 ).romPath );
+   EXPECT_EQ( list.domText( 0, "path" ), list.at( 0 ).romPath );
    EXPECT_EQ( reload( fixture ).count(), 1 );
    // Unlike removeGame, no file goes with the entry.
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
@@ -708,7 +704,7 @@ QByteArray readAll( const QString& aPath )
 
 QString linkInDom( const Gamelist& aList, int aIndex, const char* aName )
 {
-   return aList.gameNode( aIndex ).firstChildElement( QLatin1String( aName ) ).text();
+   return aList.domText( aIndex, aName );
 }
 
 TEST( Gamelist, SetVideoFailedSaveRestoresFilesDocumentAndGame )
