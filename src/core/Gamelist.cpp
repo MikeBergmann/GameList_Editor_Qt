@@ -1,19 +1,13 @@
 #include "Gamelist.h"
 
-#include <QBuffer>
 #include <QDate>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
-#include <QImageReader>
-#include <QImageWriter>
-#include <QMimeDatabase>
 #include <QSaveFile>
 #include <QSet>
-
-#include <cmath>
 
 namespace {
 
@@ -21,56 +15,6 @@ namespace {
 // the layout EmulationStation itself writes.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
-
-// Media already on disk is looked for in the gamelist's own folder, then in these:
-// ES writes ./media/..., older setups and ScummVM keep plain ./images.
-const QStringList Cst_ImageSearchFolders = { QStringLiteral( "./media/images/" ),
-                                             QStringLiteral( "./images/" ) };
-const QStringList Cst_VideoSearchFolders = { QStringLiteral( "./media/videos/" ),
-                                             QStringLiteral( "./videos/" ) };
-
-// What scrapers append to the ROM name, in order of preference: the plain name first.
-const QStringList Cst_ImageStems = { QString(), QStringLiteral( "-image" ) };
-const QStringList Cst_VideoStems = { QString(), QStringLiteral( "-video" ) };
-
-// Kind of file by MIME type, so no extension list to keep.
-const QString Cst_ImageMime = QStringLiteral( "image/" );
-const QString Cst_VideoMime = QStringLiteral( "video/" );
-
-// The files of aDir whose MIME type starts with aMimePrefix, by lower-cased name
-// without the extension ("x.scummvm.png" is "x.scummvm") -> the real name. Judged
-// by file name alone: nothing is opened. Of several files with the same name
-// (Sonic.png, Sonic.jpg) the first in name order wins.
-QHash<QString, QString> mediaIndex( const QDir& aDir, const QString& aMimePrefix )
-{
-   const QMimeDatabase mimes;
-   QHash<QString, QString> index;
-   for ( const QString& name : aDir.entryList( QDir::Files ) ) {
-      if ( !mimes.mimeTypeForFile( name, QMimeDatabase::MatchExtension )
-              .name()
-              .startsWith( aMimePrefix ) )
-         continue;
-
-      const QString key = QFileInfo( name ).completeBaseName().toLower();
-      if ( !index.contains( key ) )
-         index.insert( key, name );
-   }
-   return index;
-}
-
-// The file name for the first base+stem that aIndex holds, or empty.
-QString findMedia( const QHash<QString, QString>& aIndex, const QStringList& aBases,
-                   const QStringList& aStems )
-{
-   for ( const QString& base : aBases ) {
-      for ( const QString& stem : aStems ) {
-         const QString name = aIndex.value( base + stem );
-         if ( !name.isEmpty() )
-            return name;
-      }
-   }
-   return {};
-}
 
 QString folderOf( const QString& aLink )
 {
@@ -81,16 +25,6 @@ QString folderOf( const QString& aLink )
 QString childText( const QDomElement& aNode, const char* aName )
 {
    return aNode.firstChildElement( QLatin1String( aName ) ).text();
-}
-
-// Gamelist paths are relative to the system folder and start with "./", which
-// cleanPath folds away. Always joined with '/', which Qt accepts on every platform.
-QString physicalPath( const QString& aSystemDir, const QString& aRelative )
-{
-   if ( aRelative.isEmpty() )
-      return {};
-
-   return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
 }
 
 // Where a file about to be written should land. The directory follows an existing
@@ -135,6 +69,16 @@ QDate releaseDateValue( const QString& aDisplayDate )
 }
 
 }  // namespace
+
+// Gamelist paths are relative to the system folder and start with "./", which
+// cleanPath folds away. Always joined with '/', which Qt accepts on every platform.
+QString physicalPath( const QString& aSystemDir, const QString& aRelative )
+{
+   if ( aRelative.isEmpty() )
+      return {};
+
+   return resolvePath( QDir::cleanPath( QDir( aSystemDir ).filePath( aRelative ) ) );
+}
 
 QVector<SystemEntry> scanSystems( const QString& aRootPath )
 {
@@ -628,67 +572,6 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
    return changed;
 }
 
-QVector<MediaLink> Gamelist::unlinkedMedia() const
-{
-   struct Kind
-   {
-      bool isImage;
-      const QString& mime;
-      QStringList folders;  // the gamelist's own first, then the usual ones
-      const QStringList& stems;
-   };
-   const Kind kinds[] = {
-      { true, Cst_ImageMime, QStringList( FImageFolder ) + Cst_ImageSearchFolders, Cst_ImageStems },
-      { false, Cst_VideoMime, QStringList( FVideoFolder ) + Cst_VideoSearchFolders, Cst_VideoStems },
-   };
-
-   QVector<MediaLink> found;
-   for ( const Kind& kind : kinds ) {
-      // One index per folder: the match is case-blind but the link keeps the
-      // file's real case, which a case-sensitive FS needs.
-      struct Folder
-      {
-         QDir dir;
-         QHash<QString, QString> index;
-      };
-      QVector<Folder> folders;
-      QStringList seen;
-      for ( const QString& link : kind.folders ) {
-         // An empty folder (a link with no '/') would be QDir(""): the working directory.
-         const QString path = physicalPath( FSystemDir, link );
-         if ( path.isEmpty() || seen.contains( path ) )
-            continue;
-         seen << path;
-
-         Folder folder{ QDir( path ), {} };
-         folder.index = mediaIndex( folder.dir, kind.mime );
-         if ( !folder.index.isEmpty() )
-            folders.append( folder );
-      }
-      if ( folders.isEmpty() )
-         continue;
-
-      for ( int index = 0; index < FGames.size(); ++index ) {
-         const Game& game = FGames.at( index );
-         if ( !( kind.isImage ? game.missingImage : game.missingVideo ) || game.romPath.isEmpty() )
-            continue;
-
-         // "Sonic" for Sonic.zip, and "Sonic.zip" itself: ES names the media of a
-         // ScummVM "game" folder, wetlands-us.scummvm, after the whole name.
-         const QStringList bases = { game.romNameWoExt().toLower(), game.romName().toLower() };
-         for ( const Folder& folder : folders ) {
-            const QString name = findMedia( folder.index, bases, kind.stems );
-            if ( !name.isEmpty() ) {
-               found.append( { index, kind.isImage, folder.dir.filePath( name ) } );
-               break;
-            }
-         }
-      }
-   }
-
-   return found;
-}
-
 int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
 {
    const QVector<Game> before = FGames;
@@ -724,59 +607,6 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
    }
 
    return linked;
-}
-
-QVector<MediaRename> Gamelist::misnamedMedia( bool aStrict ) const
-{
-   QVector<MediaRename> found;
-   QSet<QString> claimed;  // lower-cased new paths, so two games cannot take one name
-
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      const Game& game = FGames.at( index );
-      if ( game.romPath.isEmpty() )
-         continue;
-
-      for ( const bool isImage : { true, false } ) {
-         if ( isImage ? game.missingImage : game.missingVideo )
-            continue;
-
-         const QString path = isImage ? game.physicalImagePath : game.physicalVideoPath;
-         const QFileInfo info( path );
-         const QString stem = info.completeBaseName();
-
-         bool named = false;
-         const QStringList lenient = isImage ? Cst_ImageStems : Cst_VideoStems;
-         for ( const QString& base : { game.romNameWoExt(), game.romName() } ) {
-            for ( const QString& suffix : aStrict ? QStringList( QString() ) : lenient )
-               named = named || stem == base + suffix;
-         }
-         if ( named )
-            continue;
-
-         MediaRename rename{ index, isImage, path, {}, {} };
-         rename.newPath = info.dir().filePath(
-            info.suffix().isEmpty() ? game.romNameWoExt()
-                                    : game.romNameWoExt() + QLatin1Char( '.' ) + info.suffix() );
-
-         // ponytail: a case-only rename on a case-folding filesystem is offered but
-         // QFile::rename may refuse it; the whole batch then rolls back. Upgrade: two
-         // steps through a temporary name.
-         if ( fileShared( index, path, isImage ) ) {
-            rename.problem = QStringLiteral( "shared with another game" );
-         } else if ( QFileInfo::exists( rename.newPath ) &&
-                     QFileInfo( rename.newPath ).canonicalFilePath() != info.canonicalFilePath() ) {
-            rename.problem = QStringLiteral( "a file with that name exists" );
-         } else if ( claimed.contains( rename.newPath.toLower() ) ) {
-            rename.problem = QStringLiteral( "another game is renamed to that name" );
-         } else {
-            claimed.insert( rename.newPath.toLower() );
-         }
-
-         found.append( rename );
-      }
-   }
-
-   return found;
 }
 
 int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError )
@@ -873,87 +703,6 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
    }
 
    return false;
-}
-
-QVector<OversizedImage> Gamelist::oversizedImages( qint64 aMaxBytes ) const
-{
-   QVector<OversizedImage> found;
-   QSet<QString> seen;
-
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      const QString& path = FGames.at( index ).physicalImagePath;
-      if ( path.isEmpty() || seen.contains( path ) )
-         continue;
-      seen.insert( path );
-
-      const qint64 size = QFileInfo( path ).size();
-      if ( size > aMaxBytes )
-         found.append( { index, path, size } );
-   }
-
-   return found;
-}
-
-qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError )
-{
-   const auto failed = [&]( const QString& aMessage ) {
-      fail( aError, QStringLiteral( "%1: %2" ).arg( QFileInfo( aPath ).fileName(), aMessage ) );
-      return qint64( -1 );
-   };
-
-   // The reader is scoped so its file handle is closed before QSaveFile renames over
-   // aPath: Windows refuses to replace a file that is still open.
-   QByteArray format;
-   QImage picture;
-   {
-      QImageReader reader( aPath );
-      reader.setAutoTransform( false );
-      format = reader.format();
-      if ( reader.imageCount() > 1 )
-         return failed( QStringLiteral( "animated pictures are left alone." ) );
-
-      picture = reader.read();
-      if ( picture.isNull() )
-         return failed( reader.errorString() );
-   }
-
-   const qint64 original = QFileInfo( aPath ).size();
-   if ( original <= aMaxBytes )
-      return original;
-
-   // Size follows the pixel count, so aim at the area ratio and correct from what
-   // the encoder really produced. Always scaled from the original: scaling the
-   // scaled copy over and over would blur it. 0.95 aims a little under the limit.
-   double factor = std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( original ) ) * 0.95;
-   QByteArray encoded;
-   for ( int pass = 0; pass < 8; ++pass ) {
-      const QSize size( qMax( 1, qRound( picture.width() * factor ) ),
-                        qMax( 1, qRound( picture.height() * factor ) ) );
-      const QImage scaled = picture.scaled( size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation );
-
-      encoded.clear();
-      QBuffer buffer( &encoded );
-      buffer.open( QIODevice::WriteOnly );
-      QImageWriter writer( &buffer, format );
-      if ( !writer.write( scaled ) )
-         return failed( writer.errorString() );
-
-      if ( encoded.size() <= aMaxBytes )
-         break;
-
-      factor *= std::sqrt( static_cast<double>( aMaxBytes ) / static_cast<double>( encoded.size() ) ) * 0.95;
-      encoded.clear();
-   }
-
-   if ( encoded.isEmpty() )
-      return failed( QStringLiteral( "cannot be made that small." ) );
-
-   QSaveFile file( aPath );
-   if ( !file.open( QIODevice::WriteOnly ) || file.write( encoded ) != encoded.size() ||
-        !file.commit() )
-      return failed( file.errorString() );
-
-   return encoded.size();
 }
 
 bool Gamelist::removeImage( int aIndex, QString* aError )

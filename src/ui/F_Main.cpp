@@ -8,6 +8,7 @@
 #include "F_MoreInfos.h"
 #include "GameEditPanel.h"
 #include "GamelistModel.h"
+#include "MediaOps.h"
 #include "Resources.h"
 #include "ScrapePanel.h"
 
@@ -653,7 +654,7 @@ void Frm_Editor::linkExistingMedia()
    if ( !confirmLeaveEdits() )
       return;
 
-   const QVector<MediaLink> candidates = FGamelist.unlinkedMedia();
+   const QVector<MediaLink> candidates = unlinkedMedia( FGamelist );
    if ( candidates.isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No unlinked picture or video found." ) );
@@ -682,7 +683,7 @@ void Frm_Editor::renameMediaAfterRoms()
       return;
 
    // Strict is the superset: if it finds nothing, no checkbox state can.
-   if ( FGamelist.misnamedMedia( true ).isEmpty() ) {
+   if ( misnamedMedia( FGamelist, true ).isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "Every picture and video is named after its ROM." ) );
       return;
@@ -716,7 +717,7 @@ void Frm_Editor::shrinkLargeImages()
       return;
    const qint64 maxBytes = qRound64( megabytes * 1024 * 1024 );
 
-   const QVector<OversizedImage> candidates = FGamelist.oversizedImages( maxBytes );
+   const QVector<OversizedImage> candidates = oversizedImages( FGamelist, maxBytes );
    if ( candidates.isEmpty() ) {
       QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
                                 QStringLiteral( "No picture is over that size." ) );

@@ -72,6 +72,7 @@ add_library( gle_core STATIC
    src/core/Game.cpp
    src/core/Gamelist.cpp
    src/core/GamelistModel.cpp
+   src/core/MediaOps.cpp
    src/core/NameEdit.cpp
    src/core/Resources.cpp
 )
@@ -145,6 +146,7 @@ add_executable( tests
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
+   tests/tst_mediaops.cpp
    tests/tst_resources.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp

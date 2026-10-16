@@ -59,6 +59,4 @@ The logic is a 1:1 port, except where I think the original was wrong or didn't f
 ## Later
 
 - Open question: Gradually replace the parallel arrays with a single structured table.
-- Currently, my comments are very specific to the port from Delphi, sometimes including line numbers. Change them to something more general.
-- I have a lot of constants, which could be enums. E.g. `case 11: return aGame.kidGame == 1;` reads better as `case FilterCategory::KidGame:`
 - Secrets: The `QSettings` keys `SSPwd` and `ProxyPwd` (kept from the Delphi ini) would store the ScreenScraper and proxy passwords in plain text. Decide before the scraper is ported: plain INI as before, or the system keyring.

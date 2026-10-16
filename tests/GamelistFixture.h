@@ -98,3 +98,11 @@ struct Fixture
       return dir.filePath( QLatin1String( aRelative ) );
    }
 };
+
+// What a second reader sees after a save, which is the only thing that matters.
+inline Gamelist reload( const Fixture& aFixture )
+{
+   Gamelist list;
+   EXPECT_TRUE( list.load( aFixture.snes ) );
+   return list;
+}
