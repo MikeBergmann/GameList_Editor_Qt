@@ -1,0 +1,3 @@
+# LF in the repository and in every checkout, on Windows too, so raw string
+# literals and diffs do not depend on a machine's core.autocrlf.
+* text=auto eol=lf
