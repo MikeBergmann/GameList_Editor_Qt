@@ -118,6 +118,7 @@ target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
 add_library( gle_ui STATIC
    src/ui/GameEditPanel.cpp
    src/ui/ScrapePanel.cpp
+   src/ui/SystemActions.cpp
    src/ui/F_Main.cpp
    src/ui/dialogs/F_About.cpp
    src/ui/dialogs/F_AddRoms.cpp

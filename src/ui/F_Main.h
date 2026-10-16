@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Gamelist.h"
+#include "SystemActions.h"
 
+#include <QList>
 #include <QMainWindow>
 #include <QPixmap>
 
@@ -50,19 +52,15 @@ private:
 
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
-   // Actions > Add missing ROMs.
-   void addMissingRoms();
-   // Actions > Link existing media.
-   void linkExistingMedia();
-   // Actions > Rename media after ROMs.
-   void renameMediaAfterRoms();
-   // Actions > Shrink large pictures.
-   void shrinkLargeImages();
-   // Actions > System > Delete orphans / Delete duplicates.
-   void deleteOrphans();
-   void deleteDuplicates();
-   // Asks, drops the games, and resets the views onto what is left.
-   void confirmAndRemove( const QVector<int>& aIndexes, const QString& aWhat );
+   // Runs an Actions > System command (SystemActions.h) after the unsaved-edits guard,
+   // then brings the views in line with what it reports.
+   void runAction( SystemAction aAction );
+   // The views after games were added or removed: indices shifted, so every view starts over.
+   void resetViews();
+   // The views after the same games changed content or media.
+   void refreshViews();
+   // The commands that need a loaded system.
+   void setSystemActionsEnabled( bool aEnabled );
    // Actions > System > Set system type: maps an unrecognised folder to a known system.
    void setSystemType();
    // Actions > System > Export games list.
@@ -118,14 +116,8 @@ private:
    QLabel* Lbl_NbGamesFound = nullptr;
 
    QAction* Mnu_Reload = nullptr;
-   QAction* Mnu_AddRoms = nullptr;
-   QAction* Mnu_LinkMedia = nullptr;
-   QAction* Mnu_RenameMedia = nullptr;
-   QAction* Mnu_ShrinkImages = nullptr;
-   QAction* Mnu_SetSystemType = nullptr;
-   QAction* Mnu_DeleteOrphans = nullptr;
-   QAction* Mnu_DeleteDuplicates = nullptr;
-   QAction* Mnu_ExportList = nullptr;
+   // Actions > System entries that work on the loaded system; off while none is.
+   QList<QAction*> FSystemActions;
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
@@ -17,6 +18,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
+#include <QTemporaryDir>
 #include <QTimer>
 
 namespace {
@@ -235,6 +237,95 @@ TEST( MainWindow, CancellingTheUnsavedChangesPromptKeepsTheEditAndTheSelection )
    EXPECT_EQ( games->currentIndex().row(), 0 );
    EXPECT_TRUE( games->selectionModel()->isRowSelected( 0 ) );
    EXPECT_FALSE( games->selectionModel()->isRowSelected( 2 ) );
+}
+
+QAction* findAction( const Frm_Editor& aEditor, const QString& aText )
+{
+   for ( QAction* action : aEditor.findChildren<QAction*>() )
+      if ( action->text() == aText )
+         return action;
+   return nullptr;
+}
+
+// Answers the next modal message box on the next event-loop turn.
+void answerNextBox( QMessageBox::StandardButton aButton )
+{
+   QTimer::singleShot( 0, [aButton] {
+      if ( auto* box = qobject_cast<QMessageBox*>( QApplication::activeModalWidget() ) )
+         box->button( aButton )->click();
+   } );
+}
+
+// A system command runs through Frm_Editor::runAction: the games go, the file is
+// saved, and the views start over on what is left.
+TEST( MainWindow, DeleteOrphansDropsTheGameSavesAndResetsTheViews )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->setCurrentIndex( 1 );  // snes
+
+   ASSERT_EQ( shown( editor ).size(), 3 );
+   QAction* action = findAction( editor, QStringLiteral( "Delete orphans from gamelist..." ) );
+   ASSERT_NE( action, nullptr );
+
+   answerNextBox( QMessageBox::Yes );
+   action->trigger();
+
+   EXPECT_EQ( shown( editor ).size(), 2 );
+   EXPECT_EQ( reload( fixture ).count(), 2 );
+   EXPECT_EQ( editor.findChild<QLabel*>( QStringLiteral( "Lbl_NbGamesFound" ) )->text(),
+              QStringLiteral( "2 game(s) found." ) );
+   // The first row is selected again, so the editor shows a game, not a stale one.
+   EXPECT_EQ( editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) )->currentIndex().row(), 0 );
+}
+
+// Saying No leaves the gamelist alone.
+TEST( MainWindow, DecliningADeleteChangesNothing )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->setCurrentIndex( 1 );  // snes
+
+   answerNextBox( QMessageBox::No );
+   findAction( editor, QStringLiteral( "Delete orphans from gamelist..." ) )->trigger();
+
+   EXPECT_EQ( shown( editor ).size(), 3 );
+   EXPECT_EQ( reload( fixture ).count(), 3 );
+}
+
+// Every command that works on the loaded system follows one rule, including after a
+// folder with no systems replaces the loaded one.
+TEST( MainWindow, SystemCommandsAreOnlyEnabledWhileASystemIsLoaded )
+{
+   Fixture fixture;
+   QTemporaryDir empty;
+   Frm_Editor editor;
+
+   const QStringList commands = { QStringLiteral( "Add missing ROMs..." ),
+                                  QStringLiteral( "Link existing media..." ),
+                                  QStringLiteral( "Rename media after ROMs..." ),
+                                  QStringLiteral( "Shrink large pictures..." ),
+                                  QStringLiteral( "Set system type..." ),
+                                  QStringLiteral( "Delete orphans from gamelist..." ),
+                                  QStringLiteral( "Delete duplicates from gamelist..." ),
+                                  QStringLiteral( "Export games list to txt file..." ) };
+   const auto expectAll = [&]( bool aEnabled ) {
+      for ( const QString& text : commands ) {
+         QAction* action = findAction( editor, text );
+         ASSERT_NE( action, nullptr ) << qPrintable( text );
+         EXPECT_EQ( action->isEnabled(), aEnabled ) << qPrintable( text );
+      }
+   };
+
+   expectAll( false );
+   editor.openRootFolder( fixture.dir.path() );
+   expectAll( true );
+
+   answerNextBox( QMessageBox::Ok );  // "you selected the wrong folder"
+   editor.openRootFolder( empty.path() );
+   expectAll( false );
 }
 
 }  // namespace
