@@ -205,12 +205,10 @@ QVector<OversizedImage> oversizedImages( const Gamelist& aList, qint64 aMaxBytes
    return found;
 }
 
-qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError )
+Result<qint64> shrinkImageFile( const QString& aPath, qint64 aMaxBytes )
 {
    const auto failed = [&]( const QString& aMessage ) {
-      if ( aError )
-         *aError = QStringLiteral( "%1: %2" ).arg( QFileInfo( aPath ).fileName(), aMessage );
-      return qint64( -1 );
+      return Error{ QStringLiteral( "%1: %2" ).arg( QFileInfo( aPath ).fileName(), aMessage ) };
    };
 
    // The reader is scoped so its file handle is closed before QSaveFile renames over
@@ -265,5 +263,5 @@ qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError 
         !file.commit() )
       return failed( file.errorString() );
 
-   return encoded.size();
+   return qint64( encoded.size() );
 }

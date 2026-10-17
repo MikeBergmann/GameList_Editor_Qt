@@ -46,13 +46,6 @@ bool fileMissing( const QString& aPath )
    return aPath.isEmpty() || !QFileInfo::exists( aPath );
 }
 
-bool fail( QString* aError, const QString& aMessage )
-{
-   if ( aError )
-      *aError = aMessage;
-   return false;
-}
-
 // New media is written next to its target under this name, then swapped in, so a
 // half-written file never replaces a good one. The old file waits under the other
 // name until the gamelist has been saved.
@@ -60,31 +53,29 @@ constexpr const char* Cst_StagedSuffix = ".gle-new";
 constexpr const char* Cst_BackupSuffix = ".gle-bak";
 
 // Moves aStaged to aTarget. An existing aTarget is moved aside first and its new name
-// returned in aBackup (empty if there was none). On false, aTarget is as it was and
-// aStaged is gone.
-bool swapIn( const QString& aStaged, const QString& aTarget, QString& aBackup, QString* aError )
+// returned (empty if there was none). On an Error, aTarget is as it was and aStaged
+// is gone.
+Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
 {
-   aBackup.clear();
+   QString backup;
 
    if ( QFileInfo::exists( aTarget ) ) {
-      const QString backup = aTarget + QLatin1String( Cst_BackupSuffix );
+      backup = aTarget + QLatin1String( Cst_BackupSuffix );
       QFile::remove( backup );
       if ( !QFile::rename( aTarget, backup ) ) {
          QFile::remove( aStaged );
-         return fail( aError, QStringLiteral( "Cannot replace %1." ).arg( aTarget ) );
+         return Error{ QStringLiteral( "Cannot replace %1." ).arg( aTarget ) };
       }
-      aBackup = backup;
    }
 
    if ( !QFile::rename( aStaged, aTarget ) ) {
-      if ( !aBackup.isEmpty() )
-         QFile::rename( aBackup, aTarget );
-      aBackup.clear();
+      if ( !backup.isEmpty() )
+         QFile::rename( backup, aTarget );
       QFile::remove( aStaged );
-      return fail( aError, QStringLiteral( "Cannot write %1." ).arg( aTarget ) );
+      return Error{ QStringLiteral( "Cannot write %1." ).arg( aTarget ) };
    }
 
-   return true;
+   return backup;
 }
 
 // Ratings are written with either decimal separator; an unparseable one counts as 0.
@@ -111,7 +102,7 @@ QString Gamelist::domText( int aIndex, const char* aName ) const
    return childText( FNodes.value( aIndex ), aName );
 }
 
-bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
+Result<> Gamelist::load( const SystemEntry& aSystem )
 {
    FSystem = aSystem;
    FSystemDir.clear();
@@ -125,17 +116,17 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
 
    QFile file( aSystem.gamelistPath );
    if ( !file.open( QIODevice::ReadOnly ) )
-      return fail( aError, QStringLiteral( "Cannot read %1: %2" )
-                              .arg( aSystem.gamelistPath, file.errorString() ) );
+      return Error{ QStringLiteral( "Cannot read %1: %2" )
+                       .arg( aSystem.gamelistPath, file.errorString() ) };
 
    QString parseError;
    int line = 0;
    int column = 0;
    if ( !FDocument.setContent( &file, &parseError, &line, &column ) ) {
-      return fail( aError, QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
-                              .arg( aSystem.gamelistPath, parseError )
-                              .arg( line )
-                              .arg( column ) );
+      return Error{ QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
+                       .arg( aSystem.gamelistPath, parseError )
+                       .arg( line )
+                       .arg( column ) };
    }
 
    FSystemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
@@ -165,11 +156,11 @@ bool Gamelist::load( const SystemEntry& aSystem, QString* aError )
    }
 
    if ( FGames.isEmpty() )
-      return fail( aError, QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) );
+      return Error{ QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) };
 
    countDuplicates();
 
-   return true;
+   return {};
 }
 
 Game Gamelist::gameFromNode( const QDomElement& aNode ) const
@@ -253,7 +244,7 @@ QStringList Gamelist::unlistedRoms() const
    return found;
 }
 
-int Gamelist::addGames( const QStringList& aRomPaths, QString* aError )
+Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 {
    const QDir systemDir( FSystemDir );
    QSet<QString> seen;
@@ -276,8 +267,7 @@ int Gamelist::addGames( const QStringList& aRomPaths, QString* aError )
 
       if ( !info.isFile() || relative.startsWith( QLatin1String( ".." ) ) ) {
          rollback();
-         fail( aError, QStringLiteral( "%1 is not a file inside %2." ).arg( path, FSystemDir ) );
-         return -1;
+         return Error{ QStringLiteral( "%1 is not a file inside %2." ).arg( path, FSystemDir ) };
       }
 
       // Already listed, or picked twice: nothing to add, and not an error.
@@ -299,9 +289,9 @@ int Gamelist::addGames( const QStringList& aRomPaths, QString* aError )
    if ( added.isEmpty() )
       return 0;
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       rollback();
-      return -1;
+      return Error{ saved.error() };
    }
 
    countDuplicates();
@@ -319,26 +309,26 @@ void Gamelist::countDuplicates()
    }
 }
 
-bool Gamelist::save( QString* aError )
+Result<> Gamelist::save()
 {
    QSaveFile file( FSystem.gamelistPath );
    if ( !file.open( QIODevice::WriteOnly ) )
-      return fail( aError, QStringLiteral( "Cannot write %1: %2" )
-                              .arg( FSystem.gamelistPath, file.errorString() ) );
+      return Error{ QStringLiteral( "Cannot write %1: %2" )
+                       .arg( FSystem.gamelistPath, file.errorString() ) };
 
    // The whole document is re-indented; three spaces is what EmulationStation writes.
    const QByteArray content = FDocument.toByteArray( 3 );
    if ( file.write( content ) != content.size() ) {
       file.cancelWriting();
-      return fail( aError, QStringLiteral( "Cannot write %1: %2" )
-                              .arg( FSystem.gamelistPath, file.errorString() ) );
+      return Error{ QStringLiteral( "Cannot write %1: %2" )
+                       .arg( FSystem.gamelistPath, file.errorString() ) };
    }
 
    if ( !file.commit() )
-      return fail( aError, QStringLiteral( "Cannot write %1: %2" )
-                              .arg( FSystem.gamelistPath, file.errorString() ) );
+      return Error{ QStringLiteral( "Cannot write %1: %2" )
+                       .arg( FSystem.gamelistPath, file.errorString() ) };
 
-   return true;
+   return {};
 }
 
 QDomElement Gamelist::ensureChild( QDomElement aNode, const char* aName )
@@ -419,23 +409,21 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       countDuplicates();
 }
 
-bool Gamelist::applyImage( int aIndex, const QImage& aPicture, MediaWrite& aWrite,
-                          QString* aError )
+Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPicture )
 {
    Game& game = FGames[aIndex];
    const QString link = FImageFolder + game.romNameWoExt() + QLatin1String( Cst_ImageSuffixPng );
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
-      return fail( aError,
-                   QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
+      return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };
 
    // The suffix would pick the format, but the staged name has a foreign one: always PNG.
    const QString staged = target + QLatin1String( Cst_StagedSuffix );
    QFile::remove( staged );
    if ( !aPicture.save( staged, "PNG" ) ) {
       QFile::remove( staged );
-      return fail( aError, QStringLiteral( "Cannot write %1." ).arg( target ) );
+      return Error{ QStringLiteral( "Cannot write %1." ).arg( target ) };
    }
 
    MediaWrite write;
@@ -443,16 +431,17 @@ bool Gamelist::applyImage( int aIndex, const QImage& aPicture, MediaWrite& aWrit
    write.isImage = true;
    write.target = target;
    write.before = game;
-   if ( !swapIn( staged, target, write.backup, aError ) )
-      return false;
+   const Result<QString> backup = swapIn( staged, target );
+   if ( !backup )
+      return Error{ backup.error() };
+   write.backup = backup.value();
 
    setChildText( FNodes[aIndex], Cst_ImageLink, link );
    game.imagePath = link;
    game.physicalImagePath = target;
    game.missingImage = false;
 
-   aWrite = write;
-   return true;
+   return write;
 }
 
 void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
@@ -474,55 +463,53 @@ void Gamelist::undoMedia( const MediaWrite& aWrite )
    restoreLink( aWrite.index, aWrite.isImage, aWrite.before );
 }
 
-bool Gamelist::commitMedia( const QVector<MediaWrite>& aWrites, QString* aError )
+Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 {
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
          undoMedia( *it );
-      return false;
+      return saved;
    }
 
    for ( const MediaWrite& write : aWrites ) {
       if ( !write.backup.isEmpty() )
          QFile::remove( write.backup );
    }
-   return true;
+   return {};
 }
 
-bool Gamelist::setImage( int aIndex, const QString& aSourcePath, QString* aError )
+Result<> Gamelist::setImage( int aIndex, const QString& aSourcePath )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
    QImage picture;
    if ( !picture.load( aSourcePath ) ) {
-      return fail(
-         aError, QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) );
+      return Error{
+         QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) };
    }
 
-   return setImage( aIndex, picture, aError );
+   return setImage( aIndex, picture );
 }
 
-bool Gamelist::setImage( int aIndex, const QImage& aPicture, QString* aError )
+Result<> Gamelist::setImage( int aIndex, const QImage& aPicture )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
-   MediaWrite write;
-   if ( !applyImage( aIndex, aPicture, write, aError ) )
-      return false;
+   const Result<MediaWrite> write = applyImage( aIndex, aPicture );
+   if ( !write )
+      return Error{ write.error() };
 
-   return commitMedia( { write }, aError );
+   return commitMedia( { write.value() } );
 }
 
-int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aError )
+Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 {
    QImage picture;
-   if ( !picture.load( aSourcePath ) ) {
-      fail( aError,
-            QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) );
-      return 0;
-   }
+   if ( !picture.load( aSourcePath ) )
+      return Error{
+         QStringLiteral( "%1 is not a picture this build can read." ).arg( aSourcePath ) };
 
    // All or nothing: half a batch of pictures with no way back is worse than none.
    QVector<MediaWrite> writes;
@@ -530,22 +517,25 @@ int Gamelist::setDefaultImageForMissing( const QString& aSourcePath, QString* aE
       if ( !FGames.at( index ).missingImage )
          continue;
 
-      MediaWrite write;
-      if ( !applyImage( index, picture, write, aError ) ) {
+      const Result<MediaWrite> write = applyImage( index, picture );
+      if ( !write ) {
          for ( auto it = writes.crbegin(); it != writes.crend(); ++it )
             undoMedia( *it );
-         return 0;
+         return Error{ write.error() };
       }
-      writes.append( write );
+      writes.append( write.value() );
    }
 
-   if ( writes.isEmpty() || !commitMedia( writes, aError ) )
+   if ( writes.isEmpty() )
       return 0;
+
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return Error{ committed.error() };
 
    return static_cast<int>( writes.size() );
 }
 
-int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
+Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
    const QVector<Game> before = FGames;
    const QDir systemDir( FSystemDir );
@@ -567,7 +557,7 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
    if ( linked == 0 )
       return 0;
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       for ( const MediaLink& link : aLinks ) {
          if ( link.index < 0 || link.index >= FGames.size() )
             continue;
@@ -576,13 +566,13 @@ int Gamelist::linkMedia( const QVector<MediaLink>& aLinks, QString* aError )
                        link.isImage ? old.imagePath : old.videoPath );
       }
       FGames = before;
-      return -1;
+      return Error{ saved.error() };
    }
 
    return linked;
 }
 
-int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError )
+Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 {
    const QVector<Game> before = FGames;
 
@@ -604,8 +594,8 @@ int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError
 
       if ( !QFile::rename( rename.path, rename.newPath ) ) {
          undo();
-         fail( aError, QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) );
-         return -1;
+         return Error{
+            QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) };
       }
       done << &rename;
 
@@ -621,32 +611,31 @@ int Gamelist::renameMedia( const QVector<MediaRename>& aRenames, QString* aError
    if ( done.isEmpty() )
       return 0;
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       undo();
-      return -1;
+      return Error{ saved.error() };
    }
 
-   return done.size();
+   return static_cast<int>( done.size() );
 }
 
-bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError )
+Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
    Game& game = FGames[aIndex];
    const QString link = FVideoFolder + game.romNameWoExt() + QLatin1String( Cst_VideoSuffixMp4 );
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
-      return fail( aError,
-                   QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) );
+      return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };
 
    // Choosing the game's own video would otherwise remove the file and then copy
    // from it, i.e. a deletion; the copy is skipped when source and target are one file.
    const QString source = QFileInfo( aSourcePath ).canonicalFilePath();
    if ( source.isEmpty() )
-      return fail( aError, QStringLiteral( "%1 cannot be read." ).arg( aSourcePath ) );
+      return Error{ QStringLiteral( "%1 cannot be read." ).arg( aSourcePath ) };
 
    MediaWrite write;
    write.index = aIndex;
@@ -659,11 +648,13 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
       QFile::remove( staged );
       if ( !QFile::copy( source, staged ) ) {
          QFile::remove( staged );
-         return fail( aError, QStringLiteral( "Cannot copy %1 to %2." ).arg( source, target ) );
+         return Error{ QStringLiteral( "Cannot copy %1 to %2." ).arg( source, target ) };
       }
 
-      if ( !swapIn( staged, target, write.backup, aError ) )
-         return false;
+      const Result<QString> backup = swapIn( staged, target );
+      if ( !backup )
+         return Error{ backup.error() };
+      write.backup = backup.value();
       write.target = target;
    }
 
@@ -672,7 +663,7 @@ bool Gamelist::setVideo( int aIndex, const QString& aSourcePath, QString* aError
    game.physicalVideoPath = target;
    game.missingVideo = false;
 
-   return commitMedia( { write }, aError );
+   return commitMedia( { write } );
 }
 
 bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
@@ -691,10 +682,10 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
    return false;
 }
 
-bool Gamelist::removeImage( int aIndex, QString* aError )
+Result<> Gamelist::removeImage( int aIndex )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
    Game& game = FGames[aIndex];
    const QString file = game.physicalImagePath;
@@ -705,9 +696,9 @@ bool Gamelist::removeImage( int aIndex, QString* aError )
    game.physicalImagePath.clear();
    game.missingImage = true;
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       restoreLink( aIndex, true, before );
-      return false;
+      return saved;
    }
 
    // Only once the gamelist has stopped pointing at it, and only if no other
@@ -715,13 +706,13 @@ bool Gamelist::removeImage( int aIndex, QString* aError )
    if ( !file.isEmpty() && !fileShared( aIndex, file, true ) )
       QFile::remove( file );
 
-   return true;
+   return {};
 }
 
-bool Gamelist::removeVideo( int aIndex, QString* aError )
+Result<> Gamelist::removeVideo( int aIndex )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
    Game& game = FGames[aIndex];
    const QString file = game.physicalVideoPath;
@@ -732,30 +723,30 @@ bool Gamelist::removeVideo( int aIndex, QString* aError )
    game.physicalVideoPath.clear();
    game.missingVideo = true;
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       restoreLink( aIndex, false, before );
-      return false;
+      return saved;
    }
 
    if ( !file.isEmpty() && !fileShared( aIndex, file, false ) )
       QFile::remove( file );
 
-   return true;
+   return {};
 }
 
-bool Gamelist::removeGame( int aIndex, QString* aError )
+Result<QStringList> Gamelist::removeGame( int aIndex )
 {
    if ( aIndex < 0 || aIndex >= FGames.size() )
-      return fail( aError, QStringLiteral( "No game selected." ) );
+      return Error{ QStringLiteral( "No game selected." ) };
 
    QDomElement node = FNodes.at( aIndex );
    QDomNode parent = node.parentNode();
    const QDomNode next = node.nextSibling();
    parent.removeChild( node );
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       parent.insertBefore( node, next );
-      return false;
+      return Error{ saved.error() };
    }
 
    const Game game = FGames.at( aIndex );
@@ -785,14 +776,10 @@ bool Gamelist::removeGame( int aIndex, QString* aError )
    drop( game.physicalImagePath, &Game::physicalImagePath );
    drop( game.physicalVideoPath, &Game::physicalVideoPath );
 
-   if ( !stuck.isEmpty() && aError )
-      *aError = QStringLiteral( "Removed from the gamelist, but could not delete:\n%1" )
-                   .arg( stuck.join( QLatin1Char( '\n' ) ) );
-
-   return true;
+   return stuck;
 }
 
-bool Gamelist::removeGames( const QVector<int>& aIndexes, QString* aError )
+Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
 {
    QSet<int> doomed;
    for ( int index : aIndexes ) {
@@ -800,7 +787,7 @@ bool Gamelist::removeGames( const QVector<int>& aIndexes, QString* aError )
          doomed.insert( index );
    }
    if ( doomed.isEmpty() )
-      return true;
+      return {};
 
    struct Removed
    {
@@ -818,13 +805,13 @@ bool Gamelist::removeGames( const QVector<int>& aIndexes, QString* aError )
       removed.last().parent.removeChild( node );
    }
 
-   if ( !save( aError ) ) {
+   if ( const Result<> saved = save(); !saved ) {
       // Backwards, so every remembered neighbour is back in place first.
       for ( auto it = removed.crbegin(); it != removed.crend(); ++it ) {
          QDomNode parent = it->parent;
          parent.insertBefore( it->node, it->next );
       }
-      return false;
+      return saved;
    }
 
    QVector<Game> games;
@@ -839,7 +826,7 @@ bool Gamelist::removeGames( const QVector<int>& aIndexes, QString* aError )
    FGames = games;
    FNodes = nodes;
    countDuplicates();
-   return true;
+   return {};
 }
 
 QVector<int> Gamelist::orphanIndexes() const

@@ -29,8 +29,9 @@ TEST( MediaOps, UnlinkedMediaFindsFilesByRomNameAndLinkMediaPointsTheGamesAtThem
    EXPECT_EQ( found[2].index, 1 );
    EXPECT_FALSE( found[2].isImage );
 
-   QString error;
-   ASSERT_EQ( list.linkMedia( found, &error ), 3 ) << error.toStdString();
+   const Result<int> linked = list.linkMedia( found );
+   ASSERT_TRUE( linked ) << linked.error().toStdString();
+   ASSERT_EQ( linked.value(), 3 );
    EXPECT_FALSE( list.at( 1 ).missingImage );
    EXPECT_FALSE( list.at( 1 ).missingVideo );
    EXPECT_TRUE( unlinkedMedia( list ).isEmpty() );
@@ -55,9 +56,11 @@ TEST( MediaOps, MisnamedMediaProposesRomNamesAndRenameMediaRelinksThem )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    // Game 1 links sonic.PNG, whose proper name Sonic.PNG is taken; game 2 links Renamed.jpg.
-   ASSERT_EQ( list.linkMedia( { { 1, true, fixture.path( "snes/media/images/sonic.PNG" ) },
-                                { 2, true, fixture.path( "snes/media/images/Renamed.jpg" ) } } ),
-              2 );
+   const Result<int> linked =
+      list.linkMedia( { { 1, true, fixture.path( "snes/media/images/sonic.PNG" ) },
+                        { 2, true, fixture.path( "snes/media/images/Renamed.jpg" ) } } );
+   ASSERT_TRUE( linked ) << linked.error().toStdString();
+   ASSERT_EQ( linked.value(), 2 );
 
    // Game 0's Sonic.png / Sonic.mp4 are already right.
    const QVector<MediaRename> found = misnamedMedia( list );
@@ -68,8 +71,9 @@ TEST( MediaOps, MisnamedMediaProposesRomNamesAndRenameMediaRelinksThem )
    EXPECT_TRUE( found[1].problem.isEmpty() );
    EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
 
-   QString error;
-   ASSERT_EQ( list.renameMedia( found, &error ), 1 ) << error.toStdString();
+   const Result<int> renamed = list.renameMedia( found );
+   ASSERT_TRUE( renamed ) << renamed.error().toStdString();
+   ASSERT_EQ( renamed.value(), 1 );
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Renamed.jpg" ) ) );
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.jpg" ) ) );
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/sonic.PNG" ) ) );
@@ -93,9 +97,11 @@ TEST( MediaOps, StrictMisnamedMediaAlsoRenamesDashImageAndDashVideoFiles )
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
-   ASSERT_EQ( list.linkMedia( { { 2, true, fixture.path( "snes/media/images/Vanished-image.jpg" ) },
-                                { 2, false, fixture.path( "snes/media/videos/Vanished-video.mp4" ) } } ),
-              2 );
+   const Result<int> linked =
+      list.linkMedia( { { 2, true, fixture.path( "snes/media/images/Vanished-image.jpg" ) },
+                        { 2, false, fixture.path( "snes/media/videos/Vanished-video.mp4" ) } } );
+   ASSERT_TRUE( linked ) << linked.error().toStdString();
+   ASSERT_EQ( linked.value(), 2 );
 
    // Scraper-style names are fine by default ...
    EXPECT_TRUE( misnamedMedia( list ).isEmpty() );
@@ -106,8 +112,9 @@ TEST( MediaOps, StrictMisnamedMediaAlsoRenamesDashImageAndDashVideoFiles )
    EXPECT_EQ( found[0].newPath, fixture.path( "snes/media/images/Vanished.jpg" ) );
    EXPECT_EQ( found[1].newPath, fixture.path( "snes/media/videos/Vanished.mp4" ) );
 
-   QString error;
-   ASSERT_EQ( list.renameMedia( found, &error ), 2 ) << error.toStdString();
+   const Result<int> renamed = list.renameMedia( found );
+   ASSERT_TRUE( renamed ) << renamed.error().toStdString();
+   ASSERT_EQ( renamed.value(), 2 );
    const Gamelist saved = reload( fixture );
    EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
    EXPECT_EQ( saved.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.mp4" ) );
@@ -205,9 +212,10 @@ TEST( MediaOps, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
    EXPECT_EQ( found.at( 0 ).size, before );
    EXPECT_TRUE( oversizedImages( list, before ).isEmpty() );
 
-   QString error;
-   const qint64 after = shrinkImageFile( big, limit, &error );
-   ASSERT_GT( after, 0 ) << error.toStdString();
+   const Result<qint64> shrunk = shrinkImageFile( big, limit );
+   ASSERT_TRUE( shrunk ) << shrunk.error().toStdString();
+   const qint64 after = shrunk.value();
+   ASSERT_GT( after, 0 );
    EXPECT_LE( after, limit );
    EXPECT_GT( after, limit / 2 );  // "ca.": close to the limit, not shrunk to a thumbnail
    EXPECT_EQ( QFileInfo( big ).size(), after );
@@ -218,11 +226,14 @@ TEST( MediaOps, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
    EXPECT_TRUE( oversizedImages( list, limit ).isEmpty() );
 
    // Already small enough: left alone, and an unreadable file is an error that leaves it be.
-   EXPECT_EQ( shrinkImageFile( big, limit ), after );
+   const Result<qint64> again = shrinkImageFile( big, limit );
+   ASSERT_TRUE( again );
+   EXPECT_EQ( again.value(), after );
    const QString junk = fixture.path( "snes/media/images/junk.png" );
    writeFile( junk, QByteArray( 5000, 'x' ) );
-   EXPECT_EQ( shrinkImageFile( junk, 100, &error ), -1 );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<qint64> unreadable = shrinkImageFile( junk, 100 );
+   EXPECT_FALSE( unreadable );
+   EXPECT_FALSE( unreadable.error().isEmpty() );
    EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
 }
 

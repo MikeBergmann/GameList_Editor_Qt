@@ -514,7 +514,7 @@ void ScrapePanel::save()
                            [this, onSaved, onFailed]( const QString&, const QString& aMessage ) {
                               QObject::disconnect( *onSaved );
                               QObject::disconnect( *onFailed );
-                              report( false, aMessage );
+                              report( Error{ aMessage } );
                            } );
       FScraper.downloadToFile( FLastInfo.videoLink, temp );
    } else {
@@ -532,36 +532,35 @@ void ScrapePanel::finishSave( const QString& aVideoPath )
    if ( which )
       FGamelist->setFields( { FIndex }, fields(), which );
 
-   QString error;
-   bool ok = true;
+   Result<> result;
    bool savedAlready = false;
 
    if ( Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull() ) {
-      ok = FGamelist->setImage( FIndex, FSelectedPicture, &error );
+      result = FGamelist->setImage( FIndex, FSelectedPicture );
       savedAlready = true;
    }
 
-   if ( ok && !aVideoPath.isEmpty() ) {
-      ok = FGamelist->setVideo( FIndex, aVideoPath, &error );
+   if ( result && !aVideoPath.isEmpty() ) {
+      result = FGamelist->setVideo( FIndex, aVideoPath );
       savedAlready = true;
       QFile::remove( aVideoPath );
    }
 
    // setFields() alone does not save, so an infos-only save has to ask for it.
-   if ( ok && which && !savedAlready )
-      ok = FGamelist->save( &error );
+   if ( result && which && !savedAlready )
+      result = FGamelist->save();
 
-   report( ok, error );
+   report( result );
 }
 
-void ScrapePanel::report( bool aOk, const QString& aError )
+void ScrapePanel::report( const Result<>& aResult )
 {
    QGuiApplication::restoreOverrideCursor();
    Img_Loading->setVisible( false );
    setEnabled( true );
 
-   if ( !aOk )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aError );
+   if ( !aResult )
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aResult.error() );
 
    emit gamesChanged();
 }

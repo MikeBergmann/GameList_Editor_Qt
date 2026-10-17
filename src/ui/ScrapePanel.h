@@ -64,7 +64,7 @@ private:
    void enableScrapeComponents( bool aEnabled );
    void updateSaveEnabled();
    void showSelectedPicture();
-   void report( bool aOk, const QString& aError );
+   void report( const Result<>& aResult );
 
    void handleGameInfo( const ScrapedInfo& aInfo );
    void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );

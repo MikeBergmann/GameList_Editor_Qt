@@ -31,9 +31,8 @@ ViewUpdate confirmAndRemove( QWidget* aParent, Gamelist& aGamelist, const QVecto
    if ( answer != QMessageBox::Yes )
       return ViewUpdate::None;
 
-   QString error;
-   if ( !aGamelist.removeGames( aIndexes, &error ) ) {
-      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), error );
+   if ( const Result<> removed = aGamelist.removeGames( aIndexes ); !removed ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), removed.error() );
       return ViewUpdate::None;
    }
 
@@ -49,15 +48,14 @@ ViewUpdate addMissingRoms( QWidget* aParent, Gamelist& aGamelist )
    if ( chosen.isEmpty() )
       return ViewUpdate::None;
 
-   QString error;
-   const int added = aGamelist.addGames( chosen, &error );
-   if ( added < 0 ) {
-      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), error );
+   const Result<int> added = aGamelist.addGames( chosen );
+   if ( !added ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), added.error() );
       return ViewUpdate::None;
    }
 
    // Rows are indices into the Gamelist; the model only knows how to reset for added games.
-   return added == 0 ? ViewUpdate::None : ViewUpdate::Reset;
+   return added.value() == 0 ? ViewUpdate::None : ViewUpdate::Reset;
 }
 
 ViewUpdate linkExistingMedia( QWidget* aParent, Gamelist& aGamelist )
@@ -73,9 +71,8 @@ ViewUpdate linkExistingMedia( QWidget* aParent, Gamelist& aGamelist )
    if ( chosen.isEmpty() )
       return ViewUpdate::None;
 
-   QString error;
-   if ( aGamelist.linkMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), error );
+   if ( const Result<int> linked = aGamelist.linkMedia( chosen ); !linked ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), linked.error() );
       return ViewUpdate::None;
    }
 
@@ -96,9 +93,8 @@ ViewUpdate renameMediaAfterRoms( QWidget* aParent, Gamelist& aGamelist )
    if ( chosen.isEmpty() )
       return ViewUpdate::None;
 
-   QString error;
-   if ( aGamelist.renameMedia( chosen, &error ) < 0 ) {
-      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), error );
+   if ( const Result<int> renamed = aGamelist.renameMedia( chosen ); !renamed ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), renamed.error() );
       return ViewUpdate::None;
    }
 
@@ -140,14 +136,13 @@ ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist )
       if ( progress.wasCanceled() )
          break;
 
-      QString error;
-      const qint64 size = shrinkImageFile( chosen.at( row ).path, maxBytes, &error );
-      if ( size < 0 ) {
-         problems << error;
+      const Result<qint64> size = shrinkImageFile( chosen.at( row ).path, maxBytes );
+      if ( !size ) {
+         problems << size.error();
          continue;
       }
       ++shrunk;
-      saved += chosen.at( row ).size - size;
+      saved += chosen.at( row ).size - size.value();
    }
    progress.setValue( static_cast<int>( chosen.size() ) );
 

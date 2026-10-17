@@ -37,9 +37,9 @@ TEST( Gamelist, ParsesGamesAndSkipsEmptyNodes )
 {
    Fixture fixture;
    Gamelist list;
-   QString error;
 
-   ASSERT_TRUE( list.load( fixture.snes, &error ) ) << error.toStdString();
+   const Result<> loaded = list.load( fixture.snes );
+   ASSERT_TRUE( loaded ) << loaded.error().toStdString();
 
    // The <game/> with no children was never a game.
    ASSERT_EQ( list.count(), 3 );
@@ -111,25 +111,25 @@ TEST( Gamelist, ReportsWhatItCannotLoad )
 {
    Fixture fixture;
    Gamelist list;
-   QString error;
 
-   EXPECT_FALSE(
-      list.load( { QStringLiteral( "x" ), skOther, fixture.path( "snes/absent.xml" ) }, &error ) );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<> absent =
+      list.load( { QStringLiteral( "x" ), skOther, fixture.path( "snes/absent.xml" ) } );
+   EXPECT_FALSE( absent );
+   EXPECT_FALSE( absent.error().isEmpty() );
 
    writeFile( fixture.path( "broken/gamelist.xml" ), "<gameList><game>" );
-   error.clear();
-   EXPECT_FALSE(
-      list.load( { QStringLiteral( "broken" ), skOther, fixture.path( "broken/gamelist.xml" ) },
-                 &error ) );
-   EXPECT_TRUE( error.contains( QStringLiteral( "not valid XML" ) ) ) << error.toStdString();
+   const Result<> broken =
+      list.load( { QStringLiteral( "broken" ), skOther, fixture.path( "broken/gamelist.xml" ) } );
+   EXPECT_FALSE( broken );
+   EXPECT_TRUE( broken.error().contains( QStringLiteral( "not valid XML" ) ) )
+      << broken.error().toStdString();
 
    writeFile( fixture.path( "empty/gamelist.xml" ), "<gameList/>" );
-   error.clear();
-   EXPECT_FALSE(
-      list.load( { QStringLiteral( "empty" ), skOther, fixture.path( "empty/gamelist.xml" ) },
-                 &error ) );
-   EXPECT_TRUE( error.contains( QStringLiteral( "no game" ) ) ) << error.toStdString();
+   const Result<> empty =
+      list.load( { QStringLiteral( "empty" ), skOther, fixture.path( "empty/gamelist.xml" ) } );
+   EXPECT_FALSE( empty );
+   EXPECT_TRUE( empty.error().contains( QStringLiteral( "no game" ) ) )
+      << empty.error().toStdString();
 }
 
 TEST( Gamelist, FiltersOnTheGameItself )
@@ -290,8 +290,8 @@ TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
    EXPECT_EQ( which, GameFieldSet( gfGenre | gfFavorite ) );
 
    list.setFields( { 0 }, values, which );
-   QString error;
-   ASSERT_TRUE( list.save( &error ) ) << error.toStdString();
+   const Result<> written = list.save();
+   ASSERT_TRUE( written ) << written.error().toStdString();
 
    const Gamelist saved = reload( fixture );
    EXPECT_EQ( saved.at( 0 ).genre, QStringLiteral( "Platformer" ) );
@@ -384,10 +384,9 @@ TEST( Gamelist, SetImageReEncodesIntoTheSystemsImageFolder )
    // Taken from the first game that has one, not guessed.
    EXPECT_EQ( list.imageFolder(), QStringLiteral( "./media/images/" ) );
 
-   QString error;
    // Out of the .qrc, which is the reason this is a load-and-save and not a copy.
-   ASSERT_TRUE( list.setImage( 2, QStringLiteral( ":/DefaultPictures/default.png" ), &error ) )
-      << error.toStdString();
+   const Result<> set = list.setImage( 2, QStringLiteral( ":/DefaultPictures/default.png" ) );
+   ASSERT_TRUE( set ) << set.error().toStdString();
 
    EXPECT_EQ( list.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.png" ) );
    EXPECT_FALSE( list.at( 2 ).missingImage );
@@ -407,13 +406,12 @@ TEST( Gamelist, ChangeAllOnlyTouchesGamesWithNoPicture )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    const QString kept = list.at( 0 ).physicalImagePath;
-   QString error;
 
    // Two of the three have no picture; the third one's art must not be overwritten.
-   EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
-                                              &error ),
-              2 );
-   EXPECT_TRUE( error.isEmpty() ) << error.toStdString();
+   const Result<int> changed =
+      list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ) );
+   ASSERT_TRUE( changed ) << changed.error().toStdString();
+   EXPECT_EQ( changed.value(), 2 );
 
    EXPECT_EQ( list.at( 0 ).physicalImagePath, kept );
    EXPECT_EQ( QFile( kept ).size(), 3 );  // still the fixture's three bytes
@@ -475,8 +473,9 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   QString error;
-   ASSERT_TRUE( list.removeGame( 0, &error ) ) << error.toStdString();
+   const Result<QStringList> removed = list.removeGame( 0 );
+   ASSERT_TRUE( removed ) << removed.error().toStdString();
+   EXPECT_TRUE( removed.value().isEmpty() ) << "every file could be deleted";
 
    ASSERT_EQ( list.count(), 2 );
    EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
@@ -489,7 +488,7 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
    EXPECT_EQ( reload( fixture ).count(), 2 );
    EXPECT_EQ( list.domText( 0, "path" ), list.at( 0 ).romPath );
 
-   EXPECT_FALSE( list.removeGame( 2, &error ) );
+   EXPECT_FALSE( list.removeGame( 2 ) );
 }
 
 TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
@@ -502,8 +501,8 @@ TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
    EXPECT_EQ( list.orphanIndexes(), QVector<int>( { 2 } ) );
    EXPECT_TRUE( list.duplicateIndexes().isEmpty() );
 
-   QString error;
-   ASSERT_TRUE( list.removeGames( { 0, 2, 99 }, &error ) ) << error.toStdString();
+   const Result<> dropped = list.removeGames( { 0, 2, 99 } );
+   ASSERT_TRUE( dropped ) << dropped.error().toStdString();
 
    ASSERT_EQ( list.count(), 1 );
    EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
@@ -542,15 +541,15 @@ TEST( Gamelist, SetAndRemoveVideo )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
-   QString error;
-   ASSERT_TRUE( list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ), &error ) )
-      << error.toStdString();
+   Result<> set = list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ) );
+   ASSERT_TRUE( set ) << set.error().toStdString();
 
    EXPECT_EQ( list.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.mp4" ) );
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/videos/Vanished.mp4" ) ) );
 
    // Choosing the game's own video must not be remove-then-copy onto itself.
-   ASSERT_TRUE( list.setVideo( 2, list.at( 2 ).physicalVideoPath, &error ) ) << error.toStdString();
+   set = list.setVideo( 2, list.at( 2 ).physicalVideoPath );
+   ASSERT_TRUE( set ) << set.error().toStdString();
    EXPECT_EQ( QFile( list.at( 2 ).physicalVideoPath ).size(), 5 );
 
    ASSERT_TRUE( list.removeVideo( 2 ) );
@@ -569,15 +568,15 @@ TEST( Gamelist, WritesFollowAnExistingFolderUnderDifferentCase )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
-   QString error;
-   ASSERT_TRUE( list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ), &error ) )
-      << error.toStdString();
+   const Result<> video = list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ) );
+   ASSERT_TRUE( video ) << video.error().toStdString();
    EXPECT_EQ( list.at( 2 ).physicalVideoPath, fixture.path( "snes/Media/videos/Vanished.mp4" ) );
    EXPECT_TRUE( QFileInfo::exists( list.at( 2 ).physicalVideoPath ) );
 
    QImage picture( 2, 2, QImage::Format_RGB32 );
    picture.fill( Qt::red );
-   ASSERT_TRUE( list.setImage( 2, picture, &error ) ) << error.toStdString();
+   const Result<> image = list.setImage( 2, picture );
+   ASSERT_TRUE( image ) << image.error().toStdString();
    EXPECT_EQ( list.at( 2 ).physicalImagePath, fixture.path( "snes/Media/images/Vanished.png" ) );
 
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media" ) ) ) << "no second folder";
@@ -595,9 +594,8 @@ TEST( Gamelist, WritesFollowAPartlyExistingFolderUnderDifferentCase )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
-   QString error;
-   ASSERT_TRUE( list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ), &error ) )
-      << error.toStdString();
+   const Result<> video = list.setVideo( 2, fixture.path( "elsewhere/clip.mp4" ) );
+   ASSERT_TRUE( video ) << video.error().toStdString();
    EXPECT_EQ( list.at( 2 ).physicalVideoPath, fixture.path( "snes/Media/videos/Vanished.mp4" ) );
    EXPECT_TRUE( QFileInfo::exists( list.at( 2 ).physicalVideoPath ) );
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media" ) ) ) << "no second folder";
@@ -643,14 +641,13 @@ TEST( Gamelist, AddGamesWritesPathAndNameAndSurvivesAReload )
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
-   QString error;
 
    // The listed Sonic.zip is skipped, not an error.
-   ASSERT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ), fixture.path( "snes/Sonic.zip" ),
-                               fixture.path( "snes/sub/Zelda.sfc" ) },
-                             &error ),
-              2 )
-      << error.toStdString();
+   const Result<int> added =
+      list.addGames( { fixture.path( "snes/Streets.zip" ), fixture.path( "snes/Sonic.zip" ),
+                       fixture.path( "snes/sub/Zelda.sfc" ) } );
+   ASSERT_TRUE( added ) << added.error().toStdString();
+   ASSERT_EQ( added.value(), 2 );
 
    ASSERT_EQ( list.count(), 5 );
    EXPECT_EQ( list.at( 3 ).romPath, QStringLiteral( "./Streets.zip" ) );
@@ -672,18 +669,19 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
-   QString error;
 
-   EXPECT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ), fixture.path( "megadrive/Other.zip" ) },
-                             &error ),
-              -1 );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<int> refused = list.addGames(
+      { fixture.path( "snes/Streets.zip" ), fixture.path( "megadrive/Other.zip" ) } );
+   EXPECT_FALSE( refused );
+   EXPECT_FALSE( refused.error().isEmpty() );
    EXPECT_EQ( list.count(), 3 );
    EXPECT_EQ( reload( fixture ).count(), 3 );
 
    // And the rolled-back node is really gone from the document: a good add after it
    // must not write the refused batch's first file too.
-   ASSERT_EQ( list.addGames( { fixture.path( "snes/Streets.zip" ) } ), 1 );
+   const Result<int> added = list.addGames( { fixture.path( "snes/Streets.zip" ) } );
+   ASSERT_TRUE( added ) << added.error().toStdString();
+   EXPECT_EQ( added.value(), 1 );
    EXPECT_EQ( reload( fixture ).count(), 4 );
 }
 
@@ -717,10 +715,10 @@ TEST( Gamelist, SetVideoFailedSaveRestoresFilesDocumentAndGame )
    const Game before = list.at( 0 );
 
    breakSave( fixture, list );
-   QString error;
 
-   EXPECT_FALSE( list.setVideo( 0, fixture.path( "new.mp4" ), &error ) );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<> failed = list.setVideo( 0, fixture.path( "new.mp4" ) );
+   EXPECT_FALSE( failed );
+   EXPECT_FALSE( failed.error().isEmpty() );
    EXPECT_EQ( readAll( video ), QByteArray( "mp4" ) );
    EXPECT_FALSE( QFileInfo::exists( video + QStringLiteral( ".gle-new" ) ) );
    EXPECT_FALSE( QFileInfo::exists( video + QStringLiteral( ".gle-bak" ) ) );
@@ -784,12 +782,11 @@ TEST( Gamelist, ChangeAllIsAllOrNothing )
    const QString written = fixture.path( "snes/media/images/Vanished.png" );
 
    breakSave( fixture, list );
-   QString error;
 
-   EXPECT_EQ( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ),
-                                              &error ),
-              0 );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<int> failed =
+      list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ) );
+   EXPECT_FALSE( failed );
+   EXPECT_FALSE( failed.error().isEmpty() );
    EXPECT_FALSE( QFileInfo::exists( written ) );
    EXPECT_TRUE( list.at( 1 ).missingImage );
    EXPECT_TRUE( list.at( 2 ).missingImage );

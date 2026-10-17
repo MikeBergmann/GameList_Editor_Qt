@@ -563,10 +563,9 @@ void Frm_Editor::Cbx_SystemsChange()
       Edt_Search->clear();
    }
 
-   QString error;
-   if ( !FGamelist.load( system, &error ) ) {
+   if ( const Result<> loaded = FGamelist.load( system ); !loaded ) {
       updateCount();
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), loaded.error() );
       return;
    }
 

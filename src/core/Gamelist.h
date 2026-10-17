@@ -3,6 +3,7 @@
 #include "Game.h"
 #include "GamelistFilter.h"
 #include "Resources.h"
+#include "Result.h"
 #include "Systems.h"
 
 #include <QDomDocument>
@@ -43,10 +44,9 @@ struct MediaRename
 class Gamelist
 {
 public:
-   // Parses aSystem's gamelist.xml and keeps the document open. False (with a
-   // message in aError, if given) when the file cannot be read or parsed, or
-   // holds no <game> element.
-   bool load( const SystemEntry& aSystem, QString* aError = nullptr );
+   // Parses aSystem's gamelist.xml and keeps the document open. An Error when the
+   // file cannot be read or parsed, or holds no <game> element.
+   Result<> load( const SystemEntry& aSystem );
 
    const SystemEntry& system() const { return FSystem; }
    // Re-types the open system (a user mapping); nothing on disk depends on it.
@@ -58,27 +58,28 @@ public:
    int count() const { return static_cast<int>( FGames.size() ); }
    const Game& at( int aIndex ) const { return FGames.at( aIndex ); }
 
-   bool save( QString* aError = nullptr );
+   Result<> save();
 
    void setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
-   bool setImage( int aIndex, const QString& aSourcePath, QString* aError = nullptr );
-   bool setImage( int aIndex, const QImage& aPicture, QString* aError = nullptr );
-   bool setVideo( int aIndex, const QString& aSourcePath, QString* aError = nullptr );
+   Result<> setImage( int aIndex, const QString& aSourcePath );
+   Result<> setImage( int aIndex, const QImage& aPicture );
+   Result<> setVideo( int aIndex, const QString& aSourcePath );
 
-   bool removeImage( int aIndex, QString* aError = nullptr );
-   bool removeVideo( int aIndex, QString* aError = nullptr );
+   Result<> removeImage( int aIndex );
+   Result<> removeVideo( int aIndex );
 
    // God mode's delete: drops the <game> and indices after aIndex shift down, so
    // callers must reset their views. The ROM, picture and video go too, except
-   // any that another game still points at. False, with the gamelist untouched, if
-   // the write failed; true with aError set if only some file could not be removed.
-   bool removeGame( int aIndex, QString* aError = nullptr );
+   // any that another game still points at. An Error, with the gamelist untouched,
+   // if the write failed. On success the value lists the files that could not be
+   // removed (usually empty): the game is gone from the gamelist either way.
+   Result<QStringList> removeGame( int aIndex );
 
    // Actions > System > Delete orphans / duplicates: drops the <game>s only, no
    // file, then writes the gamelist once. Indices shift afterwards, so callers
-   // must reset their views. False, with the gamelist untouched, if the write failed.
-   bool removeGames( const QVector<int>& aIndexes, QString* aError = nullptr );
+   // must reset their views. An Error, with the gamelist untouched, if the write failed.
+   Result<> removeGames( const QVector<int>& aIndexes );
 
    // Games whose ROM is not on disk.
    QVector<int> orphanIndexes() const;
@@ -93,21 +94,23 @@ public:
 
    // Appends a <game> (path and name only) per file, then writes the gamelist
    // once. New games take the indices count()..count()+n-1. Files already listed
-   // are skipped. Returns how many were added, or -1 with aError set and the
-   // gamelist untouched: a file outside the system folder, or a failed write.
-   int addGames( const QStringList& aRomPaths, QString* aError = nullptr );
+   // are skipped. The value is how many were added; an Error leaves the gamelist
+   // untouched: a file outside the system folder, or a failed write.
+   Result<int> addGames( const QStringList& aRomPaths );
 
-   int setDefaultImageForMissing( const QString& aSourcePath, QString* aError = nullptr );
+   // Gives every game with no picture the one in aSourcePath. All or nothing; the
+   // value is how many games got it.
+   Result<int> setDefaultImageForMissing( const QString& aSourcePath );
 
    // Points the games at the files, in place, then writes the gamelist once.
-   // Returns how many links were set, or -1 with aError set and the gamelist
-   // as it was: a failed write.
-   int linkMedia( const QVector<MediaLink>& aLinks, QString* aError = nullptr );
+   // The value is how many links were set; an Error leaves the gamelist as it was:
+   // a failed write.
+   Result<int> linkMedia( const QVector<MediaLink>& aLinks );
 
    // Renames the files without a problem and repoints the games at them, then
-   // writes the gamelist once. Returns how many were renamed, or -1 with aError
-   // set, the gamelist as it was and the files back under their old names.
-   int renameMedia( const QVector<MediaRename>& aRenames, QString* aError = nullptr );
+   // writes the gamelist once. The value is how many were renamed; an Error leaves
+   // the gamelist as it was and the files back under their old names.
+   Result<int> renameMedia( const QVector<MediaRename>& aRenames );
 
    // Whether a game other than aIndex resolves to the same file on disk. Compared
    // by resolved path, not link text: links differing only in case are one file.
@@ -150,11 +153,11 @@ private:
       Game before;     // the game as it was, link text included
    };
 
-   // Writes the picture and edits DOM and game, without saving. aWrite is only valid
-   // when this returns true; on false nothing has changed.
-   bool applyImage( int aIndex, const QImage& aPicture, MediaWrite& aWrite, QString* aError );
+   // Writes the picture and edits DOM and game, without saving. On an Error nothing
+   // has changed.
+   Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
    // Saves; on success drops the backups, on failure undoes aWrites (files, DOM, games).
-   bool commitMedia( const QVector<MediaWrite>& aWrites, QString* aError );
+   Result<> commitMedia( const QVector<MediaWrite>& aWrites );
    void undoMedia( const MediaWrite& aWrite );
    void restoreLink( int aIndex, bool aIsImage, const Game& aBefore );
 
