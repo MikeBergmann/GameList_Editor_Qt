@@ -16,8 +16,8 @@
 // One system's gamelist.xml held open as a DOM, plus the root folder scan.
 //
 // load() parses the document once; setFields() and the media actions edit it in
-// memory and save() writes it out. Games and their <game> elements are
-// index-aligned (see domText()).
+// memory and save() writes it out. Each Game is stored with its <game> element
+// (see domText()), so removing one cannot leave the two out of step.
 
 // A picture or video that sits in the media folder under the ROM's name but that
 // the <game> does not point at (no link, or a link to a file that is not there).
@@ -52,11 +52,11 @@ public:
    // Re-types the open system (a user mapping); nothing on disk depends on it.
    void setSystemKind( SystemKind aKind ) { FSystem.kind = aKind; }
    const QString& systemDir() const { return FSystemDir; }
-   const QVector<Game>& games() const { return FGames; }
+
    // int, not qsizetype: indices and rows are int throughout (QAbstractItemModel's
    // are too), and a gamelist is nowhere near INT_MAX entries.
-   int count() const { return static_cast<int>( FGames.size() ); }
-   const Game& at( int aIndex ) const { return FGames.at( aIndex ); }
+   int count() const { return static_cast<int>( FEntries.size() ); }
+   const Game& at( int aIndex ) const { return FEntries.at( aIndex ).game; }
 
    Result<> save();
 
@@ -120,7 +120,7 @@ public:
 
    // The text of aName under the <game> aIndex was parsed from, as it is in the
    // document (not the Game). Read-only on purpose: tests use it to check that the
-   // DOM and the games stay index-aligned. Empty for a bad index or a missing child.
+   // DOM and the games stay in step. Empty for a bad index or a missing child.
    QString domText( int aIndex, const char* aName ) const;
 
    // The folder new media goes into, taken at load from the first game that has
@@ -166,8 +166,14 @@ private:
    SystemEntry FSystem;
    QString FSystemDir;
    QDomDocument FDocument;
-   QVector<Game> FGames;
-   QVector<QDomElement> FNodes;
+   // A game and the <game> element it was parsed from, kept together so they
+   // cannot drift apart.
+   struct Entry
+   {
+      Game game;
+      QDomElement node;
+   };
+   QVector<Entry> FEntries;
 
    QString FImageFolder;
    QString FVideoFolder;
