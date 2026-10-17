@@ -18,14 +18,8 @@ class QPushButton;
 class QShowEvent;
 class QTabWidget;
 
-// The 12 editable fields, the picture and the media buttons.
-//
-// The widgets produce one GameFields value, and the dirty flag is a comparison of two of
-// those.
-//
-// It addresses games by index into the Gamelist, never by pointer, and it drives
-// both save paths: one game compares against what is stored, several compare
-// against "filled in at all".
+// The 12 editable fields, the picture and the media buttons. Addresses games by
+// index. The dirty flag compares the widgets' GameFields against what is stored.
 class GameEditPanel : public QWidget
 {
    Q_OBJECT
@@ -36,49 +30,40 @@ public:
    // Borrowed, not owned. Null means no system is loaded.
    void setGamelist( Gamelist* aGamelist );
 
-   // Indices into the Gamelist. Empty disables everything; more than one is the
-   // batch mode, where the fields start blank and mean "set this on all of them".
+   // More than one index is batch mode: fields start blank and mean "set on all".
    void setSelection( const QVector<int>& aIndices );
    const QVector<int>& selection() const { return FSelection; }
 
    GameFields fields() const;
    void setFields( const GameFields& aFields );
 
-   // True if the fields differ from what is stored.
    bool isDirty() const;
 
-   // Writes the gamelist and reloads the fields from it, so what is on screen is what
-   // was actually stored. False if the write failed: the Gamelist is then left as it
-   // was and the edit stays dirty.
+   // Reloads the fields from the Gamelist afterwards. False if the write failed;
+   // the edit then stays dirty.
    bool save();
 
-   // God mode shows Delete Game; aSkipPrompt drops its confirmation.
+   // aSkipPrompt drops the delete confirmation.
    void setGodMode( bool aEnabled, bool aSkipPrompt );
 
-   // Start the video as soon as it is loaded, instead of paused on its first
-   // frame. Still muted unless the Mute box is unticked.
+   // Still muted unless the Mute box is unticked.
    void setAutoplay( bool aEnabled ) { FAutoplay = aEnabled; }
 
 signals:
    void dirtyChanged( bool aDirty );
 
-   // The gamelist changed under the list view: names, and the fields the filter
-   // looks at. The form re-runs the filter and repaints.
    void gamesChanged();
 
-   // The hash prompt reads a setting the form owns, so it stays there; the panel only
-   // says which game.
    void moreInfosRequested( int aIndex );
 
-   // A game is gone from the Gamelist and every index above it moved, so the
-   // list view has to be reset, not repainted. aIndex is where it was.
+   // Later indices shifted, so the list view must reset. aIndex is where it was.
    void gameDeleted( int aIndex );
 
 protected:
    bool eventFilter( QObject* aWatched, QEvent* aEvent ) override;
 
-   // The player only holds a file while this panel is on screen, so the scrape
-   // tab can replace a video without it being open.
+   // The player holds the video file only while the panel is visible, so the
+   // scrape tab can replace it.
    void showEvent( QShowEvent* aEvent ) override;
    void hideEvent( QHideEvent* aEvent ) override;
 
@@ -91,13 +76,10 @@ private:
    void scalePicture();
    void reload();
 
-   // Loads the selected game's video, paused on its first frame, but only while
-   // the Video tab is the one on screen: nothing is opened or decoded otherwise.
+   // Only loads while the Video tab is showing.
    void syncVideo();
    void updateVideoTab( bool aHasVideo );
 
-   // Each of these is a file dialog and a call into Gamelist, which owns the gamelist
-   // document and the media folders.
    void chooseImage();
    void chooseVideo();
    void setDefaultPicture();
@@ -108,7 +90,7 @@ private:
    Gamelist* FGamelist = nullptr;
    QVector<int> FSelection;
 
-   // Guards the load: filling the widgets must not look like the user typing.
+   // Filling the widgets must not look like the user typing.
    bool FIsLoading = false;
    bool FDirty = false;
    bool FGodMode = false;

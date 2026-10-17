@@ -12,10 +12,9 @@
 
 #include <memory>
 
-// Client for screenscraper.fr's jeuInfos.php. Asynchronous (QNetworkAccessManager); everything
-// runs on the calling thread, so nothing needs locking.
+// Client for screenscraper.fr's jeuInfos.php. Asynchronous, on the calling thread.
 
-// One requested lookup. The caller supplies crc32 and romSize, so this stays free of widgets.
+// One requested lookup.
 struct ScrapeRequest
 {
    QString systemId;
@@ -29,7 +28,7 @@ struct ScrapeRequest
 
 };
 
-// One <medias><media> the user can choose to download.
+// A downloadable media entry.
 struct MediaInfo
 {
    QString fileExt;
@@ -52,30 +51,26 @@ struct ScrapedInfo
    QVector<MediaInfo> pictures;  // already filtered to the requested media types
    QString videoLink;            // empty unless offered and requested
 
-   // ssuser/maxthreads, clamped to at least 1 (an absent node must not mean zero downloads).
+   // Clamped to at least 1: an absent node must not mean zero downloads.
    int maxThreads = 1;
 };
 
-// Parses one jeuInfos.php response; needs no network. An Error when the XML is invalid or
-// the reply holds no <jeu> node (an API error document).
+// Needs no network. An Error when the XML is invalid or holds no <jeu>.
 Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
                                         bool aWantVideo, LangName aLanguage );
 
-// Strips the developer's and the user's ids and passwords from a message. Callers must pass
-// the whole error text, not just the URL they built: QNetworkReply::errorString() embeds its
-// own copy of the request URL, credentials included.
+// Strips credentials from a message. Pass the whole error text, not just your
+// URL: QNetworkReply::errorString() embeds its own copy of the request URL.
 QString sanitizeUrl( const QString& aUrl );
 
-// Decodes one of the XOR-encoded, NUL-terminated Cst_Dev*Xor arrays of DevCredentials.h.
-// aData must be terminated (the generated arrays always are).
+// aData must be NUL-terminated.
 QString decodeDevSecret( const unsigned char* aData );
 
-// The jeuInfos.php URL for aRequest, every value percent-encoded. Exposed so a
-// test can check the encoding without a network.
+// Every value percent-encoded.
 QString buildGameQuery( const ScrapeRequest& aRequest );
 
-// False when the build carries no developer credentials (devid/devpassword);
-// requestGame() then fails immediately instead of calling the API.
+// False when the build has no developer credentials; requestGame() then fails
+// immediately.
 bool devCredentialsConfigured();
 
 class Scraper : public QObject
@@ -89,22 +84,20 @@ public:
    void setProxy( const QString& aServer, int aPort, const QString& aUser,
                   const QString& aPassword );
 
-   // aMediaTypes holds the Cst_Media* picture types to offer; aWantVideo is separate because
-   // the video is offered apart from the pictures.
+   // The video is offered apart from the pictures, hence aWantVideo.
    void requestGame( const ScrapeRequest& aRequest, const QSet<QString>& aMediaTypes,
                      bool aWantVideo, LangName aLanguage );
 
-   // Downloads aMedia, at most aMaxThreads at a time (the server states that limit; ignoring
-   // it risks a ban). mediaReady fires once per picture that arrives, mediaFinished once after
-   // all have arrived or failed.
+   // At most aMaxThreads at a time; the server states that limit. mediaReady fires
+   // per picture, mediaFinished once at the end.
    void requestMedia( const QVector<MediaInfo>& aMedia, int aMaxThreads = 1 );
 
-   // Downloads one file (the chosen video) to aDestPath; emits fileSaved or fileSaveFailed.
+
    void downloadToFile( const QString& aUrl, const QString& aDestPath );
 
 signals:
    void gameInfoReady( const ScrapedInfo& aInfo );
-   // aDetails is the (sanitized) body the server sent; empty when there was none.
+   // aDetails is the sanitized server body, if any.
    void gameInfoFailed( const QString& aMessage, const QString& aDetails = QString() );
 
    void mediaReady( int aIndex, const QImage& aImage );
@@ -115,7 +108,7 @@ signals:
    void fileSaveFailed( const QString& aPath, const QString& aMessage );
 
 private:
-   // State of one requestMedia() call, so overlapping batches cannot interfere.
+   // One requestMedia() call's state, so overlapping batches cannot interfere.
    struct MediaBatch
    {
       QVector<MediaInfo> media;

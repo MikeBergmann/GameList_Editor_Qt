@@ -235,8 +235,8 @@ inline constexpr const char* Cst_IniProxyServer = "ProxyServer";
 inline constexpr const char* Cst_IniProxyPort = "ProxyPort";
 inline constexpr const char* Cst_IniProxyUse = "ProxyUse";
 inline constexpr const char* Cst_IniLastFolder = "LastFolder";
-// Own group: folder name -> the known system's folder name ("amiga500" = "amiga"),
-// for folders the tables do not recognise. Actions > System > Set system type.
+// Folder name -> known system's folder name ("amiga500" = "amiga"), for
+// folders the tables do not recognise.
 inline constexpr const char* Cst_IniSystemMap = "SystemMap";
 
 // Language is the one key whose default is not the zero value (lnFrench is 0).

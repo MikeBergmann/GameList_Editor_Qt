@@ -5,25 +5,15 @@
 #include <optional>
 #include <utility>
 
-// What a fallible operation returns instead of "bool plus QString* out-parameter":
-// either a value (Result<void> has none) or an Error with a message fit for a dialog.
-// Nodiscard, so an ignored failure is a warning, not a silent one.
+// A fallible operation's result: a value (none for Result<void>) or an Error
+// with a message fit for a dialog.
 //
-//    Result<int> addGames( ... );
-//    ...
 //    const Result<int> added = list.addGames( paths );
 //    if ( !added )
 //       warn( added.error() );
-//    else
-//       use( added.value() );
 //
-// An Error is built with `return Error{ message };`, success with `return value;`
-// (or `return {};` for Result<void>).
-//
-// A failed Result of any type converts to a failed Result of any other, so a caller
-// passes a failure up with `return saved;`, not `return Error{ saved.error() };`.
-// A Result<void> target also accepts a success (the value is dropped); any other
-// target does not, because there would be no value to give it.
+// Fail with `return Error{ message };`. A failed Result converts to any other
+// Result type, so pass one up with `return saved;`.
 struct Error
 {
    QString message;
@@ -44,9 +34,7 @@ public:
 
    explicit operator bool() const { return FValue.has_value(); }
 
-   // Only valid on success.
    const T& value() const { return *FValue; }
-   // Empty on success.
    const QString& error() const { return FError; }
 
 private:
