@@ -132,6 +132,9 @@ public:
    bool romIsDuplicated( const QString& aRomName ) const { return FRomCounts.value( aRomName ) > 1; }
 
 private:
+   // An Error ("No game selected.") when aIndex is not a game of this list.
+   Result<> checkIndex( int aIndex ) const;
+
    // One <game> element as a Game, filesystem flags included.
    Game gameFromNode( const QDomElement& aNode ) const;
 

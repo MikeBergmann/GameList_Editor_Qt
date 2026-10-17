@@ -607,7 +607,7 @@ void GameEditPanel::setDefaultPictureForAll()
 {
    const Result<int> changed = FGamelist->setDefaultImageForMissing( Cst_DefaultPicture );
    if ( !changed ) {
-      report( Error{ changed.error() } );
+      report( changed );
       return;
    }
 
