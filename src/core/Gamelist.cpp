@@ -12,8 +12,7 @@
 
 namespace {
 
-// Where new media lands when the system has none yet to copy the layout from:
-// the layout EmulationStation itself writes.
+// The layout EmulationStation writes, for systems with no media yet.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
 
@@ -28,32 +27,27 @@ QString childText( const QDomElement& aNode, const char* aName )
    return aNode.firstChildElement( QLatin1String( aName ) ).text();
 }
 
-// Where a file about to be written should land. The directory follows an existing
-// "Media/" when the link says "media/", as far down as it exists. The file name
-// stays literal on purpose: resolving it could land on, and overwrite, another
-// game's differently-cased file.
+// The directory follows existing case ("Media/" for "media/"). The file name stays
+// literal: resolving it could overwrite another game's differently-cased file.
 QString writeTarget( const QString& aSystemDir, const QString& aLink )
 {
    const QFileInfo info( QDir::cleanPath( QDir( aSystemDir ).filePath( aLink ) ) );
    return QDir( resolvePath( info.path() ) ).filePath( info.fileName() );
 }
 
-// Evaluated once at load, so filtering does not stat a file per row on every
-// keystroke. An empty link counts as missing.
+// An empty link counts as missing.
 bool fileMissing( const QString& aPath )
 {
    return aPath.isEmpty() || !QFileInfo::exists( aPath );
 }
 
-// New media is written next to its target under this name, then swapped in, so a
-// half-written file never replaces a good one. The old file waits under the other
-// name until the gamelist has been saved.
+// New media is written under the staged name, then swapped in; the old file waits
+// under the backup name until the gamelist is saved.
 constexpr const char* Cst_StagedSuffix = ".gle-new";
 constexpr const char* Cst_BackupSuffix = ".gle-bak";
 
-// Moves aStaged to aTarget. An existing aTarget is moved aside first and its new name
-// returned (empty if there was none). On an Error, aTarget is as it was and aStaged
-// is gone.
+// Returns the backup name of a replaced aTarget (empty if none). On an Error,
+// aTarget is as it was and aStaged is gone.
 Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
 {
    QString backup;

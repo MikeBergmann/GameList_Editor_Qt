@@ -3,10 +3,10 @@
 class Gamelist;
 class QWidget;
 
-// What an Actions > System command did, as far as the window's views are concerned.
-//   None:    nothing changed, or the user cancelled.
-//   Refresh: same games, different content or media: repaint the list and reload the editor.
-//   Reset:   games were added or removed, so indices shifted: the views start over.
+// What the window's views owe after a command.
+//   None:    nothing changed.
+//   Refresh: same games, new content: repaint.
+//   Reset:   games added or removed, indices shifted: views start over.
 enum class ViewUpdate
 {
    None,
@@ -14,8 +14,8 @@ enum class ViewUpdate
    Reset,
 };
 
-// A command: asks the user, edits the gamelist (each step saves by itself) and says which
-// view update the window owes. The window guards unsaved edits before calling one.
+// A command: asks the user, edits the gamelist, reports the view update owed.
+// The caller guards unsaved edits first.
 using SystemAction = ViewUpdate ( * )( QWidget* aParent, Gamelist& aGamelist );
 
 ViewUpdate addMissingRoms( QWidget* aParent, Gamelist& aGamelist );

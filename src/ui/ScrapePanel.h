@@ -16,13 +16,7 @@ class QProgressBar;
 class QPushButton;
 class QScrollArea;
 
-// The scrape tab: its widgets, and the picture the user chose out of the results.
-// Scrapes only ever apply to the one game currently selected in the main tab
-// (FIndex), so this addresses that one index into the Gamelist rather than taking a
-// selection like GameEditPanel does.
-//
-// It owns its own Scraper - the network request, unlike the gamelist edits, has no
-// other consumer - and produces the same GameFields shape GameEditPanel does.
+// The scrape tab. Applies to the one selected game, and owns its Scraper.
 class ScrapePanel : public QWidget
 {
    Q_OBJECT
@@ -33,23 +27,16 @@ public:
    // Borrowed, not owned. Null means no system is loaded.
    void setGamelist( Gamelist* aGamelist );
 
-   // Index into the Gamelist of the game to scrape, or -1 for none (e.g. a batch
-   // selection).
+   // -1 for none, e.g. a batch selection.
    void setSelection( int aIndex );
 
-   // Reads the same QSettings Frm_Network writes - proxy, ScreenScraper credentials,
-   // scrape language - and clears the Save Picture/Save Video checkboxes left over from
-   // whatever was scraped last.
+   // Re-reads the QSettings keys and clears the Save checkboxes.
    void activate();
 
-   // Exposed so a test can emit these directly - the way tst_scraper.cpp
-   // drives parseScrapeResponse with no QNetworkAccessManager at all - rather
-   // than needing a real network round trip to exercise this panel.
+   // Exposed so tests can emit its signals without a network round trip.
    Scraper& scraper() { return FScraper; }
 
 signals:
-   // The gamelist changed under the list view. Same signal shape as
-   // GameEditPanel's, for the same reason: the form re-runs the filter.
    void gamesChanged();
 
 private:
@@ -83,7 +70,6 @@ private:
    bool FHasScrapedData = false;
    QImage FSelectedPicture;
 
-   // Read from QSettings by activate(), the same keys Frm_Network writes.
    QString FSSLogin;
    QString FSSPassword;
 

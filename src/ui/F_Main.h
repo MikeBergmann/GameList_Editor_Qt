@@ -20,10 +20,7 @@ class QListView;
 class QMenu;
 class QTabWidget;
 
-// The main window: menus, the system combo, the game list and the settings.
-//
-// It owns no game data: the Gamelist below is the single loaded system, the model
-// addresses it by index, and the editing panels take and return GameFields values.
+// The main window. Owns no game data: the Gamelist is the single loaded system.
 class Frm_Editor : public QMainWindow
 {
    Q_OBJECT
@@ -31,12 +28,11 @@ class Frm_Editor : public QMainWindow
 public:
    explicit Frm_Editor( QWidget* aParent = nullptr );
 
-   // Shows the tips window if enabled. Called once the window is up, because it is modal.
+   // Modal, so call it once the window is up.
    void showTipsAtStart();
 
-   // Scan aRootPath and select its first system. The folder picker is the only
-   // other caller; keeping the two apart is what lets the whole scan -> load ->
-   // filter -> display chain be driven without a modal dialog in the way.
+   // Scans aRootPath and selects its first system. Separate from the folder
+   // picker so tests can drive it without a modal dialog.
    void openRootFolder( const QString& aRootPath );
 
 protected:
@@ -52,36 +48,27 @@ private:
 
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
-   // Runs an Actions > System command (SystemActions.h) after the unsaved-edits guard,
-   // then brings the views in line with what it reports.
    void runAction( SystemAction aAction );
-   // The views after games were added or removed: indices shifted, so every view starts over.
+   // After games were added or removed: indices shifted, so views start over.
    void resetViews();
-   // The views after the same games changed content or media.
+   // After games changed content or media.
    void refreshViews();
-   // The commands that need a loaded system.
    void setSystemActionsEnabled( bool aEnabled );
-   // Actions > System > Set system type: maps an unrecognised folder to a known system.
    void setSystemType();
-   // Actions > System > Export games list.
    void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
 
-   // Save / Discard / Cancel when the editor holds unsaved changes. False means
-   // stay put: the user cancelled, or the save failed.
+   // False means stay put: the user cancelled, or the save failed.
    bool confirmLeaveEdits();
-   // Puts the list back on the games the editor is showing, after a Cancel.
    void restoreSelection( const QVector<int>& aIndices );
 
-   // Collects the filter widgets into one FilterSpec and hands it to the model.
    void refreshFilter();
    void updateCount();
    int currentGameIndex() const;
    QVector<int> selectedGameIndexes() const;
 
-   // The panel says which game; the hash prompt is here because FAutoHash is.
    void showMoreInfos( int aIndex );
 
    QString FRootPath;
@@ -93,8 +80,7 @@ private:
    bool FGenesisLogo = false;
    bool FAutoplayVideo = false;
 
-   // Guards the filter/selection round trip: re-filtering moves the current row,
-   // which would otherwise re-enter refreshFilter through the selection change.
+   // Re-filtering moves the current row, which would re-enter refreshFilter.
    bool FIsLoading = false;
 
    Gamelist FGamelist;
@@ -116,8 +102,7 @@ private:
    QLabel* Lbl_NbGamesFound = nullptr;
 
    QAction* Mnu_Reload = nullptr;
-   // Actions > System entries that work on the loaded system; off while none is.
-   QList<QAction*> FSystemActions;
+   QList<QAction*> FSystemActions;  // off while no system is loaded
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;
@@ -125,8 +110,6 @@ private:
    QAction* Mnu_Genesis = nullptr;
    QAction* Mnu_AutoplayVideo = nullptr;
 
-   // Game and Selection hold only disabled placeholder entries; System is live apart from
-   // its three text conversions.
    QMenu* Mnu_System = nullptr;
    QMenu* Mnu_Game = nullptr;
    QMenu* Mnu_Selection = nullptr;
