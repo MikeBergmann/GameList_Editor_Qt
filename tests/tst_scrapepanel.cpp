@@ -169,7 +169,6 @@ TEST( ScrapePanel, SaveIsBusyUntilTheWriteEnds )
    EXPECT_TRUE( panel.panel.isEnabled() );
 }
 
-
 TEST( ScrapePanel, SaveAsksTheGuardFirstAndStopsWhenItSaysNo )
 {
    Panel panel;

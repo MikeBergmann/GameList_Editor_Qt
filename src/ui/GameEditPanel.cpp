@@ -579,22 +579,25 @@ void GameEditPanel::report( const Result<>& aResult )
 
 void GameEditPanel::chooseImage()
 {
+   // Asked before the dialog, so a Cancel does not throw a picked file away.
+   if ( !mayLeave() )
+      return;
+
    const QString file =
       QFileDialog::getOpenFileName( this, QStringLiteral( "Choose a picture" ), QString(),
                                     QStringLiteral( "Images (*.png *.jpg *.jpeg)" ) );
    if ( file.isEmpty() )
       return;
 
-   // The guard can save and move the selection, so take the game first.
    const int index = FSelection.value( 0, -1 );
-   if ( !mayLeave() )
-      return;
-
    report( FGamelist->setImage( index, file ) );
 }
 
 void GameEditPanel::chooseVideo()
 {
+   if ( !mayLeave() )
+      return;
+
    const QString file =
       QFileDialog::getOpenFileName( this, QStringLiteral( "Choose a video" ), QString(),
                                     QStringLiteral( "Videos (*.mp4)" ) );
@@ -602,9 +605,6 @@ void GameEditPanel::chooseVideo()
       return;
 
    const int index = FSelection.value( 0, -1 );
-   if ( !mayLeave() )
-      return;
-
    FPlayer->setSource( QUrl() );  // the new file replaces the one that is open
    report( FGamelist->setVideo( index, file ) );
 }

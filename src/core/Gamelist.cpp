@@ -425,6 +425,8 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
       const QString link = folder + stem + suffix;
       const QString target = writeTarget( FSystemDir, link );
 
+      // ponytail: a scan of every game per attempt, so a ChangeAll over N games is O(N^2)
+      // (~25M compares at 5000). Upgrade: a set of the taken keys, built once per batch.
       bool taken = false;
       for ( int index = 0; index < FEntries.size() && !taken; ++index ) {
          const Game& other = FEntries.at( index ).game;

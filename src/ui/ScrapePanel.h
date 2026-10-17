@@ -62,8 +62,6 @@ private:
    void showSelectedPicture();
    void report( const Result<>& aResult );
 
-   std::function<bool()> FLeaveGuard;
-
    void handleGameInfo( const ScrapedInfo& aInfo );
    void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );
    void handleMediaReady( int aIndex, const QImage& aImage );
@@ -73,6 +71,7 @@ private:
    void setFields( const GameFields& aFields );
    QSet<QString> mediaTypes() const;  // The 8 picture checkboxes, as Cst_Media* values
 
+   std::function<bool()> FLeaveGuard;
    Gamelist* FGamelist = nullptr;
    int FIndex = -1;
 

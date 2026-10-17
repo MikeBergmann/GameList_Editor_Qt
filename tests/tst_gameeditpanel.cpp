@@ -139,7 +139,6 @@ TEST( GameEditPanel, AFailedSaveKeepsTheEditAndLeavesTheGamelistAlone )
    EXPECT_TRUE( panel.panel.isDirty() );
 }
 
-
 TEST( GameEditPanel, MediaButtonsAskBeforeDroppingTypedEdits )
 {
    Panel panel;

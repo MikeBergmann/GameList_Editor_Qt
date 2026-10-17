@@ -554,8 +554,11 @@ void ScrapePanel::finishSave( const QString& aVideoPath )
    if ( result && !aVideoPath.isEmpty() ) {
       result = FGamelist->setVideo( index, aVideoPath );
       saved = saved || bool( result );
-      QFile::remove( aVideoPath );
    }
+
+   // Also when the image failed and the video was never used.
+   if ( !aVideoPath.isEmpty() )
+      QFile::remove( aVideoPath );
 
    // setFields() alone does not save, so an infos-only save has to ask for it.
    if ( result && which && !saved )
