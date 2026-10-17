@@ -237,4 +237,103 @@ TEST( MediaOps, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
    EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
 }
 
+// What a failed link or rename must leave behind: the game, and the DOM, as they were.
+void expectLinksAre( const Gamelist& aList, int aIndex, const Game& aBefore, const QString& aImageDom,
+                     const QString& aVideoDom )
+{
+   const Game& game = aList.at( aIndex );
+   EXPECT_EQ( game.imagePath, aBefore.imagePath );
+   EXPECT_EQ( game.videoPath, aBefore.videoPath );
+   EXPECT_EQ( game.physicalImagePath, aBefore.physicalImagePath );
+   EXPECT_EQ( game.physicalVideoPath, aBefore.physicalVideoPath );
+   EXPECT_EQ( game.missingImage, aBefore.missingImage );
+   EXPECT_EQ( game.missingVideo, aBefore.missingVideo );
+   EXPECT_EQ( aList.domText( aIndex, "image" ), aImageDom );
+   EXPECT_EQ( aList.domText( aIndex, "video" ), aVideoDom );
+}
+
+TEST( MediaOps, LinkMediaFailedSaveLeavesGamesAndDocumentAsTheyWere )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/media/images/Vanished-image.jpg" ), "jpg" );
+   writeFile( fixture.path( "snes/media/videos/Vanished-video.mp4" ), "mp4" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const Game before1 = list.at( 1 );
+   const Game before2 = list.at( 2 );
+   const QString image1 = list.domText( 1, "image" );
+   const QString video1 = list.domText( 1, "video" );
+   const QString image2 = list.domText( 2, "image" );
+   const QString video2 = list.domText( 2, "video" );
+
+   breakSave( fixture, list );
+
+   // Game 2 gets an image and a video in one batch: both must come back.
+   const Result<int> failed =
+      list.linkMedia( { { 1, true, fixture.path( "snes/media/images/sonic.PNG" ) },
+                        { 2, true, fixture.path( "snes/media/images/Vanished-image.jpg" ) },
+                        { 2, false, fixture.path( "snes/media/videos/Vanished-video.mp4" ) } } );
+   EXPECT_FALSE( failed );
+   EXPECT_FALSE( failed.error().isEmpty() );
+   expectLinksAre( list, 1, before1, image1, video1 );
+   expectLinksAre( list, 2, before2, image2, video2 );
+}
+
+TEST( MediaOps, RenameMediaFailedSaveRenamesTheFilesBack )
+{
+   Fixture fixture;
+   const QString renamed = fixture.path( "snes/media/images/Renamed.jpg" );
+   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );  // game 0's link, in its own case
+   writeFile( renamed, "jpg" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.linkMedia( { { 2, true, renamed } } ) );
+   const Game before = list.at( 2 );
+   const QString image = list.domText( 2, "image" );
+   const QString video = list.domText( 2, "video" );
+
+   const QVector<MediaRename> found = misnamedMedia( list );
+   ASSERT_EQ( found.size(), 1 );
+   ASSERT_TRUE( found[0].problem.isEmpty() );
+
+   breakSave( fixture, list );
+
+   const Result<int> failed = list.renameMedia( found );
+   EXPECT_FALSE( failed );
+   EXPECT_FALSE( failed.error().isEmpty() );
+   EXPECT_TRUE( QFileInfo::exists( renamed ) );
+   EXPECT_FALSE( QFileInfo::exists( found[0].newPath ) );
+   expectLinksAre( list, 2, before, image, video );
+}
+
+TEST( MediaOps, RenameMediaThatFailsMidwayPutsTheEarlierRenamesBack )
+{
+   Fixture fixture;
+   const QString renamed = fixture.path( "snes/media/images/Renamed.jpg" );
+   writeFile( renamed, "jpg" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.linkMedia( { { 2, true, renamed } } ) );
+   const Game before = list.at( 2 );
+   const QString image = list.domText( 2, "image" );
+   const QString video = list.domText( 2, "video" );
+
+   // The first rename works; the second names a file that is not there.
+   const QString target = fixture.path( "snes/media/images/Vanished.jpg" );
+   const QVector<MediaRename> renames = {
+      { 2, true, renamed, target, QString() },
+      { 1, true, fixture.path( "snes/media/images/absent.png" ),
+        fixture.path( "snes/media/images/Gone.png" ), QString() },
+   };
+
+   const Result<int> failed = list.renameMedia( renames );
+   EXPECT_FALSE( failed );
+   EXPECT_TRUE( QFileInfo::exists( renamed ) );
+   EXPECT_FALSE( QFileInfo::exists( target ) );
+   expectLinksAre( list, 2, before, image, video );
+}
+
 }  // namespace

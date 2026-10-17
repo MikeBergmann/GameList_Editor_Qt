@@ -2,6 +2,7 @@
 // against a real gamelist.xml written into a QTemporaryDir, because the three
 // filesystem-backed flags are the point.
 
+#include "GamelistFilter.h"
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
 
@@ -143,7 +144,7 @@ TEST( Gamelist, FiltersOnTheGameItself )
       FilterSpec filter;
       filter.category = aCategory;
       for ( int index = 0; index < list.count(); ++index )
-         if ( list.accepts( index, filter ) )
+         if ( filterAccepts( list, index, filter ) )
             kept.append( index );
       return kept;
    };
@@ -189,32 +190,32 @@ TEST( Gamelist, SameAsSelectedNeedsASelection )
    filter.category = FilterCategory::SamePublisher;
 
    // No reference game, so nothing matches.
-   EXPECT_FALSE( list.accepts( 0, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 0, filter ) );
 
    filter.reference = 0;
-   EXPECT_TRUE( list.accepts( 2, filter ) );  // Sega, like the reference
-   EXPECT_FALSE( list.accepts( 1, filter ) );
+   EXPECT_TRUE( filterAccepts( list, 2, filter ) );  // Sega, like the reference
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
 
    // Ratings compare numerically, and "0,8" is the same number as "0.8".
    filter.category = FilterCategory::SameOrLowerRating;
-   EXPECT_TRUE( list.accepts( 1, filter ) );
-   EXPECT_FALSE( list.accepts( 2, filter ) );  // no rating at all, so never
+   EXPECT_TRUE( filterAccepts( list, 1, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 2, filter ) );  // no rating at all, so never
    filter.category = FilterCategory::SameOrHigherRating;
-   EXPECT_FALSE( list.accepts( 1, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
 
    // Release date <= reference, over the shortened display forms: "1991" is the
    // 1st of January, which is before the reference's 23rd of June.
    filter.category = FilterCategory::SameOrEarlierDate;
-   EXPECT_TRUE( list.accepts( 1, filter ) );
+   EXPECT_TRUE( filterAccepts( list, 1, filter ) );
    filter.category = FilterCategory::SameOrLaterDate;
-   EXPECT_FALSE( list.accepts( 1, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
 
    // Same folder, and same ROM file name across different folders.
    filter.category = FilterCategory::SameFolder;
-   EXPECT_TRUE( list.accepts( 2, filter ) );
-   EXPECT_FALSE( list.accepts( 1, filter ) );
+   EXPECT_TRUE( filterAccepts( list, 2, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
    filter.category = FilterCategory::SameRom;
-   EXPECT_TRUE( list.accepts( 1, filter ) );
+   EXPECT_TRUE( filterAccepts( list, 1, filter ) );
 }
 
 TEST( Gamelist, SearchMatchesWhateverTheListShows )
@@ -224,26 +225,26 @@ TEST( Gamelist, SearchMatchesWhateverTheListShows )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    FilterSpec filter;
-   EXPECT_EQ( list.displayName( 0, filter ), QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( displayName( list, 0, filter ), QStringLiteral( "Sonic The Hedgehog" ) );
 
    filter.listByRom = true;
-   EXPECT_EQ( list.displayName( 1, filter ), QStringLiteral( "Sonic.zip" ) );
+   EXPECT_EQ( displayName( list, 1, filter ), QStringLiteral( "Sonic.zip" ) );
 
    filter.fullRomName = true;
-   EXPECT_EQ( list.displayName( 1, filter ), QStringLiteral( "sub/Sonic.zip" ) );
+   EXPECT_EQ( displayName( list, 1, filter ), QStringLiteral( "sub/Sonic.zip" ) );
 
    // The search is case-insensitive, and only the rom path holds "sub".
    filter.search = QStringLiteral( "SUB/" );
-   EXPECT_TRUE( list.accepts( 1, filter ) );
-   EXPECT_FALSE( list.accepts( 0, filter ) );
+   EXPECT_TRUE( filterAccepts( list, 1, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 0, filter ) );
 
    filter.listByRom = false;
-   EXPECT_FALSE( list.accepts( 1, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
 
    // The search narrows the category; it does not widen it.
    filter.category = FilterCategory::Orphan;
    filter.search = QStringLiteral( "sonic" );
-   EXPECT_FALSE( list.accepts( 0, filter ) );
+   EXPECT_FALSE( filterAccepts( list, 0, filter ) );
 }
 
 TEST( Gamelist, ConvertsReleaseDatesBothWays )
@@ -683,15 +684,6 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
    ASSERT_TRUE( added ) << added.error().toStdString();
    EXPECT_EQ( added.value(), 1 );
    EXPECT_EQ( reload( fixture ).count(), 4 );
-}
-
-// The next save() fails on every platform: a file cannot be renamed over a directory.
-// (A read-only gamelist would not do: on Linux the rename succeeds anyway.)
-void breakSave( const Fixture& aFixture, Gamelist& aList )
-{
-   ASSERT_TRUE( QFile::remove( aFixture.snes.gamelistPath ) );
-   ASSERT_TRUE( QDir().mkpath( aFixture.snes.gamelistPath ) );
-   ASSERT_FALSE( aList.save() );
 }
 
 QByteArray readAll( const QString& aPath )

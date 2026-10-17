@@ -59,3 +59,11 @@ struct FilterSpec
    // view must re-run the filter when the selection changes.
    int reference = -1;
 };
+
+class Gamelist;
+
+// What the list shows for that game, and what the search text matches.
+QString displayName( const Gamelist& aList, int aIndex, const FilterSpec& aFilter );
+
+// The filter predicate, category and search text together. False for a bad index.
+bool filterAccepts( const Gamelist& aList, int aIndex, const FilterSpec& aFilter );

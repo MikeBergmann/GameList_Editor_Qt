@@ -2,7 +2,6 @@
 
 #include "PathUtil.h"
 
-#include <QDate>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -76,23 +75,6 @@ Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
    }
 
    return backup;
-}
-
-// Ratings are written with either decimal separator; an unparseable one counts as 0.
-double ratingValue( const QString& aRating )
-{
-   QString text = aRating;
-   return text.replace( QLatin1Char( ',' ), QLatin1Char( '.' ) ).toDouble();
-}
-
-QDate releaseDateValue( const QString& aDisplayDate )
-{
-   switch ( aDisplayDate.size() ) {
-      case 4: return QDate::fromString( aDisplayDate, QStringLiteral( "yyyy" ) );
-      case 7: return QDate::fromString( aDisplayDate, QStringLiteral( "MM/yyyy" ) );
-      case 10: return QDate::fromString( aDisplayDate, QStringLiteral( "dd/MM/yyyy" ) );
-      default: return {};
-   }
 }
 
 }  // namespace
@@ -452,18 +434,27 @@ void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
 void Gamelist::undoMedia( const MediaWrite& aWrite )
 {
    if ( !aWrite.target.isEmpty() ) {
-      QFile::remove( aWrite.target );
-      if ( !aWrite.backup.isEmpty() )
-         QFile::rename( aWrite.backup, aWrite.target );
+      if ( !aWrite.movedFrom.isEmpty() ) {
+         QFile::rename( aWrite.target, aWrite.movedFrom );
+      } else {
+         QFile::remove( aWrite.target );
+         if ( !aWrite.backup.isEmpty() )
+            QFile::rename( aWrite.backup, aWrite.target );
+      }
    }
    restoreLink( aWrite.index, aWrite.isImage, aWrite.before );
+}
+
+void Gamelist::rollbackMedia( const QVector<MediaWrite>& aWrites )
+{
+   for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
+      undoMedia( *it );
 }
 
 Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 {
    if ( const Result<> saved = save(); !saved ) {
-      for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
-         undoMedia( *it );
+      rollbackMedia( aWrites );
       return saved;
    }
 
@@ -515,8 +506,7 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
       const Result<MediaWrite> write = applyImage( index, picture );
       if ( !write ) {
-         for ( auto it = writes.crbegin(); it != writes.crend(); ++it )
-            undoMedia( *it );
+         rollbackMedia( writes );
          return Error{ write.error() };
       }
       writes.append( write.value() );
@@ -533,70 +523,63 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
 Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
-   const QVector<Entry> before = FEntries;
    const QDir systemDir( FSystemDir );
 
-   int linked = 0;
+   // No file is touched, so the journal holds only the games as they were.
+   QVector<MediaWrite> writes;
    for ( const MediaLink& link : aLinks ) {
       if ( link.index < 0 || link.index >= FEntries.size() )
          continue;
 
       Game& game = FEntries[link.index].game;
+
+      MediaWrite write;
+      write.index = link.index;
+      write.isImage = link.isImage;
+      write.before = game;
+      writes.append( write );
+
       const QString text = QStringLiteral( "./" ) + systemDir.relativeFilePath( link.path );
       setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
       ( link.isImage ? game.imagePath : game.videoPath ) = text;
       ( link.isImage ? game.physicalImagePath : game.physicalVideoPath ) = link.path;
       ( link.isImage ? game.missingImage : game.missingVideo ) = false;
-      ++linked;
    }
 
-   if ( linked == 0 )
+   if ( writes.isEmpty() )
       return 0;
 
-   if ( const Result<> saved = save(); !saved ) {
-      for ( const MediaLink& link : aLinks ) {
-         if ( link.index < 0 || link.index >= FEntries.size() )
-            continue;
-         const Game& old = before.at( link.index ).game;
-         setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink,
-                       link.isImage ? old.imagePath : old.videoPath );
-      }
-      FEntries = before;
-      return Error{ saved.error() };
-   }
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return Error{ committed.error() };
 
-   return linked;
+   return static_cast<int>( writes.size() );
 }
 
 Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 {
-   const QVector<Entry> before = FEntries;
-
-   QVector<const MediaRename*> done;
-   auto undo = [&]() {
-      for ( auto it = done.crbegin(); it != done.crend(); ++it )
-         QFile::rename( ( *it )->newPath, ( *it )->path );
-      for ( const MediaRename* rename : done ) {
-         const Game& old = before.at( rename->index ).game;
-         setChildText( FEntries[rename->index].node, rename->isImage ? Cst_ImageLink : Cst_VideoLink,
-                       rename->isImage ? old.imagePath : old.videoPath );
-      }
-      FEntries = before;
-   };
+   QVector<MediaWrite> writes;
 
    for ( const MediaRename& rename : aRenames ) {
       if ( rename.index < 0 || rename.index >= FEntries.size() || !rename.problem.isEmpty() )
          continue;
 
       if ( !QFile::rename( rename.path, rename.newPath ) ) {
-         undo();
+         rollbackMedia( writes );
          return Error{
             QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) };
       }
-      done << &rename;
+
+      Game& game = FEntries[rename.index].game;
+
+      MediaWrite write;
+      write.index = rename.index;
+      write.isImage = rename.isImage;
+      write.target = rename.newPath;
+      write.movedFrom = rename.path;
+      write.before = game;
+      writes.append( write );
 
       // Only the file name changes: the folder part of the link stays as written.
-      Game& game = FEntries[rename.index].game;
       const QString oldLink = rename.isImage ? game.imagePath : game.videoPath;
       const QString text = folderOf( oldLink ) + QFileInfo( rename.newPath ).fileName();
       setChildText( FEntries[rename.index].node, rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
@@ -604,15 +587,13 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
       ( rename.isImage ? game.physicalImagePath : game.physicalVideoPath ) = rename.newPath;
    }
 
-   if ( done.isEmpty() )
+   if ( writes.isEmpty() )
       return 0;
 
-   if ( const Result<> saved = save(); !saved ) {
-      undo();
-      return Error{ saved.error() };
-   }
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return Error{ committed.error() };
 
-   return static_cast<int>( done.size() );
+   return static_cast<int>( writes.size() );
 }
 
 Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
@@ -861,103 +842,4 @@ void Gamelist::ensureHashes( int aIndex )
       game.sha1 = fileHash( game.physicalRomPath, QCryptographicHash::Sha1 );
    if ( game.crc32.isEmpty() )
       game.crc32 = fileCrc32( game.physicalRomPath );
-}
-
-bool Gamelist::accepts( int aIndex, const FilterSpec& aFilter ) const
-{
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return false;
-
-   if ( !matchesCategory( FEntries.at( aIndex ).game, aFilter ) )
-      return false;
-
-   // Case-insensitive, against whatever the list displays.
-   return aFilter.search.isEmpty() ||
-          displayName( aIndex, aFilter ).contains( aFilter.search, Qt::CaseInsensitive );
-}
-
-QString Gamelist::displayName( int aIndex, const FilterSpec& aFilter ) const
-{
-   const Game& game = FEntries.at( aIndex ).game;
-
-   if ( !aFilter.listByRom )
-      return game.name;
-   if ( !aFilter.fullRomName )
-      return game.romName();
-
-   QString path = game.romPath;
-   if ( path.startsWith( QLatin1String( "./" ) ) )
-      path.remove( 0, 2 );
-   return path;
-}
-
-bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) const
-{
-   // The "same as" categories compare against the selected game; with none selected
-   // nothing matches.
-   const bool needsReference = filterDependsOnSelection( aFilter.category );
-   if ( needsReference && ( aFilter.reference < 0 || aFilter.reference >= FEntries.size() ) )
-      return false;
-
-   // Only read by the categories above, for which it is valid. No default in the
-   // switch below, so the compiler flags a category added to the enum and not handled.
-   const Game& reference = needsReference ? FEntries.at( aFilter.reference ).game : aGame;
-
-   switch ( aFilter.category ) {
-      case FilterCategory::All: return true;
-      case FilterCategory::MissingImage: return aGame.missingImage;
-      case FilterCategory::MissingVideo: return aGame.missingVideo;
-      case FilterCategory::MissingDate: return aGame.releaseDate.isEmpty();
-      case FilterCategory::MissingPlayers: return aGame.players.isEmpty();
-      case FilterCategory::MissingRating: return aGame.rating.isEmpty();
-      case FilterCategory::MissingDeveloper: return aGame.developer.isEmpty();
-      case FilterCategory::MissingPublisher: return aGame.publisher.isEmpty();
-      case FilterCategory::MissingDescription: return aGame.description.isEmpty();
-      case FilterCategory::MissingGenre: return aGame.genre.isEmpty();
-      case FilterCategory::MissingRegion: return aGame.region.isEmpty();
-      case FilterCategory::KidGame: return aGame.kidGame == 1;
-      case FilterCategory::Hidden: return aGame.hidden == 1;
-      case FilterCategory::Favorite: return aGame.favorite == 1;
-      case FilterCategory::Orphan: return aGame.isOrphan;
-      case FilterCategory::DuplicateNames: return FNameCounts.value( aGame.name ) > 1;
-      case FilterCategory::DuplicateRoms: return FRomCounts.value( aGame.romName() ) > 1;
-
-      case FilterCategory::SameRegion: return aGame.region == reference.region;
-      case FilterCategory::SameDate: return aGame.releaseDate == reference.releaseDate;
-      case FilterCategory::SameOrEarlierDate:
-      case FilterCategory::SameOrLaterDate: {
-         if ( aGame.releaseDate.isEmpty() )
-            return false;
-         // An unset reference date counts as today.
-         QDate referenceDate = releaseDateValue( reference.releaseDate );
-         if ( !referenceDate.isValid() )
-            referenceDate = QDate::currentDate();
-         const QDate date = releaseDateValue( aGame.releaseDate );
-         return aFilter.category == FilterCategory::SameOrEarlierDate ? date <= referenceDate
-                                                                      : date >= referenceDate;
-      }
-      case FilterCategory::SamePlayers: return aGame.players == reference.players;
-      case FilterCategory::SameRating: return aGame.rating == reference.rating;
-      case FilterCategory::SameOrLowerRating:
-         return !aGame.rating.isEmpty() &&
-                ratingValue( aGame.rating ) <= ratingValue( reference.rating );
-      case FilterCategory::SameOrHigherRating:
-         return !aGame.rating.isEmpty() &&
-                ratingValue( aGame.rating ) >= ratingValue( reference.rating );
-      case FilterCategory::SamePublisher: return aGame.publisher == reference.publisher;
-      case FilterCategory::SameDeveloper: return aGame.developer == reference.developer;
-      case FilterCategory::SameGenre: return aGame.genre == reference.genre;
-      // Compared as written, not case-insensitively: on Linux two distinct directories
-      // can differ only in case. The case is already settled against the disk by
-      // resolvePath.
-      case FilterCategory::SameFolder:
-         return QFileInfo( aGame.physicalRomPath ).path() ==
-                QFileInfo( reference.physicalRomPath ).path();
-      case FilterCategory::SameName: return aGame.name == reference.name;
-      case FilterCategory::SameRom: return aGame.romName() == reference.romName();
-
-      case FilterCategory::Count: break;
-   }
-
-   return false;
 }

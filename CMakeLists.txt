@@ -71,6 +71,7 @@ include( GoogleTest )
 add_library( gle_core STATIC
    src/core/Game.cpp
    src/core/Gamelist.cpp
+   src/core/GamelistFilter.cpp
    src/core/GamelistModel.cpp
    src/core/MediaOps.cpp
    src/core/NameEdit.cpp
