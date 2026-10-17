@@ -5,6 +5,7 @@
 #include "GamelistFilter.h"
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
+#include "ScrapePanel.h"
 
 #include <gtest/gtest.h>
 
@@ -294,6 +295,38 @@ TEST( MainWindow, DecliningADeleteChangesNothing )
 
    EXPECT_EQ( shown( editor ).size(), 3 );
    EXPECT_EQ( reload( fixture ).count(), 3 );
+}
+
+TEST( MainWindow, BusyScrapeLocksTheSelectionControls )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+
+   ScrapePanel* scrape = editor.findChild<ScrapePanel*>();
+   QListView* games = editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) );
+   QComboBox* systems = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) );
+   QComboBox* filter = editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Filter" ) );
+   QLineEdit* search = editor.findChild<QLineEdit*>( QStringLiteral( "Edt_Search" ) );
+   QCheckBox* fullRomName = editor.findChild<QCheckBox*>( QStringLiteral( "Chk_FullRomName" ) );
+   ASSERT_NE( scrape, nullptr );
+
+   const auto expectLocked = [&]( bool aLocked ) {
+      for ( QWidget* widget : { static_cast<QWidget*>( games ), static_cast<QWidget*>( systems ),
+                                static_cast<QWidget*>( filter ), static_cast<QWidget*>( search ) } )
+         EXPECT_EQ( widget->isEnabled(), !aLocked ) << qPrintable( widget->objectName() );
+      EXPECT_EQ( editor.menuBar()->isEnabled(), !aLocked );
+   };
+
+   expectLocked( false );
+   EXPECT_FALSE( fullRomName->isEnabled() );
+
+   emit scrape->busyChanged( true );
+   expectLocked( true );
+
+   emit scrape->busyChanged( false );
+   expectLocked( false );
+   EXPECT_FALSE( fullRomName->isEnabled() );
 }
 
 // Every command that works on the loaded system follows one rule, including after a
