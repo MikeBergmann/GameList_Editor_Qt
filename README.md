@@ -1,7 +1,8 @@
 # GameList_Editor_Qt
 
-[![CI](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml)
+[![CI (Linux)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml)
 [![CI (Windows)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-windows.yml)
+[![CI (macOS)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-macos.yml)
 
 **Qt6 Port of GameList Editor Delphi**
 
