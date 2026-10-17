@@ -2,6 +2,7 @@
 // then work the widgets that decide what the list shows and what the editor holds.
 
 #include "F_Main.h"
+#include "GamelistFilter.h"
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
 

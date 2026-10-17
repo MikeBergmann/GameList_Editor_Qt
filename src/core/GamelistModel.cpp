@@ -26,7 +26,7 @@ void GamelistModel::setFilter( const FilterSpec& aFilter )
 
 bool GamelistModel::accepts( int aRow ) const
 {
-   return FGamelist && FGamelist->accepts( aRow, FFilter );
+   return FGamelist && filterAccepts( *FGamelist, aRow, FFilter );
 }
 
 void GamelistModel::refresh()
@@ -52,7 +52,7 @@ QVariant GamelistModel::data( const QModelIndex& aIndex, int aRole ) const
       return {};
 
    if ( aRole == Qt::DisplayRole )
-      return FGamelist->displayName( aIndex.row(), FFilter );
+      return displayName( *FGamelist, aIndex.row(), FFilter );
 
    if ( aRole == Qt::ToolTipRole )
       return FGamelist->at( aIndex.row() ).romPath;

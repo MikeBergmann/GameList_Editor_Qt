@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Gamelist.h"
+#include "GamelistFilter.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Game.h"
-#include "GamelistFilter.h"
 #include "Resources.h"
 #include "Result.h"
 #include "Systems.h"
@@ -128,16 +127,13 @@ public:
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 
-   // The filter predicate, category and search text together.
-   bool accepts( int aIndex, const FilterSpec& aFilter ) const;
-
-   // What the list shows for that game, and what the search text matches.
-   QString displayName( int aIndex, const FilterSpec& aFilter ) const;
+   // Whether more than one game carries that name / ROM file name.
+   bool nameIsDuplicated( const QString& aName ) const { return FNameCounts.value( aName ) > 1; }
+   bool romIsDuplicated( const QString& aRomName ) const { return FRomCounts.value( aRomName ) > 1; }
 
 private:
    // One <game> element as a Game, filesystem flags included.
    Game gameFromNode( const QDomElement& aNode ) const;
-   bool matchesCategory( const Game& aGame, const FilterSpec& aFilter ) const;
 
    QDomElement ensureChild( QDomElement aNode, const char* aName );
    void setChildText( QDomElement aNode, const char* aName, const QString& aText );
