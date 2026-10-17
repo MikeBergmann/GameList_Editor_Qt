@@ -269,7 +269,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 
    if ( const Result<> saved = save(); !saved ) {
       rollback();
-      return Error{ saved.error() };
+      return saved;
    }
 
    countDuplicates();
@@ -285,6 +285,13 @@ void Gamelist::countDuplicates()
       ++FNameCounts[entry.game.name];
       ++FRomCounts[entry.game.romName()];
    }
+}
+
+Result<> Gamelist::checkIndex( int aIndex ) const
+{
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
+      return Error{ QStringLiteral( "No game selected." ) };
+   return {};
 }
 
 Result<> Gamelist::save()
@@ -411,7 +418,7 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
    write.before = game;
    const Result<QString> backup = swapIn( staged, target );
    if ( !backup )
-      return Error{ backup.error() };
+      return backup;
    write.backup = backup.value();
 
    setChildText( FEntries[aIndex].node, Cst_ImageLink, link );
@@ -467,8 +474,8 @@ Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 
 Result<> Gamelist::setImage( int aIndex, const QString& aSourcePath )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    QImage picture;
    if ( !picture.load( aSourcePath ) ) {
@@ -481,12 +488,12 @@ Result<> Gamelist::setImage( int aIndex, const QString& aSourcePath )
 
 Result<> Gamelist::setImage( int aIndex, const QImage& aPicture )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    const Result<MediaWrite> write = applyImage( aIndex, aPicture );
    if ( !write )
-      return Error{ write.error() };
+      return write;
 
    return commitMedia( { write.value() } );
 }
@@ -507,7 +514,7 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
       const Result<MediaWrite> write = applyImage( index, picture );
       if ( !write ) {
          rollbackMedia( writes );
-         return Error{ write.error() };
+         return write;
       }
       writes.append( write.value() );
    }
@@ -516,7 +523,7 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
       return 0;
 
    if ( const Result<> committed = commitMedia( writes ); !committed )
-      return Error{ committed.error() };
+      return committed;
 
    return static_cast<int>( writes.size() );
 }
@@ -550,7 +557,7 @@ Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
       return 0;
 
    if ( const Result<> committed = commitMedia( writes ); !committed )
-      return Error{ committed.error() };
+      return committed;
 
    return static_cast<int>( writes.size() );
 }
@@ -591,15 +598,15 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
       return 0;
 
    if ( const Result<> committed = commitMedia( writes ); !committed )
-      return Error{ committed.error() };
+      return committed;
 
    return static_cast<int>( writes.size() );
 }
 
 Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    Game& game = FEntries[aIndex].game;
    const QString link = FVideoFolder + game.romNameWoExt() + QLatin1String( Cst_VideoSuffixMp4 );
@@ -630,7 +637,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
 
       const Result<QString> backup = swapIn( staged, target );
       if ( !backup )
-         return Error{ backup.error() };
+         return backup;
       write.backup = backup.value();
       write.target = target;
    }
@@ -661,8 +668,8 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
 
 Result<> Gamelist::removeImage( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    Game& game = FEntries[aIndex].game;
    const QString file = game.physicalImagePath;
@@ -688,8 +695,8 @@ Result<> Gamelist::removeImage( int aIndex )
 
 Result<> Gamelist::removeVideo( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    Game& game = FEntries[aIndex].game;
    const QString file = game.physicalVideoPath;
@@ -713,8 +720,8 @@ Result<> Gamelist::removeVideo( int aIndex )
 
 Result<QStringList> Gamelist::removeGame( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FEntries.size() )
-      return Error{ QStringLiteral( "No game selected." ) };
+   if ( const Result<> valid = checkIndex( aIndex ); !valid )
+      return valid;
 
    QDomElement node = FEntries.at( aIndex ).node;
    QDomNode parent = node.parentNode();
@@ -723,7 +730,7 @@ Result<QStringList> Gamelist::removeGame( int aIndex )
 
    if ( const Result<> saved = save(); !saved ) {
       parent.insertBefore( node, next );
-      return Error{ saved.error() };
+      return saved;
    }
 
    const Game game = FEntries.at( aIndex ).game;

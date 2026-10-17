@@ -51,4 +51,31 @@ TEST( Result, VoidSpecialisation )
    EXPECT_FALSE( silent );
 }
 
+// A failure passes up through any Result type as `return failed;`.
+Result<int> passesUp( int aValue )
+{
+   if ( const Result<> positive = needsPositive( aValue ); !positive )
+      return positive;
+   if ( const Result<int> halved = half( aValue ); !halved )
+      return halved;
+   return aValue;
+}
+
+TEST( Result, FailureConvertsBetweenTypes )
+{
+   const Result<int> notPositive = passesUp( 0 );
+   EXPECT_FALSE( notPositive );
+   EXPECT_EQ( notPositive.error(), QStringLiteral( "not positive" ) );
+
+   const Result<int> odd = passesUp( 3 );
+   EXPECT_FALSE( odd );
+   EXPECT_EQ( odd.error(), QStringLiteral( "3 is odd" ) );
+
+   const Result<> dropped = half( 8 );  // a success keeps being one when the value is dropped
+   EXPECT_TRUE( dropped );
+   const Result<> droppedFailure = half( 7 );
+   EXPECT_FALSE( droppedFailure );
+   EXPECT_EQ( droppedFailure.error(), QStringLiteral( "7 is odd" ) );
+}
+
 }  // namespace
