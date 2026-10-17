@@ -494,6 +494,12 @@ void ScrapePanel::save()
    if ( !FGamelist || FIndex < 0 )
       return;
 
+   // The guard can save, which may move the selection and clear the scraped data.
+   if ( FLeaveGuard && !FLeaveGuard() )
+      return;
+   if ( !FGamelist || FIndex < 0 || !FHasScrapedData )
+      return;
+
    // Same busy look as a scrape. report() undoes it on every way out.
    setBusy( true );
    QGuiApplication::setOverrideCursor( Qt::WaitCursor );
@@ -529,29 +535,35 @@ void ScrapePanel::save()
 
 void ScrapePanel::finishSave( const QString& aVideoPath )
 {
+   const int index = FIndex;
+   const GameFields before = gameFields( FGamelist->at( index ) );
    const GameFieldSet which = Chk_ScrapeInfos->isChecked()
-                                 ? changedFields( FGamelist->at( FIndex ), fields() )
+                                 ? changedFields( FGamelist->at( index ), fields() )
                                  : GameFieldSet();
    if ( which )
-      FGamelist->setFields( { FIndex }, fields(), which );
+      FGamelist->setFields( { index }, fields(), which );
 
    Result<> result;
-   bool savedAlready = false;
+   bool saved = false;  // a save went through, infos included
 
    if ( Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull() ) {
-      result = FGamelist->setImage( FIndex, FSelectedPicture );
-      savedAlready = true;
+      result = FGamelist->setImage( index, FSelectedPicture );
+      saved = bool( result );
    }
 
    if ( result && !aVideoPath.isEmpty() ) {
-      result = FGamelist->setVideo( FIndex, aVideoPath );
-      savedAlready = true;
+      result = FGamelist->setVideo( index, aVideoPath );
+      saved = saved || bool( result );
       QFile::remove( aVideoPath );
    }
 
    // setFields() alone does not save, so an infos-only save has to ask for it.
-   if ( result && which && !savedAlready )
+   if ( result && which && !saved )
       result = FGamelist->save();
+
+   // Without a save the infos are only in memory; the next media save would write them unasked.
+   if ( !result && which && !saved )
+      FGamelist->setFields( { index }, before, which );
 
    report( result );
 }

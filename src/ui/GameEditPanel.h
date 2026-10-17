@@ -7,6 +7,8 @@
 #include <QVector>
 #include <QWidget>
 
+#include <functional>
+
 class Gamelist;
 class QComboBox;
 class QLabel;
@@ -38,6 +40,9 @@ public:
    void setFields( const GameFields& aFields );
 
    bool isDirty() const;
+
+   // Asked before an action that would drop typed edits; false cancels. Unset: go ahead.
+   void setLeaveGuard( std::function<bool()> aGuard ) { FLeaveGuard = std::move( aGuard ); }
 
    // Reloads the fields from the Gamelist afterwards. False if the write failed;
    // the edit then stays dirty.
@@ -86,7 +91,9 @@ private:
    void setDefaultPictureForAll();
    void deleteGame();
    void report( const Result<>& aResult );
+   bool mayLeave() const { return !FLeaveGuard || FLeaveGuard(); }
 
+   std::function<bool()> FLeaveGuard;
    Gamelist* FGamelist = nullptr;
    QVector<int> FSelection;
 

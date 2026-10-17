@@ -139,6 +139,32 @@ TEST( GameEditPanel, AFailedSaveKeepsTheEditAndLeavesTheGamelistAlone )
    EXPECT_TRUE( panel.panel.isDirty() );
 }
 
+
+TEST( GameEditPanel, MediaButtonsAskBeforeDroppingTypedEdits )
+{
+   Panel panel;
+   panel.panel.setSelection( { 1 } );
+   panel.edit( "Edt_Genre" )->setText( QStringLiteral( "Platformer" ) );
+
+   int asked = 0;
+   bool allow = false;
+   panel.panel.setLeaveGuard( [&] {
+      ++asked;
+      return allow;
+   } );
+
+   panel.button( "Btn_SetDefaultPicture" )->click();
+   EXPECT_EQ( asked, 1 );
+   EXPECT_TRUE( panel.list.at( 1 ).missingImage );
+   EXPECT_EQ( panel.edit( "Edt_Genre" )->text(), QStringLiteral( "Platformer" ) );
+   EXPECT_TRUE( panel.panel.isDirty() );
+
+   allow = true;
+   panel.button( "Btn_SetDefaultPicture" )->click();
+   EXPECT_EQ( asked, 2 );
+   EXPECT_FALSE( panel.list.at( 1 ).missingImage );
+}
+
 // Several games: the fields start blank and only the filled-in ones are written.
 TEST( GameEditPanel, SeveralGamesStartBlankAndWriteOnlyWhatIsFilledIn )
 {

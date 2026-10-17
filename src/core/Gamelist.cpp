@@ -35,6 +35,28 @@ QString writeTarget( const QString& aSystemDir, const QString& aLink )
    return QDir( resolvePath( info.path() ) ).filePath( info.fileName() );
 }
 
+// Probed, not assumed from the OS: Linux can mount NTFS, Windows has case-sensitive folders.
+bool volumeFoldsCase( const QString& aGamelistPath )
+{
+   const QFileInfo info( aGamelistPath );
+   const QString upper = info.fileName().toUpper();
+   const QString probe = upper != info.fileName() ? upper : info.fileName().toLower();
+   return probe != info.fileName() && QFileInfo::exists( info.dir().filePath( probe ) );
+}
+
+// A bare toLower() is wrong on Linux, where sonic.zip is not Sonic.zip.
+QString fileKey( const QString& aPath, bool aFoldsCase )
+{
+   const QString clean = QDir::cleanPath( aPath );
+   return aFoldsCase ? clean.toLower() : clean;
+}
+
+// Both paths are already clean, as every physical path is.
+bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase )
+{
+   return aA.compare( aB, aFoldsCase ? Qt::CaseInsensitive : Qt::CaseSensitive ) == 0;
+}
+
 // An empty link counts as missing.
 bool fileMissing( const QString& aPath )
 {
@@ -105,6 +127,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    }
 
    FSystemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
+   FFoldsCase = volumeFoldsCase( aSystem.gamelistPath );
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
@@ -169,14 +192,11 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
 
 QStringList Gamelist::unlistedRoms() const
 {
-   // Case-folded absolute paths of everything the gamelist already points at.
-   const auto key = [this]( const QString& aPath ) {
-      return QDir::cleanPath( QDir( FSystemDir ).filePath( aPath ) ).toLower();
-   };
-
    QSet<QString> listed;
-   for ( const Entry& entry : FEntries )
-      listed.insert( key( entry.game.romPath ) );
+   for ( const Entry& entry : FEntries ) {
+      if ( !entry.game.physicalRomPath.isEmpty() )
+         listed.insert( fileKey( entry.game.physicalRomPath, FFoldsCase ) );
+   }
 
    // Media is not a ROM: skip the folders the gamelist keeps its art in (when
    // they are subfolders at all) and the usual non-ROM extensions.
@@ -208,7 +228,7 @@ QStringList Gamelist::unlistedRoms() const
 
       if ( notRoms.contains( QFileInfo( path ).suffix().toLower() ) ||
            mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) ||
-           listed.contains( key( path ) ) )
+           listed.contains( fileKey( path, FFoldsCase ) ) )
          continue;
 
       found << path;
@@ -222,8 +242,10 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 {
    const QDir systemDir( FSystemDir );
    QSet<QString> seen;
-   for ( const Entry& entry : FEntries )
-      seen.insert( QDir::cleanPath( systemDir.filePath( entry.game.romPath ) ).toLower() );
+   for ( const Entry& entry : FEntries ) {
+      if ( !entry.game.physicalRomPath.isEmpty() )
+         seen.insert( fileKey( entry.game.physicalRomPath, FFoldsCase ) );
+   }
 
    const int firstNew = static_cast<int>( FEntries.size() );
    QVector<QDomElement> added;
@@ -244,7 +266,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
       }
 
       // Already listed, or picked twice: nothing to add, and not an error.
-      const QString key = QDir::cleanPath( info.absoluteFilePath() ).toLower();
+      const QString key = fileKey( info.absoluteFilePath(), FFoldsCase );
       if ( seen.contains( key ) )
          continue;
       seen.insert( key );
@@ -388,10 +410,38 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       countDuplicates();
 }
 
+// Sonic.zip and Sonic.7z share a stem: keep the ROM's extension, then count up.
+QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
+{
+   const Game& game = FEntries.at( aIndex ).game;
+   const QString folder = aIsImage ? FImageFolder : FVideoFolder;
+   const QLatin1String suffix( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
+
+   for ( int attempt = 0;; ++attempt ) {
+      const QString stem = attempt == 0   ? game.romNameWoExt()
+                           : attempt == 1 ? game.romName()
+                                          : game.romNameWoExt() + QLatin1Char( '_' ) +
+                                               QString::number( attempt );
+      const QString link = folder + stem + suffix;
+      const QString target = writeTarget( FSystemDir, link );
+
+      bool taken = false;
+      for ( int index = 0; index < FEntries.size() && !taken; ++index ) {
+         const Game& other = FEntries.at( index ).game;
+         taken = index != aIndex &&
+                 sameFile( aIsImage ? other.physicalImagePath : other.physicalVideoPath, target,
+                           FFoldsCase );
+      }
+
+      if ( !taken )
+         return link;
+   }
+}
+
 Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPicture )
 {
    Game& game = FEntries[aIndex].game;
-   const QString link = FImageFolder + game.romNameWoExt() + QLatin1String( Cst_ImageSuffixPng );
+   const QString link = freeMediaLink( aIndex, true );
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
@@ -603,7 +653,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
       return valid;
 
    Game& game = FEntries[aIndex].game;
-   const QString link = FVideoFolder + game.romNameWoExt() + QLatin1String( Cst_VideoSuffixMp4 );
+   const QString link = freeMediaLink( aIndex, false );
    const QString target = writeTarget( FSystemDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )

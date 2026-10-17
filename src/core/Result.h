@@ -30,11 +30,19 @@ public:
    Result( const Result<U>& aFailed ) : FError( aFailed.error() )
    {
       Q_ASSERT_X( !aFailed, "Result", "only a failed Result converts to a Result with a value" );
+      // Release skips the assert: still a failure, with a reason.
+      if ( aFailed && FError.isEmpty() )
+         FError = QStringLiteral(
+            "Internal error: a successful Result cannot become a Result with a value." );
    }
 
    explicit operator bool() const { return FValue.has_value(); }
 
-   const T& value() const { return *FValue; }
+   const T& value() const
+   {
+      Q_ASSERT_X( FValue.has_value(), "Result", "value() of a failed Result" );
+      return *FValue;
+   }
    const QString& error() const { return FError; }
 
 private:

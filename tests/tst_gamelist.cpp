@@ -426,9 +426,9 @@ TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShare )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   // Both Sonics are called Sonic.zip, so both links are ./media/images/Sonic.png.
+   // Game 1 would get its own file name, so link it by hand.
    ASSERT_TRUE( list.setImage( 0, QStringLiteral( ":/DefaultPictures/default.png" ) ) );
-   ASSERT_TRUE( list.setImage( 1, QStringLiteral( ":/DefaultPictures/default.png" ) ) );
+   ASSERT_TRUE( list.linkMedia( { { 1, true, list.at( 0 ).physicalImagePath } } ) );
    ASSERT_EQ( list.at( 1 ).imagePath, list.at( 0 ).imagePath );
 
    const QString shared = list.at( 1 ).physicalImagePath;
@@ -783,6 +783,92 @@ TEST( Gamelist, ChangeAllIsAllOrNothing )
    EXPECT_TRUE( list.at( 1 ).missingImage );
    EXPECT_TRUE( list.at( 2 ).missingImage );
    EXPECT_TRUE( list.at( 2 ).imagePath.isEmpty() );
+}
+
+constexpr const char* Cst_SameStemGamelist = R"(<gameList>
+   <game><path>./Sonic.zip</path></game>
+   <game><path>./Sonic.7z</path></game>
+</gameList>)";
+
+TEST( Gamelist, NewMediaNeverTakesAFileAnotherGameHas )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), Cst_SameStemGamelist );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   QImage red( 2, 2, QImage::Format_RGB32 );
+   red.fill( Qt::red );
+   QImage blue( 2, 2, QImage::Format_RGB32 );
+   blue.fill( Qt::blue );
+   ASSERT_TRUE( list.setImage( 0, red ) );
+   ASSERT_TRUE( list.setImage( 1, blue ) );
+
+   EXPECT_EQ( list.at( 0 ).imagePath, QStringLiteral( "./media/images/Sonic.png" ) );
+   EXPECT_EQ( list.at( 1 ).imagePath, QStringLiteral( "./media/images/Sonic.7z.png" ) );
+   EXPECT_EQ( QImage( list.at( 0 ).physicalImagePath ).pixel( 0, 0 ), red.pixel( 0, 0 ) );
+   EXPECT_EQ( QImage( list.at( 1 ).physicalImagePath ).pixel( 0, 0 ), blue.pixel( 0, 0 ) );
+
+   writeFile( fixture.path( "clip1.mp4" ), "one" );
+   writeFile( fixture.path( "clip2.mp4" ), "two" );
+   ASSERT_TRUE( list.setVideo( 0, fixture.path( "clip1.mp4" ) ) );
+   ASSERT_TRUE( list.setVideo( 1, fixture.path( "clip2.mp4" ) ) );
+
+   EXPECT_EQ( list.at( 1 ).videoPath, QStringLiteral( "./media/videos/Sonic.7z.mp4" ) );
+   EXPECT_EQ( readAll( list.at( 0 ).physicalVideoPath ), QByteArray( "one" ) );
+   EXPECT_EQ( readAll( list.at( 1 ).physicalVideoPath ), QByteArray( "two" ) );
+
+   // Replacing a game's own picture is still a replace, not a new name.
+   ASSERT_TRUE( list.setImage( 1, red ) );
+   EXPECT_EQ( list.at( 1 ).imagePath, QStringLiteral( "./media/images/Sonic.7z.png" ) );
+}
+
+TEST( Gamelist, ChangeAllWritesOneFilePerGameEvenWithTheSameStem )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), Cst_SameStemGamelist );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   const Result<int> changed =
+      list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ) );
+   ASSERT_TRUE( changed ) << changed.error().toStdString();
+   EXPECT_EQ( changed.value(), 2 );
+   EXPECT_NE( list.at( 0 ).physicalImagePath, list.at( 1 ).physicalImagePath );
+}
+
+// The second swapIn used to delete the first game's backup.
+TEST( Gamelist, ChangeAllRollbackBringsBackAFileTheFirstGameReplaced )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), Cst_SameStemGamelist );
+   const QString stray = fixture.path( "snes/media/images/Sonic.png" );
+   writeFile( stray, "old" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   breakSave( fixture, list );
+
+   EXPECT_FALSE( list.setDefaultImageForMissing( QStringLiteral( ":/DefaultPictures/default.png" ) ) );
+   EXPECT_EQ( readAll( stray ), QByteArray( "old" ) );
+   EXPECT_FALSE( QFileInfo::exists( stray + QStringLiteral( ".gle-bak" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Sonic.7z.png" ) ) );
+}
+
+TEST( Gamelist, ARomThatDiffersOnlyInCaseIsAnotherFile )
+{
+   SKIP_ON_CASE_INSENSITIVE_FS();
+   Fixture fixture;
+   writeFile( fixture.path( "snes/sonic.zip" ), "rom" );  // beside the listed Sonic.zip
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   EXPECT_EQ( list.unlistedRoms(), QStringList( { fixture.path( "snes/sonic.zip" ) } ) );
+
+   const Result<int> added = list.addGames( { fixture.path( "snes/sonic.zip" ) } );
+   ASSERT_TRUE( added ) << added.error().toStdString();
+   EXPECT_EQ( added.value(), 1 );
+   EXPECT_TRUE( list.unlistedRoms().isEmpty() );
 }
 
 TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )
