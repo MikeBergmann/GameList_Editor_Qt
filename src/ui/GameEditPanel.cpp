@@ -211,18 +211,20 @@ void GameEditPanel::buildLayout()
    Btn_RemovePicture = new QPushButton( QStringLiteral( "Delete Picture" ), this );
    Btn_RemovePicture->setObjectName( QStringLiteral( "Btn_RemovePicture" ) );
    connect( Btn_RemovePicture, &QPushButton::clicked, this, [this, confirmDelete] {
-      if ( !confirmDelete( QStringLiteral( "picture" ) ) )
+      const int index = FSelection.value( 0, -1 );
+      if ( !confirmDelete( QStringLiteral( "picture" ) ) || !mayLeave() )
          return;
-      report( FGamelist ? FGamelist->removeImage( FSelection.value( 0, -1 ) ) : Result<>() );
+      report( FGamelist ? FGamelist->removeImage( index ) : Result<>() );
    } );
 
    Btn_RemoveVideo = new QPushButton( QStringLiteral( "Delete Video" ), this );
    Btn_RemoveVideo->setObjectName( QStringLiteral( "Btn_RemoveVideo" ) );
    connect( Btn_RemoveVideo, &QPushButton::clicked, this, [this, confirmDelete] {
-      if ( !confirmDelete( QStringLiteral( "video" ) ) )
+      const int index = FSelection.value( 0, -1 );
+      if ( !confirmDelete( QStringLiteral( "video" ) ) || !mayLeave() )
          return;
       FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
-      report( FGamelist ? FGamelist->removeVideo( FSelection.value( 0, -1 ) ) : Result<>() );
+      report( FGamelist ? FGamelist->removeVideo( index ) : Result<>() );
    } );
 
    Btn_MoreInfos = new QPushButton( QStringLiteral( "More infos..." ), this );
@@ -577,34 +579,50 @@ void GameEditPanel::report( const Result<>& aResult )
 
 void GameEditPanel::chooseImage()
 {
+   // Asked before the dialog, so a Cancel does not throw a picked file away.
+   if ( !mayLeave() )
+      return;
+
    const QString file =
       QFileDialog::getOpenFileName( this, QStringLiteral( "Choose a picture" ), QString(),
                                     QStringLiteral( "Images (*.png *.jpg *.jpeg)" ) );
    if ( file.isEmpty() )
       return;
 
-   report( FGamelist->setImage( FSelection.value( 0, -1 ), file ) );
+   const int index = FSelection.value( 0, -1 );
+   report( FGamelist->setImage( index, file ) );
 }
 
 void GameEditPanel::chooseVideo()
 {
+   if ( !mayLeave() )
+      return;
+
    const QString file =
       QFileDialog::getOpenFileName( this, QStringLiteral( "Choose a video" ), QString(),
                                     QStringLiteral( "Videos (*.mp4)" ) );
    if ( file.isEmpty() )
       return;
 
+   const int index = FSelection.value( 0, -1 );
    FPlayer->setSource( QUrl() );  // the new file replaces the one that is open
-   report( FGamelist->setVideo( FSelection.value( 0, -1 ), file ) );
+   report( FGamelist->setVideo( index, file ) );
 }
 
 void GameEditPanel::setDefaultPicture()
 {
-   report( FGamelist->setImage( FSelection.value( 0, -1 ), Cst_DefaultPicture ) );
+   const int index = FSelection.value( 0, -1 );
+   if ( !mayLeave() )
+      return;
+
+   report( FGamelist->setImage( index, Cst_DefaultPicture ) );
 }
 
 void GameEditPanel::setDefaultPictureForAll()
 {
+   if ( !mayLeave() )
+      return;
+
    const Result<int> changed = FGamelist->setDefaultImageForMissing( Cst_DefaultPicture );
    if ( !changed ) {
       report( changed );

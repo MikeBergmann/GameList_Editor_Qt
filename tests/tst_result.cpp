@@ -78,4 +78,15 @@ TEST( Result, FailureConvertsBetweenTypes )
    EXPECT_EQ( droppedFailure.error(), QStringLiteral( "7 is odd" ) );
 }
 
+// Debug builds assert instead.
+#ifdef QT_NO_DEBUG
+TEST( Result, SuccessConvertedToAValueResultFailsWithAMessage )
+{
+   const Result<> succeeded;
+   const Result<int> converted = succeeded;
+   EXPECT_FALSE( converted );
+   EXPECT_FALSE( converted.error().isEmpty() );
+}
+#endif
+
 }  // namespace

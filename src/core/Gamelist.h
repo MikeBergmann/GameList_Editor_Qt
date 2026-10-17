@@ -132,6 +132,9 @@ private:
    // Does not save. On an Error nothing has changed.
    Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
 
+   // Never a file another game has.
+   QString freeMediaLink( int aIndex, bool aIsImage ) const;
+
    Result<> commitMedia( const QVector<MediaWrite>& aWrites );
    // Newest first: a game written twice in one batch holds its first snapshot last.
    void rollbackMedia( const QVector<MediaWrite>& aWrites );
@@ -153,6 +156,7 @@ private:
 
    QString FImageFolder;
    QString FVideoFolder;
+   bool FFoldsCase = false;
 
    QHash<QString, int> FNameCounts;
    QHash<QString, int> FRomCounts;

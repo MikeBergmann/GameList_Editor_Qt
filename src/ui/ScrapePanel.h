@@ -6,6 +6,8 @@
 #include <QImage>
 #include <QWidget>
 
+#include <functional>
+
 class Gamelist;
 class QCheckBox;
 class QHBoxLayout;
@@ -32,6 +34,9 @@ public:
 
    // Re-reads the QSettings keys and clears the Save checkboxes.
    void activate();
+
+   // Asked before a save, which reloads the edit tab; false cancels. Unset: go ahead.
+   void setLeaveGuard( std::function<bool()> aGuard ) { FLeaveGuard = std::move( aGuard ); }
 
    // Exposed so tests can emit its signals without a network round trip.
    Scraper& scraper() { return FScraper; }
@@ -66,6 +71,7 @@ private:
    void setFields( const GameFields& aFields );
    QSet<QString> mediaTypes() const;  // The 8 picture checkboxes, as Cst_Media* values
 
+   std::function<bool()> FLeaveGuard;
    Gamelist* FGamelist = nullptr;
    int FIndex = -1;
 

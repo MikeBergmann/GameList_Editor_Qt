@@ -290,6 +290,10 @@ void Frm_Editor::buildCentralWidget()
    FScrapePanel = new ScrapePanel( Pgc_Editor );
    Pgc_Editor->addTab( FScrapePanel, QStringLiteral( "Scrape" ) );
 
+   // Both panels reload the edit tab, which would drop typed edits.
+   FEditPanel->setLeaveGuard( [this] { return confirmLeaveEdits(); } );
+   FScrapePanel->setLeaveGuard( [this] { return confirmLeaveEdits(); } );
+
    splitter->addWidget( Pgc_Editor );
    splitter->setStretchFactor( 1, 1 );
 

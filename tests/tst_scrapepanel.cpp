@@ -7,11 +7,13 @@
 
 #include <gtest/gtest.h>
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QCoreApplication>
 #include <QImage>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QTimer>
 #include <QToolButton>
 
 namespace {
@@ -165,6 +167,52 @@ TEST( ScrapePanel, SaveIsBusyUntilTheWriteEnds )
    QCoreApplication::processEvents();
    EXPECT_EQ( states, QVector<bool>( { true, false } ) );
    EXPECT_TRUE( panel.panel.isEnabled() );
+}
+
+TEST( ScrapePanel, SaveAsksTheGuardFirstAndStopsWhenItSaysNo )
+{
+   Panel panel;
+   panel.panel.setSelection( 0 );
+   emit panel.panel.scraper().gameInfoReady( sampleInfo() );
+   emit panel.panel.scraper().mediaFinished();
+
+   int asked = 0;
+   panel.panel.setLeaveGuard( [&] {
+      ++asked;
+      return false;
+   } );
+   int gamesChanged = 0;
+   QObject::connect( &panel.panel, &ScrapePanel::gamesChanged, [&] { ++gamesChanged; } );
+
+   panel.button( "Btn_ScrapeSave" )->click();
+   QCoreApplication::processEvents();
+
+   EXPECT_EQ( asked, 1 );
+   EXPECT_EQ( gamesChanged, 0 );
+   EXPECT_TRUE( panel.panel.isEnabled() );
+   EXPECT_EQ( panel.list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+}
+
+// Otherwise the next media save writes the unsaved infos out unasked.
+TEST( ScrapePanel, AFailedSaveLeavesTheGamelistAsItWas )
+{
+   Panel panel;
+   panel.panel.setSelection( 0 );
+   emit panel.panel.scraper().gameInfoReady( sampleInfo() );
+   emit panel.panel.scraper().mediaFinished();
+   breakSave( panel.fixture, panel.list );
+
+   panel.button( "Btn_ScrapeSave" )->click();
+   QTimer::singleShot( 0, [] {
+      if ( QWidget* box = QApplication::activeModalWidget() )
+         box->close();
+   } );
+   QCoreApplication::processEvents();  // runs the deferred write, which warns
+
+   EXPECT_EQ( panel.list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( panel.list.at( 0 ).genre, QStringLiteral( "Platform" ) );
+   EXPECT_EQ( panel.list.at( 0 ).publisher, QStringLiteral( "Sega" ) );
+   EXPECT_EQ( panel.list.domText( 0, "name" ), QStringLiteral( "Sonic The Hedgehog" ) );
 }
 
 }  // namespace
