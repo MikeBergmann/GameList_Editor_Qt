@@ -32,6 +32,7 @@ Other Design decisions:
 
 - `removeImage` / `removeVideo` delete the file only if no other game resolves to the same file. Several games can share one picture.
 - New media goes into the folder of the first game that has any (`imageFolder()` / `videoFolder()`), named after the game. Images are always re-encoded to PNG. Videos are copied as they are.
+- Every action that touches files saves by itself and leaves memory, DOM and files as they were if that save fails.
 
 ## Build and tests
 
@@ -39,7 +40,8 @@ Other Design decisions:
 - zlib is linked directly because Qt has no CRC32. It is a build dependency (`zlib1g-dev`).
 - Video playback uses Qt Multimedia (`qt6-multimedia-dev`, linked into `gle_ui` only).
 - Tests use their own `main()` because widgets need a `QApplication`. It defaults to the `offscreen` platform (so CI needs no X server) and redirects `QSettings` to a temporary directory so tests never touch the real config.
-- CI is Linux only (Ubuntu 24.04, `ctest`).
+- CI builds and runs `ctest` on Ubuntu, on Windows (Qt's MinGW kit) and on macOS. There is still no macOS release; the job only keeps the code building there.
+- Tests that need a case-sensitive filesystem skip themselves on Windows and macOS, so only the Linux job runs them.
 
 ## Deviations from the Delphi original
 
@@ -58,5 +60,4 @@ The logic is a 1:1 port, except where I think the original was wrong or didn't f
 
 ## Later
 
-
-- Secrets: The `QSettings` keys `SSPwd` and `ProxyPwd` (kept from the Delphi ini) would store the ScreenScraper and proxy passwords in plain text. Decide before the scraper is ported: plain INI as before, or the system keyring.
+- Secrets: The `QSettings` keys `SSPwd` and `ProxyPwd` (kept from the Delphi ini) store the ScreenScraper and proxy passwords in plain text.
