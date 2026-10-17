@@ -147,4 +147,24 @@ TEST( ScrapePanel, UncheckingSaveInfosLeavesTheStoredFieldsAlone )
    EXPECT_EQ( panel.list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
 }
 
+TEST( ScrapePanel, SaveIsBusyUntilTheWriteEnds )
+{
+   Panel panel;
+   panel.panel.setSelection( 0 );
+   emit panel.panel.scraper().gameInfoReady( sampleInfo() );
+   emit panel.panel.scraper().mediaFinished();
+
+   QVector<bool> states;
+   QObject::connect( &panel.panel, &ScrapePanel::busyChanged,
+                     [&]( bool aBusy ) { states.append( aBusy ); } );
+
+   panel.button( "Btn_ScrapeSave" )->click();
+   EXPECT_EQ( states, QVector<bool>( { true } ) );
+   EXPECT_FALSE( panel.panel.isEnabled() );
+
+   QCoreApplication::processEvents();
+   EXPECT_EQ( states, QVector<bool>( { true, false } ) );
+   EXPECT_TRUE( panel.panel.isEnabled() );
+}
+
 }  // namespace

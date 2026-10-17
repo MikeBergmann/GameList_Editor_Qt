@@ -229,6 +229,13 @@ void ScrapePanel::setSelection( int aIndex )
    Edt_ManualCRC->setEnabled( canScrape && Chk_ManualCRC->isChecked() );
 }
 
+void ScrapePanel::setBusy( bool aBusy )
+{
+   Img_Loading->setVisible( aBusy );
+   setEnabled( !aBusy );
+   emit busyChanged( aBusy );
+}
+
 void ScrapePanel::activate()
 {
    QSettings settings;
@@ -380,8 +387,7 @@ void ScrapePanel::requestScrape()
    emptyScrapeFields();
    clearScrapeMedia();
 
-   Img_Loading->setVisible( true );
-   setEnabled( false );
+   setBusy( true );
 
    // The hash is cached on the Game once computed, so a rescrape does not
    // rehash a ROM that has not changed.
@@ -426,8 +432,7 @@ void ScrapePanel::handleGameInfo( const ScrapedInfo& aInfo )
 
 void ScrapePanel::handleGameInfoFailed( const QString& aMessage, const QString& aDetails )
 {
-   Img_Loading->setVisible( false );
-   setEnabled( true );
+   setBusy( false );
 
    QMessageBox box( QMessageBox::Warning, QStringLiteral( "GameList Editor Qt" ), aMessage, QMessageBox::Ok,
                     this );
@@ -478,8 +483,7 @@ void ScrapePanel::handleMediaReady( int /*aIndex*/, const QImage& aImage )
 
 void ScrapePanel::handleMediaFinished()
 {
-   Img_Loading->setVisible( false );
-   setEnabled( true );
+   setBusy( false );
    FHasScrapedData = true;
    enableScrapeComponents( true );
    updateSaveEnabled();
@@ -491,8 +495,7 @@ void ScrapePanel::save()
       return;
 
    // Same busy look as a scrape. report() undoes it on every way out.
-   Img_Loading->setVisible( true );
-   setEnabled( false );
+   setBusy( true );
    QGuiApplication::setOverrideCursor( Qt::WaitCursor );
 
    // The video is only a link until now, so it is downloaded here, which needs one
@@ -556,8 +559,7 @@ void ScrapePanel::finishSave( const QString& aVideoPath )
 void ScrapePanel::report( const Result<>& aResult )
 {
    QGuiApplication::restoreOverrideCursor();
-   Img_Loading->setVisible( false );
-   setEnabled( true );
+   setBusy( false );
 
    if ( !aResult )
       QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aResult.error() );

@@ -354,6 +354,13 @@ void Frm_Editor::buildCentralWidget()
          FScrapePanel->activate();
    } );
 
+   // Disabling the host keeps each child's own enabled state for when the lock lifts.
+   connect( FScrapePanel, &ScrapePanel::busyChanged, this, [this]( bool aBusy ) {
+      Lbx_Games->parentWidget()->setEnabled( !aBusy );
+      Pgc_Editor->setTabEnabled( Pgc_Editor->indexOf( FEditPanel ), !aBusy );
+      menuBar()->setEnabled( !aBusy );
+   } );
+
    connect( FScrapePanel, &ScrapePanel::gamesChanged, this, [this] {
       refreshViews();
       Pgc_Editor->setCurrentWidget( FEditPanel );

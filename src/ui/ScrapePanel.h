@@ -39,8 +39,12 @@ public:
 signals:
    void gamesChanged();
 
+   // The selection and the Gamelist must stay put until the reply lands.
+   void busyChanged( bool aBusy );
+
 private:
    void buildLayout();
+   void setBusy( bool aBusy );
    void requestScrape();
    void save();
    void finishSave( const QString& aVideoPath );
