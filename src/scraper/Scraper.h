@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Resources.h"
+#include "Result.h"
 
 #include <QImage>
 #include <QNetworkAccessManager>
@@ -55,10 +56,10 @@ struct ScrapedInfo
    int maxThreads = 1;
 };
 
-// Parses one jeuInfos.php response; needs no network. Returns false (message in aError) when
-// the XML is invalid or the reply holds no <jeu> node (an API error document).
-bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes, bool aWantVideo,
-                          LangName aLanguage, ScrapedInfo& aInfo, QString* aError = nullptr );
+// Parses one jeuInfos.php response; needs no network. An Error when the XML is invalid or
+// the reply holds no <jeu> node (an API error document).
+Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
+                                        bool aWantVideo, LangName aLanguage );
 
 // Strips the developer's and the user's ids and passwords from a message. Callers must pass
 // the whole error text, not just the URL they built: QNetworkReply::errorString() embeds its

@@ -38,7 +38,7 @@ QVector<OversizedImage> oversizedImages( const Gamelist& aList, qint64 aMaxBytes
 
 // Re-encodes the picture in place, in its own format and under the same name, at
 // the largest size that fits aMaxBytes (a little under it, so "ca." holds).
-// The aspect ratio is kept and it is never enlarged. Returns the new size in
-// bytes, or -1 with aError set and the file untouched: unreadable, animated, a
-// format Qt cannot write, or one that will not get that small.
-qint64 shrinkImageFile( const QString& aPath, qint64 aMaxBytes, QString* aError = nullptr );
+// The aspect ratio is kept and it is never enlarged. The value is the new size in
+// bytes; an Error leaves the file untouched: unreadable, animated, a format Qt
+// cannot write, or one that will not get that small.
+Result<qint64> shrinkImageFile( const QString& aPath, qint64 aMaxBytes );

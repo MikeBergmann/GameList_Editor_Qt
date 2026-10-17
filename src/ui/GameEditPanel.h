@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Game.h"
+#include "Result.h"
 
 #include <QPixmap>
 #include <QVector>
@@ -102,7 +103,7 @@ private:
    void setDefaultPicture();
    void setDefaultPictureForAll();
    void deleteGame();
-   void report( bool aOk, const QString& aError );
+   void report( const Result<>& aResult );
 
    Gamelist* FGamelist = nullptr;
    QVector<int> FSelection;

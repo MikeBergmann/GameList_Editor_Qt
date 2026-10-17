@@ -213,8 +213,7 @@ void GameEditPanel::buildLayout()
    connect( Btn_RemovePicture, &QPushButton::clicked, this, [this, confirmDelete] {
       if ( !confirmDelete( QStringLiteral( "picture" ) ) )
          return;
-      QString error;
-      report( FGamelist && FGamelist->removeImage( FSelection.value( 0, -1 ), &error ), error );
+      report( FGamelist ? FGamelist->removeImage( FSelection.value( 0, -1 ) ) : Result<>() );
    } );
 
    Btn_RemoveVideo = new QPushButton( QStringLiteral( "Delete Video" ), this );
@@ -223,8 +222,7 @@ void GameEditPanel::buildLayout()
       if ( !confirmDelete( QStringLiteral( "video" ) ) )
          return;
       FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
-      QString error;
-      report( FGamelist && FGamelist->removeVideo( FSelection.value( 0, -1 ), &error ), error );
+      report( FGamelist ? FGamelist->removeVideo( FSelection.value( 0, -1 ) ) : Result<>() );
    } );
 
    Btn_MoreInfos = new QPushButton( QStringLiteral( "More infos..." ), this );
@@ -506,15 +504,14 @@ bool GameEditPanel::save()
 
    FGamelist->setFields( FSelection, values, which );
 
-   QString error;
-   if ( !FGamelist->save( &error ) ) {
+   if ( const Result<> saved = FGamelist->save(); !saved ) {
       // ponytail: the undo writes stored values back, so it can leave an empty or
       // "false" element where the <game> had none. Harmless; a true undo would
       // need Gamelist to snapshot the DOM nodes.
       for ( qsizetype n = 0; n < FSelection.size(); ++n )
          FGamelist->setFields( { FSelection.at( n ) }, before.at( n ), which );
 
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), saved.error() );
       return false;
    }
 
@@ -553,25 +550,27 @@ void GameEditPanel::deleteGame()
       return;
 
    FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
-   QString error;
-   if ( !FGamelist->removeGame( index, &error ) ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
+   const Result<QStringList> removed = FGamelist->removeGame( index );
+   if ( !removed ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), removed.error() );
       syncVideo();
       return;
    }
 
-   if ( !error.isEmpty() )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), error );
+   if ( !removed.value().isEmpty() )
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ),
+                            QStringLiteral( "Removed from the gamelist, but could not delete:\n%1" )
+                               .arg( removed.value().join( QLatin1Char( '\n' ) ) ) );
 
    // The edits were for a game that no longer exists, so they must not prompt.
    setSelection( {} );
    emit gameDeleted( index );
 }
 
-void GameEditPanel::report( bool aOk, const QString& aError )
+void GameEditPanel::report( const Result<>& aResult )
 {
-   if ( !aOk )
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aError );
+   if ( !aResult )
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aResult.error() );
 
    reload();
 }
@@ -584,8 +583,7 @@ void GameEditPanel::chooseImage()
    if ( file.isEmpty() )
       return;
 
-   QString error;
-   report( FGamelist->setImage( FSelection.value( 0, -1 ), file, &error ), error );
+   report( FGamelist->setImage( FSelection.value( 0, -1 ), file ) );
 }
 
 void GameEditPanel::chooseVideo()
@@ -597,29 +595,25 @@ void GameEditPanel::chooseVideo()
       return;
 
    FPlayer->setSource( QUrl() );  // the new file replaces the one that is open
-   QString error;
-   report( FGamelist->setVideo( FSelection.value( 0, -1 ), file, &error ), error );
+   report( FGamelist->setVideo( FSelection.value( 0, -1 ), file ) );
 }
 
 void GameEditPanel::setDefaultPicture()
 {
-   QString error;
-   report( FGamelist->setImage( FSelection.value( 0, -1 ), Cst_DefaultPicture, &error ), error );
+   report( FGamelist->setImage( FSelection.value( 0, -1 ), Cst_DefaultPicture ) );
 }
 
 void GameEditPanel::setDefaultPictureForAll()
 {
-   QString error;
-   const int changed = FGamelist->setDefaultImageForMissing( Cst_DefaultPicture, &error );
-
-   // A failure partway through still saves the games done before it, so the
-   // count is shown whenever there is one, not only on full success.
-   if ( changed > 0 || error.isEmpty() ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral(
-                                   "%1 game(s) had no picture and now have the default one." )
-                                   .arg( changed ) );
+   const Result<int> changed = FGamelist->setDefaultImageForMissing( Cst_DefaultPicture );
+   if ( !changed ) {
+      report( Error{ changed.error() } );
+      return;
    }
 
-   report( error.isEmpty(), error );
+   QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
+                             QStringLiteral(
+                                "%1 game(s) had no picture and now have the default one." )
+                                .arg( changed.value() ) );
+   report( Result<>() );
 }

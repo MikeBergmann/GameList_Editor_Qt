@@ -58,13 +58,12 @@ const QByteArray kResponse = QByteArrayLiteral( R"(<?xml version="1.0" encoding=
 
 TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
 {
-   ScrapedInfo info;
-   QString error;
    const QSet<QString> mediaTypes = { QStringLiteral( "box-2D" ), QStringLiteral( "ss" ) };
 
-   ASSERT_TRUE(
-      parseScrapeResponse( kResponse, mediaTypes, /*aWantVideo=*/true, lnEnglish, info, &error ) )
-      << error.toStdString();
+   const Result<ScrapedInfo> parsed =
+      parseScrapeResponse( kResponse, mediaTypes, /*aWantVideo=*/true, lnEnglish );
+   ASSERT_TRUE( parsed ) << parsed.error().toStdString();
+   const ScrapedInfo& info = parsed.value();
 
    // Name is keyed by region, not language: English has no "en" region entry,
    // so this falls through to the "eu" region.
@@ -90,54 +89,51 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
 
 TEST( ParseScrapeResponse, IgnoresVideoWhenNotRequested )
 {
-   ScrapedInfo info;
-   ASSERT_TRUE( parseScrapeResponse( kResponse, {}, /*aWantVideo=*/false, lnEnglish, info ) );
+   const Result<ScrapedInfo> parsed =
+      parseScrapeResponse( kResponse, {}, /*aWantVideo=*/false, lnEnglish );
+   ASSERT_TRUE( parsed );
 
-   EXPECT_TRUE( info.videoLink.isEmpty() );
-   EXPECT_TRUE( info.pictures.isEmpty() );
+   EXPECT_TRUE( parsed.value().videoLink.isEmpty() );
+   EXPECT_TRUE( parsed.value().pictures.isEmpty() );
 }
 
 TEST( ParseScrapeResponse, GermanPicksItsOwnSynopsisButSpanishGenreFallsToEnglish )
 {
-   ScrapedInfo german;
-   ASSERT_TRUE( parseScrapeResponse( kResponse, {}, false, lnGerman, german ) );
-   EXPECT_EQ( german.description, QStringLiteral( "Sonic und Tails." ) );
+   const Result<ScrapedInfo> german = parseScrapeResponse( kResponse, {}, false, lnGerman );
+   ASSERT_TRUE( german );
+   EXPECT_EQ( german.value().description, QStringLiteral( "Sonic und Tails." ) );
 
-   ScrapedInfo spanish;
-   ASSERT_TRUE( parseScrapeResponse( kResponse, {}, false, lnSpanish, spanish ) );
+   const Result<ScrapedInfo> spanish = parseScrapeResponse( kResponse, {}, false, lnSpanish );
+   ASSERT_TRUE( spanish );
    // Neither genre id has a Spanish entry, so both fall back to English.
-   EXPECT_EQ( spanish.genre, QStringLiteral( "Platform - Action" ) );
+   EXPECT_EQ( spanish.value().genre, QStringLiteral( "Platform - Action" ) );
 }
 
 TEST( ParseScrapeResponse, FailsWithoutAGameNode )
 {
-   ScrapedInfo info;
-   QString error;
    const QByteArray errorDoc = QByteArrayLiteral( "<Data><erreur>Dev login error</erreur></Data>" );
 
-   EXPECT_FALSE( parseScrapeResponse( errorDoc, {}, false, lnEnglish, info, &error ) );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<ScrapedInfo> parsed = parseScrapeResponse( errorDoc, {}, false, lnEnglish );
+   EXPECT_FALSE( parsed );
+   EXPECT_FALSE( parsed.error().isEmpty() );
 }
 
 TEST( ParseScrapeResponse, IgnoresATextNoteAfterTheDocument )
 {
    // Seen from the live API: the name fallback appends a French note after </Data>.
-   ScrapedInfo info;
-   QString error;
    const QByteArray reply = kResponse + "\nCRC non trouv\xC3\xA9 : Champ systemeid obligatoire  \n";
 
-   EXPECT_TRUE( parseScrapeResponse( reply, {}, false, lnEnglish, info, &error ) ) << qPrintable( error );
-   EXPECT_EQ( info.name, QStringLiteral( "Sonic Ball (Europe)" ) );
+   const Result<ScrapedInfo> parsed = parseScrapeResponse( reply, {}, false, lnEnglish );
+   ASSERT_TRUE( parsed ) << parsed.error().toStdString();
+   EXPECT_EQ( parsed.value().name, QStringLiteral( "Sonic Ball (Europe)" ) );
 }
 
 TEST( ParseScrapeResponse, FailsOnMalformedXml )
 {
-   ScrapedInfo info;
-   QString error;
-
-   EXPECT_FALSE(
-      parseScrapeResponse( QByteArrayLiteral( "not xml" ), {}, false, lnEnglish, info, &error ) );
-   EXPECT_FALSE( error.isEmpty() );
+   const Result<ScrapedInfo> parsed =
+      parseScrapeResponse( QByteArrayLiteral( "not xml" ), {}, false, lnEnglish );
+   EXPECT_FALSE( parsed );
+   EXPECT_FALSE( parsed.error().isEmpty() );
 }
 
 // QNetworkReply::errorString() embeds its own copy of the request URL

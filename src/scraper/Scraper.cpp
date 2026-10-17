@@ -70,8 +70,8 @@ QStringList descriptionFallback( const QString& aLangStr )
 
 }  // namespace
 
-bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes, bool aWantVideo,
-                          LangName aLanguage, ScrapedInfo& aInfo, QString* aError )
+Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
+                                        bool aWantVideo, LangName aLanguage )
 {
    QDomDocument doc;
    QString parseError;
@@ -80,27 +80,22 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    // strict parser rejects as extra content. The document itself is complete.
    const qsizetype end = aXml.lastIndexOf( "</Data>" );
    const QByteArray xml = end < 0 ? aXml : aXml.left( end + 7 );
-   if ( !doc.setContent( xml, &parseError ) ) {
-      if ( aError )
-         *aError = parseError;
-      return false;
-   }
+   if ( !doc.setContent( xml, &parseError ) )
+      return Error{ parseError };
 
    const QDomElement root = doc.documentElement();
    const QDomElement game = root.firstChildElement( QLatin1String( Cst_GameNode ) );
-   if ( game.isNull() ) {
-      // An API error document has no <jeu>.
-      if ( aError )
-         *aError = QStringLiteral( "Game not found" );
-      return false;
-   }
+   // An API error document has no <jeu>.
+   if ( game.isNull() )
+      return Error{ QStringLiteral( "Game not found" ) };
 
+   ScrapedInfo info;
    const QString langStr = QString( QLatin1String( Cst_LangNameStr[aLanguage] ) ).left( 2 );
 
    // Name: keyed by region, not by language - "ss" is screenscraper's own
    // generic entry and is tried last.
    const QDomElement names = game.firstChildElement( QLatin1String( Cst_NamesNode ) );
-   aInfo.name =
+   info.name =
       pickLocalized( childDict( names, Cst_AttRegion ),
                      { langStr, QLatin1String( Cst_CountryName[cnEu] ),
                        QLatin1String( Cst_CountryName[cnWor] ), QStringLiteral( "ss" ) } );
@@ -112,16 +107,16 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
          region = region.nextSiblingElement() )
       regionNames << QLatin1String(
          Cst_CountryNameFull[countryFromShortName( region.text() )][aLanguage] );
-   aInfo.region = regionNames.join( QStringLiteral( " - " ) );
+   info.region = regionNames.join( QStringLiteral( " - " ) );
 
    // Description and genre share one fallback chain: aLanguage, then en/de/es/pt.
    const QStringList textFallback = descriptionFallback( langStr );
 
    const QDomElement synopsis = game.firstChildElement( QLatin1String( Cst_SynopNode ) );
-   aInfo.description = pickLocalized( childDict( synopsis, Cst_AttLang ), textFallback );
+   info.description = pickLocalized( childDict( synopsis, Cst_AttLang ), textFallback );
 
    const QDomElement dates = game.firstChildElement( QLatin1String( Cst_DateNode ) );
-   aInfo.releaseDate = formatScrapedDate( pickLocalized(
+   info.releaseDate = formatScrapedDate( pickLocalized(
       childDict( dates, Cst_AttRegion ),
       { langStr, QLatin1String( Cst_CountryName[cnEu] ), QLatin1String( Cst_CountryName[cnWor] ),
         QLatin1String( Cst_CountryName[cnUs] ), QLatin1String( Cst_CountryName[cnJp] ) } ) );
@@ -141,12 +136,12 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    QStringList genreNames;
    for ( const QString& id : std::as_const( genreIds ) )
       genreNames << pickLocalized( genresById.value( id ), textFallback );
-   aInfo.genre = genreNames.join( QStringLiteral( " - " ) );
+   info.genre = genreNames.join( QStringLiteral( " - " ) );
 
-   aInfo.publisher = game.firstChildElement( QLatin1String( Cst_EditNode ) ).text();
-   aInfo.developer = game.firstChildElement( QLatin1String( Cst_DevNode ) ).text();
-   aInfo.players = game.firstChildElement( QLatin1String( Cst_PlayersNode ) ).text();
-   aInfo.rating = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
+   info.publisher = game.firstChildElement( QLatin1String( Cst_EditNode ) ).text();
+   info.developer = game.firstChildElement( QLatin1String( Cst_DevNode ) ).text();
+   info.players = game.firstChildElement( QLatin1String( Cst_PlayersNode ) ).text();
+   info.rating = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
 
    // Media: only the requested types; video is handled separately from the pictures.
    const QDomElement medias = game.firstChildElement( QLatin1String( Cst_MediaNode ) );
@@ -154,9 +149,9 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
          media = media.nextSiblingElement() ) {
       const QString type = media.attribute( QLatin1String( Cst_AttType ) );
       if ( aWantVideo && type == QLatin1String( Cst_MediaVideo ) ) {
-         aInfo.videoLink = media.text();
+         info.videoLink = media.text();
       } else if ( aMediaTypes.contains( type ) ) {
-         aInfo.pictures.append(
+         info.pictures.append(
             { media.attribute( QLatin1String( Cst_AttFormat ) ), media.text() } );
       }
    }
@@ -165,9 +160,9 @@ bool parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTyp
    const QString threads = user.firstChildElement( QLatin1String( Cst_ThreadNode ) ).text();
    bool threadsOk = false;
    const int maxThreads = threads.toInt( &threadsOk );
-   aInfo.maxThreads = ( threadsOk && maxThreads > 0 ) ? maxThreads : 1;
+   info.maxThreads = ( threadsOk && maxThreads > 0 ) ? maxThreads : 1;
 
-   return true;
+   return info;
 }
 
 QString sanitizeUrl( const QString& aUrl )
@@ -294,14 +289,13 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                   return;
                }
 
-               ScrapedInfo info;
-               QString error;
-               if ( !parseScrapeResponse( data, aMediaTypes, aWantVideo, aLanguage, info,
-                                          &error ) ) {
-                  emit gameInfoFailed( error, responseDetails( query, data ) );
+               const Result<ScrapedInfo> info =
+                  parseScrapeResponse( data, aMediaTypes, aWantVideo, aLanguage );
+               if ( !info ) {
+                  emit gameInfoFailed( info.error(), responseDetails( query, data ) );
                   return;
                }
-               emit gameInfoReady( info );
+               emit gameInfoReady( info.value() );
             } );
 }
 
