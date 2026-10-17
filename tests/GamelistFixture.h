@@ -100,6 +100,15 @@ struct Fixture
 };
 
 // What a second reader sees after a save, which is the only thing that matters.
+// The next save() fails on every platform: a file cannot be renamed over a directory.
+// (A read-only gamelist would not do: on Linux the rename succeeds anyway.)
+inline void breakSave( const Fixture& aFixture, Gamelist& aList )
+{
+   ASSERT_TRUE( QFile::remove( aFixture.snes.gamelistPath ) );
+   ASSERT_TRUE( QDir().mkpath( aFixture.snes.gamelistPath ) );
+   ASSERT_FALSE( aList.save() );
+}
+
 inline Gamelist reload( const Fixture& aFixture )
 {
    Gamelist list;

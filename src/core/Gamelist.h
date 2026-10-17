@@ -139,21 +139,27 @@ private:
    void setChildText( QDomElement aNode, const char* aName, const QString& aText );
 
    // What one media write changed, so a failed save can put it all back. target and
-   // backup are empty when no file was touched (removals, a video copied onto itself).
+   // backup are empty when no file was touched (removals, a video copied onto itself,
+   // links). movedFrom is set for a rename: target is where the file went, and undo
+   // moves it back instead of deleting it.
    struct MediaWrite
    {
       int index = -1;
       bool isImage = true;
-      QString target;  // the file written
-      QString backup;  // what was there before, moved aside; empty if nothing was
-      Game before;     // the game as it was, link text included
+      QString target;     // the file written, or the new name of a renamed one
+      QString backup;     // what was there before, moved aside; empty if nothing was
+      QString movedFrom;  // the old name of a renamed file; empty unless a rename
+      Game before;        // the game as it was, link text included
    };
 
    // Writes the picture and edits DOM and game, without saving. On an Error nothing
    // has changed.
    Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
-   // Saves; on success drops the backups, on failure undoes aWrites (files, DOM, games).
+   // Saves; on success drops the backups, on failure rolls aWrites back.
    Result<> commitMedia( const QVector<MediaWrite>& aWrites );
+   // Undoes aWrites newest first (files, DOM, games): a game written twice in one
+   // batch holds its first snapshot last, so the order matters.
+   void rollbackMedia( const QVector<MediaWrite>& aWrites );
    void undoMedia( const MediaWrite& aWrite );
    void restoreLink( int aIndex, bool aIsImage, const Game& aBefore );
 

@@ -686,15 +686,6 @@ TEST( Gamelist, AddGamesRefusesAFileOutsideTheSystemAndLeavesTheListAlone )
    EXPECT_EQ( reload( fixture ).count(), 4 );
 }
 
-// The next save() fails on every platform: a file cannot be renamed over a directory.
-// (A read-only gamelist would not do: on Linux the rename succeeds anyway.)
-void breakSave( const Fixture& aFixture, Gamelist& aList )
-{
-   ASSERT_TRUE( QFile::remove( aFixture.snes.gamelistPath ) );
-   ASSERT_TRUE( QDir().mkpath( aFixture.snes.gamelistPath ) );
-   ASSERT_FALSE( aList.save() );
-}
-
 QByteArray readAll( const QString& aPath )
 {
    QFile file( aPath );

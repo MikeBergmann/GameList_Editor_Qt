@@ -434,18 +434,27 @@ void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
 void Gamelist::undoMedia( const MediaWrite& aWrite )
 {
    if ( !aWrite.target.isEmpty() ) {
-      QFile::remove( aWrite.target );
-      if ( !aWrite.backup.isEmpty() )
-         QFile::rename( aWrite.backup, aWrite.target );
+      if ( !aWrite.movedFrom.isEmpty() ) {
+         QFile::rename( aWrite.target, aWrite.movedFrom );
+      } else {
+         QFile::remove( aWrite.target );
+         if ( !aWrite.backup.isEmpty() )
+            QFile::rename( aWrite.backup, aWrite.target );
+      }
    }
    restoreLink( aWrite.index, aWrite.isImage, aWrite.before );
+}
+
+void Gamelist::rollbackMedia( const QVector<MediaWrite>& aWrites )
+{
+   for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
+      undoMedia( *it );
 }
 
 Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 {
    if ( const Result<> saved = save(); !saved ) {
-      for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
-         undoMedia( *it );
+      rollbackMedia( aWrites );
       return saved;
    }
 
@@ -497,8 +506,7 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
       const Result<MediaWrite> write = applyImage( index, picture );
       if ( !write ) {
-         for ( auto it = writes.crbegin(); it != writes.crend(); ++it )
-            undoMedia( *it );
+         rollbackMedia( writes );
          return Error{ write.error() };
       }
       writes.append( write.value() );
@@ -515,70 +523,63 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
 Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
-   const QVector<Entry> before = FEntries;
    const QDir systemDir( FSystemDir );
 
-   int linked = 0;
+   // No file is touched, so the journal holds only the games as they were.
+   QVector<MediaWrite> writes;
    for ( const MediaLink& link : aLinks ) {
       if ( link.index < 0 || link.index >= FEntries.size() )
          continue;
 
       Game& game = FEntries[link.index].game;
+
+      MediaWrite write;
+      write.index = link.index;
+      write.isImage = link.isImage;
+      write.before = game;
+      writes.append( write );
+
       const QString text = QStringLiteral( "./" ) + systemDir.relativeFilePath( link.path );
       setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
       ( link.isImage ? game.imagePath : game.videoPath ) = text;
       ( link.isImage ? game.physicalImagePath : game.physicalVideoPath ) = link.path;
       ( link.isImage ? game.missingImage : game.missingVideo ) = false;
-      ++linked;
    }
 
-   if ( linked == 0 )
+   if ( writes.isEmpty() )
       return 0;
 
-   if ( const Result<> saved = save(); !saved ) {
-      for ( const MediaLink& link : aLinks ) {
-         if ( link.index < 0 || link.index >= FEntries.size() )
-            continue;
-         const Game& old = before.at( link.index ).game;
-         setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink,
-                       link.isImage ? old.imagePath : old.videoPath );
-      }
-      FEntries = before;
-      return Error{ saved.error() };
-   }
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return Error{ committed.error() };
 
-   return linked;
+   return static_cast<int>( writes.size() );
 }
 
 Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 {
-   const QVector<Entry> before = FEntries;
-
-   QVector<const MediaRename*> done;
-   auto undo = [&]() {
-      for ( auto it = done.crbegin(); it != done.crend(); ++it )
-         QFile::rename( ( *it )->newPath, ( *it )->path );
-      for ( const MediaRename* rename : done ) {
-         const Game& old = before.at( rename->index ).game;
-         setChildText( FEntries[rename->index].node, rename->isImage ? Cst_ImageLink : Cst_VideoLink,
-                       rename->isImage ? old.imagePath : old.videoPath );
-      }
-      FEntries = before;
-   };
+   QVector<MediaWrite> writes;
 
    for ( const MediaRename& rename : aRenames ) {
       if ( rename.index < 0 || rename.index >= FEntries.size() || !rename.problem.isEmpty() )
          continue;
 
       if ( !QFile::rename( rename.path, rename.newPath ) ) {
-         undo();
+         rollbackMedia( writes );
          return Error{
             QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) };
       }
-      done << &rename;
+
+      Game& game = FEntries[rename.index].game;
+
+      MediaWrite write;
+      write.index = rename.index;
+      write.isImage = rename.isImage;
+      write.target = rename.newPath;
+      write.movedFrom = rename.path;
+      write.before = game;
+      writes.append( write );
 
       // Only the file name changes: the folder part of the link stays as written.
-      Game& game = FEntries[rename.index].game;
       const QString oldLink = rename.isImage ? game.imagePath : game.videoPath;
       const QString text = folderOf( oldLink ) + QFileInfo( rename.newPath ).fileName();
       setChildText( FEntries[rename.index].node, rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
@@ -586,15 +587,13 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
       ( rename.isImage ? game.physicalImagePath : game.physicalVideoPath ) = rename.newPath;
    }
 
-   if ( done.isEmpty() )
+   if ( writes.isEmpty() )
       return 0;
 
-   if ( const Result<> saved = save(); !saved ) {
-      undo();
-      return Error{ saved.error() };
-   }
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return Error{ committed.error() };
 
-   return static_cast<int>( done.size() );
+   return static_cast<int>( writes.size() );
 }
 
 Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
