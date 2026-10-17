@@ -99,7 +99,7 @@ QDate releaseDateValue( const QString& aDisplayDate )
 
 QString Gamelist::domText( int aIndex, const char* aName ) const
 {
-   return childText( FNodes.value( aIndex ), aName );
+   return childText( FEntries.value( aIndex ).node, aName );
 }
 
 Result<> Gamelist::load( const SystemEntry& aSystem )
@@ -107,8 +107,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    FSystem = aSystem;
    FSystemDir.clear();
    FDocument = QDomDocument();
-   FGames.clear();
-   FNodes.clear();
+   FEntries.clear();
    FImageFolder = QLatin1String( Cst_DefaultImageFolder );
    FVideoFolder = QLatin1String( Cst_DefaultVideoFolder );
    FNameCounts.clear();
@@ -151,11 +150,10 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
          videoFolderFound = true;
       }
 
-      FGames.append( game );
-      FNodes.append( node );
+      FEntries.append( { game, node } );
    }
 
-   if ( FGames.isEmpty() )
+   if ( FEntries.isEmpty() )
       return Error{ QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) };
 
    countDuplicates();
@@ -201,8 +199,8 @@ QStringList Gamelist::unlistedRoms() const
    };
 
    QSet<QString> listed;
-   for ( const Game& game : FGames )
-      listed.insert( key( game.romPath ) );
+   for ( const Entry& entry : FEntries )
+      listed.insert( key( entry.game.romPath ) );
 
    // Media is not a ROM: skip the folders the gamelist keeps its art in (when
    // they are subfolders at all) and the usual non-ROM extensions.
@@ -248,17 +246,16 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 {
    const QDir systemDir( FSystemDir );
    QSet<QString> seen;
-   for ( const Game& game : FGames )
-      seen.insert( QDir::cleanPath( systemDir.filePath( game.romPath ) ).toLower() );
+   for ( const Entry& entry : FEntries )
+      seen.insert( QDir::cleanPath( systemDir.filePath( entry.game.romPath ) ).toLower() );
 
-   const int firstNew = static_cast<int>( FGames.size() );
+   const int firstNew = static_cast<int>( FEntries.size() );
    QVector<QDomElement> added;
 
    const auto rollback = [&] {
       for ( QDomElement node : std::as_const( added ) )
          FDocument.documentElement().removeChild( node );
-      FGames.resize( firstNew );
-      FNodes.resize( firstNew );
+      FEntries.resize( firstNew );
    };
 
    for ( const QString& path : aRomPaths ) {
@@ -282,8 +279,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
       setChildText( node, Cst_Name, info.completeBaseName() );
 
       added << node;
-      FGames.append( gameFromNode( node ) );
-      FNodes.append( node );
+      FEntries.append( { gameFromNode( node ), node } );
    }
 
    if ( added.isEmpty() )
@@ -303,9 +299,9 @@ void Gamelist::countDuplicates()
    FNameCounts.clear();
    FRomCounts.clear();
 
-   for ( const Game& game : FGames ) {
-      ++FNameCounts[game.name];
-      ++FRomCounts[game.romName()];
+   for ( const Entry& entry : FEntries ) {
+      ++FNameCounts[entry.game.name];
+      ++FRomCounts[entry.game.romName()];
    }
 }
 
@@ -362,11 +358,11 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
       return;
 
    for ( int index : aTargets ) {
-      if ( index < 0 || index >= FGames.size() )
+      if ( index < 0 || index >= FEntries.size() )
          continue;
 
-      Game& game = FGames[index];
-      QDomElement node = FNodes[index];
+      Game& game = FEntries[index].game;
+      QDomElement node = FEntries[index].node;
 
       const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
                               QString& aStored ) {
@@ -411,7 +407,7 @@ void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValue
 
 Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPicture )
 {
-   Game& game = FGames[aIndex];
+   Game& game = FEntries[aIndex].game;
    const QString link = FImageFolder + game.romNameWoExt() + QLatin1String( Cst_ImageSuffixPng );
    const QString target = writeTarget( FSystemDir, link );
 
@@ -436,7 +432,7 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
       return Error{ backup.error() };
    write.backup = backup.value();
 
-   setChildText( FNodes[aIndex], Cst_ImageLink, link );
+   setChildText( FEntries[aIndex].node, Cst_ImageLink, link );
    game.imagePath = link;
    game.physicalImagePath = target;
    game.missingImage = false;
@@ -448,8 +444,8 @@ void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
 {
    // ponytail: a game that had no <image>/<video> element ends up with an empty one;
    // EmulationStation reads that as unset. Upgrade: remember the node and remove it.
-   FGames[aIndex] = aBefore;
-   setChildText( FNodes[aIndex], aIsImage ? Cst_ImageLink : Cst_VideoLink,
+   FEntries[aIndex].game = aBefore;
+   setChildText( FEntries[aIndex].node, aIsImage ? Cst_ImageLink : Cst_VideoLink,
                  aIsImage ? aBefore.imagePath : aBefore.videoPath );
 }
 
@@ -480,7 +476,7 @@ Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 
 Result<> Gamelist::setImage( int aIndex, const QString& aSourcePath )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
    QImage picture;
@@ -494,7 +490,7 @@ Result<> Gamelist::setImage( int aIndex, const QString& aSourcePath )
 
 Result<> Gamelist::setImage( int aIndex, const QImage& aPicture )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
    const Result<MediaWrite> write = applyImage( aIndex, aPicture );
@@ -513,8 +509,8 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
    // All or nothing: half a batch of pictures with no way back is worse than none.
    QVector<MediaWrite> writes;
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      if ( !FGames.at( index ).missingImage )
+   for ( int index = 0; index < FEntries.size(); ++index ) {
+      if ( !FEntries.at( index ).game.missingImage )
          continue;
 
       const Result<MediaWrite> write = applyImage( index, picture );
@@ -537,17 +533,17 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
 Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
-   const QVector<Game> before = FGames;
+   const QVector<Entry> before = FEntries;
    const QDir systemDir( FSystemDir );
 
    int linked = 0;
    for ( const MediaLink& link : aLinks ) {
-      if ( link.index < 0 || link.index >= FGames.size() )
+      if ( link.index < 0 || link.index >= FEntries.size() )
          continue;
 
-      Game& game = FGames[link.index];
+      Game& game = FEntries[link.index].game;
       const QString text = QStringLiteral( "./" ) + systemDir.relativeFilePath( link.path );
-      setChildText( FNodes[link.index], link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
+      setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
       ( link.isImage ? game.imagePath : game.videoPath ) = text;
       ( link.isImage ? game.physicalImagePath : game.physicalVideoPath ) = link.path;
       ( link.isImage ? game.missingImage : game.missingVideo ) = false;
@@ -559,13 +555,13 @@ Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 
    if ( const Result<> saved = save(); !saved ) {
       for ( const MediaLink& link : aLinks ) {
-         if ( link.index < 0 || link.index >= FGames.size() )
+         if ( link.index < 0 || link.index >= FEntries.size() )
             continue;
-         const Game& old = before.at( link.index );
-         setChildText( FNodes[link.index], link.isImage ? Cst_ImageLink : Cst_VideoLink,
+         const Game& old = before.at( link.index ).game;
+         setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink,
                        link.isImage ? old.imagePath : old.videoPath );
       }
-      FGames = before;
+      FEntries = before;
       return Error{ saved.error() };
    }
 
@@ -574,22 +570,22 @@ Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 
 Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 {
-   const QVector<Game> before = FGames;
+   const QVector<Entry> before = FEntries;
 
    QVector<const MediaRename*> done;
    auto undo = [&]() {
       for ( auto it = done.crbegin(); it != done.crend(); ++it )
          QFile::rename( ( *it )->newPath, ( *it )->path );
       for ( const MediaRename* rename : done ) {
-         const Game& old = before.at( rename->index );
-         setChildText( FNodes[rename->index], rename->isImage ? Cst_ImageLink : Cst_VideoLink,
+         const Game& old = before.at( rename->index ).game;
+         setChildText( FEntries[rename->index].node, rename->isImage ? Cst_ImageLink : Cst_VideoLink,
                        rename->isImage ? old.imagePath : old.videoPath );
       }
-      FGames = before;
+      FEntries = before;
    };
 
    for ( const MediaRename& rename : aRenames ) {
-      if ( rename.index < 0 || rename.index >= FGames.size() || !rename.problem.isEmpty() )
+      if ( rename.index < 0 || rename.index >= FEntries.size() || !rename.problem.isEmpty() )
          continue;
 
       if ( !QFile::rename( rename.path, rename.newPath ) ) {
@@ -600,10 +596,10 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
       done << &rename;
 
       // Only the file name changes: the folder part of the link stays as written.
-      Game& game = FGames[rename.index];
+      Game& game = FEntries[rename.index].game;
       const QString oldLink = rename.isImage ? game.imagePath : game.videoPath;
       const QString text = folderOf( oldLink ) + QFileInfo( rename.newPath ).fileName();
-      setChildText( FNodes[rename.index], rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
+      setChildText( FEntries[rename.index].node, rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
       ( rename.isImage ? game.imagePath : game.videoPath ) = text;
       ( rename.isImage ? game.physicalImagePath : game.physicalVideoPath ) = rename.newPath;
    }
@@ -621,10 +617,10 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 
 Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
-   Game& game = FGames[aIndex];
+   Game& game = FEntries[aIndex].game;
    const QString link = FVideoFolder + game.romNameWoExt() + QLatin1String( Cst_VideoSuffixMp4 );
    const QString target = writeTarget( FSystemDir, link );
 
@@ -658,7 +654,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
       write.target = target;
    }
 
-   setChildText( FNodes[aIndex], Cst_VideoLink, link );
+   setChildText( FEntries[aIndex].node, Cst_VideoLink, link );
    game.videoPath = link;
    game.physicalVideoPath = target;
    game.missingVideo = false;
@@ -671,10 +667,10 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
    if ( aPhysicalPath.isEmpty() )
       return false;
 
-   for ( int index = 0; index < FGames.size(); ++index ) {
+   for ( int index = 0; index < FEntries.size(); ++index ) {
       if ( index == aIndex )
          continue;
-      const Game& other = FGames.at( index );
+      const Game& other = FEntries.at( index ).game;
       if ( ( aIsImage ? other.physicalImagePath : other.physicalVideoPath ) == aPhysicalPath )
          return true;
    }
@@ -684,14 +680,14 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
 
 Result<> Gamelist::removeImage( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
-   Game& game = FGames[aIndex];
+   Game& game = FEntries[aIndex].game;
    const QString file = game.physicalImagePath;
    const Game before = game;
 
-   setChildText( FNodes[aIndex], Cst_ImageLink, QString() );
+   setChildText( FEntries[aIndex].node, Cst_ImageLink, QString() );
    game.imagePath.clear();
    game.physicalImagePath.clear();
    game.missingImage = true;
@@ -711,14 +707,14 @@ Result<> Gamelist::removeImage( int aIndex )
 
 Result<> Gamelist::removeVideo( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
-   Game& game = FGames[aIndex];
+   Game& game = FEntries[aIndex].game;
    const QString file = game.physicalVideoPath;
    const Game before = game;
 
-   setChildText( FNodes[aIndex], Cst_VideoLink, QString() );
+   setChildText( FEntries[aIndex].node, Cst_VideoLink, QString() );
    game.videoPath.clear();
    game.physicalVideoPath.clear();
    game.missingVideo = true;
@@ -736,10 +732,10 @@ Result<> Gamelist::removeVideo( int aIndex )
 
 Result<QStringList> Gamelist::removeGame( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return Error{ QStringLiteral( "No game selected." ) };
 
-   QDomElement node = FNodes.at( aIndex );
+   QDomElement node = FEntries.at( aIndex ).node;
    QDomNode parent = node.parentNode();
    const QDomNode next = node.nextSibling();
    parent.removeChild( node );
@@ -749,16 +745,15 @@ Result<QStringList> Gamelist::removeGame( int aIndex )
       return Error{ saved.error() };
    }
 
-   const Game game = FGames.at( aIndex );
-   FGames.remove( aIndex );
-   FNodes.remove( aIndex );
+   const Game game = FEntries.at( aIndex ).game;
+   FEntries.remove( aIndex );
    countDuplicates();
 
    // Only once the gamelist has stopped listing it, and not what another entry
    // (a duplicate, a shared picture) still points at.
    const auto shared = [this]( const QString& aPath, QString Game::*aMember ) {
-      for ( const Game& other : std::as_const( FGames ) ) {
-         if ( other.*aMember == aPath )
+      for ( const Entry& other : std::as_const( FEntries ) ) {
+         if ( other.game.*aMember == aPath )
             return true;
       }
       return false;
@@ -783,7 +778,7 @@ Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
 {
    QSet<int> doomed;
    for ( int index : aIndexes ) {
-      if ( index >= 0 && index < FGames.size() )
+      if ( index >= 0 && index < FEntries.size() )
          doomed.insert( index );
    }
    if ( doomed.isEmpty() )
@@ -796,11 +791,11 @@ Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
       QDomNode next;
    };
    QVector<Removed> removed;
-   for ( int index = 0; index < FGames.size(); ++index ) {
+   for ( int index = 0; index < FEntries.size(); ++index ) {
       if ( !doomed.contains( index ) )
          continue;
 
-      const QDomElement node = FNodes.at( index );
+      const QDomElement node = FEntries.at( index ).node;
       removed.append( { node, node.parentNode(), node.nextSibling() } );
       removed.last().parent.removeChild( node );
    }
@@ -814,17 +809,12 @@ Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
       return saved;
    }
 
-   QVector<Game> games;
-   QVector<QDomElement> nodes;
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      if ( doomed.contains( index ) )
-         continue;
-
-      games.append( FGames.at( index ) );
-      nodes.append( FNodes.at( index ) );
+   QVector<Entry> kept;
+   for ( int index = 0; index < FEntries.size(); ++index ) {
+      if ( !doomed.contains( index ) )
+         kept.append( FEntries.at( index ) );
    }
-   FGames = games;
-   FNodes = nodes;
+   FEntries = kept;
    countDuplicates();
    return {};
 }
@@ -832,8 +822,8 @@ Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
 QVector<int> Gamelist::orphanIndexes() const
 {
    QVector<int> found;
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      if ( FGames.at( index ).isOrphan )
+   for ( int index = 0; index < FEntries.size(); ++index ) {
+      if ( FEntries.at( index ).game.isOrphan )
          found.append( index );
    }
    return found;
@@ -845,8 +835,8 @@ QVector<int> Gamelist::duplicateIndexes() const
    // to one file match and two files differing only in case do not.
    QSet<QString> seen;
    QVector<int> found;
-   for ( int index = 0; index < FGames.size(); ++index ) {
-      const QString& path = FGames.at( index ).physicalRomPath;
+   for ( int index = 0; index < FEntries.size(); ++index ) {
+      const QString& path = FEntries.at( index ).game.physicalRomPath;
       if ( path.isEmpty() )
          continue;
       if ( seen.contains( path ) )
@@ -859,10 +849,10 @@ QVector<int> Gamelist::duplicateIndexes() const
 
 void Gamelist::ensureHashes( int aIndex )
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return;
 
-   Game& game = FGames[aIndex];
+   Game& game = FEntries[aIndex].game;
 
    // An orphan (unreadable ROM) hashes to the empty string.
    if ( game.md5.isEmpty() )
@@ -875,10 +865,10 @@ void Gamelist::ensureHashes( int aIndex )
 
 bool Gamelist::accepts( int aIndex, const FilterSpec& aFilter ) const
 {
-   if ( aIndex < 0 || aIndex >= FGames.size() )
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
       return false;
 
-   if ( !matchesCategory( FGames.at( aIndex ), aFilter ) )
+   if ( !matchesCategory( FEntries.at( aIndex ).game, aFilter ) )
       return false;
 
    // Case-insensitive, against whatever the list displays.
@@ -888,7 +878,7 @@ bool Gamelist::accepts( int aIndex, const FilterSpec& aFilter ) const
 
 QString Gamelist::displayName( int aIndex, const FilterSpec& aFilter ) const
 {
-   const Game& game = FGames.at( aIndex );
+   const Game& game = FEntries.at( aIndex ).game;
 
    if ( !aFilter.listByRom )
       return game.name;
@@ -906,12 +896,12 @@ bool Gamelist::matchesCategory( const Game& aGame, const FilterSpec& aFilter ) c
    // The "same as" categories compare against the selected game; with none selected
    // nothing matches.
    const bool needsReference = filterDependsOnSelection( aFilter.category );
-   if ( needsReference && ( aFilter.reference < 0 || aFilter.reference >= FGames.size() ) )
+   if ( needsReference && ( aFilter.reference < 0 || aFilter.reference >= FEntries.size() ) )
       return false;
 
    // Only read by the categories above, for which it is valid. No default in the
    // switch below, so the compiler flags a category added to the enum and not handled.
-   const Game& reference = needsReference ? FGames.at( aFilter.reference ) : aGame;
+   const Game& reference = needsReference ? FEntries.at( aFilter.reference ).game : aGame;
 
    switch ( aFilter.category ) {
       case FilterCategory::All: return true;

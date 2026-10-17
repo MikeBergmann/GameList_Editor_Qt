@@ -58,5 +58,5 @@ The logic is a 1:1 port, except where I think the original was wrong or didn't f
 
 ## Later
 
-- Open question: Gradually replace the parallel arrays with a single structured table.
+
 - Secrets: The `QSettings` keys `SSPwd` and `ProxyPwd` (kept from the Delphi ini) would store the ScreenScraper and proxy passwords in plain text. Decide before the scraper is ported: plain INI as before, or the system keyring.
