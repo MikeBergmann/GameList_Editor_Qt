@@ -284,6 +284,7 @@ TEST( MediaOps, RenameMediaFailedSaveRenamesTheFilesBack )
 {
    Fixture fixture;
    const QString renamed = fixture.path( "snes/media/images/Renamed.jpg" );
+   writeFile( fixture.path( "snes/media/images/Sonic.png" ), "png" );  // game 0's link, in its own case
    writeFile( renamed, "jpg" );
 
    Gamelist list;
