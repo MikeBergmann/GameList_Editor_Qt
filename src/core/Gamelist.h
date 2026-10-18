@@ -91,7 +91,7 @@ public:
    // leaves list and files as they were.
    Result<int> renameMedia( const QVector<MediaRename>& aRenames );
 
-   // Compares resolved paths, not link text.
+   // Compares files on disk, not link text.
    bool fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const;
 
    void ensureHashes( int aIndex );
