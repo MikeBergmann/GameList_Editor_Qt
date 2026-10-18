@@ -2,6 +2,8 @@
 
 #include "PathUtil.h"
 
+#include <algorithm>
+
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -55,6 +57,24 @@ QString fileKey( const QString& aPath, bool aFoldsCase )
 bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase )
 {
    return aA.compare( aB, aFoldsCase ? Qt::CaseInsensitive : Qt::CaseSensitive ) == 0;
+}
+
+// ponytail: canonicalises only same-named paths, to stay cheap; a symlinked file under
+// another name is missed. Upgrade: compare file identity per entry.
+bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
+{
+   if ( sameFile( aA, aB, aFoldsCase ) )
+      return true;
+   if ( aA.isEmpty() || aB.isEmpty() )
+      return false;
+
+   const QFileInfo infoA( aA );
+   const QFileInfo infoB( aB );
+   if ( infoA.fileName().compare( infoB.fileName(), Qt::CaseInsensitive ) != 0 )
+      return false;
+
+   const QString canonical = infoA.canonicalFilePath();
+   return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
 }
 
 // An empty link counts as missing.
@@ -705,7 +725,8 @@ bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsIma
       if ( index == aIndex )
          continue;
       const Game& other = FEntries.at( index ).game;
-      if ( ( aIsImage ? other.physicalImagePath : other.physicalVideoPath ) == aPhysicalPath )
+      if ( sameFileOnDisk( aIsImage ? other.physicalImagePath : other.physicalVideoPath,
+                           aPhysicalPath, FFoldsCase ) )
          return true;
    }
 
@@ -787,7 +808,7 @@ Result<QStringList> Gamelist::removeGame( int aIndex )
    // (a duplicate, a shared picture) still points at.
    const auto shared = [this]( const QString& aPath, QString Game::*aMember ) {
       for ( const Entry& other : std::as_const( FEntries ) ) {
-         if ( other.game.*aMember == aPath )
+         if ( sameFileOnDisk( other.game.*aMember, aPath, FFoldsCase ) )
             return true;
       }
       return false;
@@ -865,18 +886,21 @@ QVector<int> Gamelist::orphanIndexes() const
 
 QVector<int> Gamelist::duplicateIndexes() const
 {
-   // physicalRomPath already has its case settled against the disk, so two links
-   // to one file match and two files differing only in case do not.
-   QSet<QString> seen;
+   QHash<QString, QStringList> seen;
    QVector<int> found;
    for ( int index = 0; index < FEntries.size(); ++index ) {
       const QString& path = FEntries.at( index ).game.physicalRomPath;
       if ( path.isEmpty() )
          continue;
-      if ( seen.contains( path ) )
+
+      QStringList& bucket = seen[QFileInfo( path ).fileName().toLower()];
+      const bool repeated = std::any_of( bucket.cbegin(), bucket.cend(), [&]( const QString& aSeen ) {
+         return sameFileOnDisk( aSeen, path, FFoldsCase );
+      } );
+      if ( repeated )
          found.append( index );
       else
-         seen.insert( path );
+         bucket.append( path );
    }
    return found;
 }

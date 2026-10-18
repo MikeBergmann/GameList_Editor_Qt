@@ -8,6 +8,8 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
+
 namespace {
 
 TEST( ScanSystems, FindsExtensionlessFolders )
@@ -466,6 +468,62 @@ TEST( Gamelist, RemoveImageKeepsAFileTwoGamesShareUnderDifferentCase )
 
    ASSERT_TRUE( list.removeImage( 1 ) );
    EXPECT_FALSE( QFileInfo::exists( shared ) );
+}
+
+// Windows may refuse without privileges.
+bool makeDirSymlink( const QString& aTarget, const QString& aLink )
+{
+   std::error_code error;
+   std::filesystem::create_directory_symlink( aTarget.toStdWString(), aLink.toStdWString(), error );
+   return !error;
+}
+
+TEST( Gamelist, SharedFileGuardsSeeThroughASymlinkedFolder )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/real/Sonic.png" ), "png" );
+   writeFile( fixture.path( "snes/real/Sonic.zip" ), "rom" );
+   if ( !makeDirSymlink( fixture.path( "snes/real" ), fixture.path( "snes/alias" ) ) )
+      GTEST_SKIP() << "cannot create symlinks";
+   writeFile( fixture.path( "snes/gamelist.xml" ), R"(<gameList>
+   <game><path>./real/Sonic.zip</path><image>./real/Sonic.png</image></game>
+   <game><path>./alias/Sonic.zip</path><image>./alias/Sonic.png</image></game>
+</gameList>)" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 1 } ) );
+
+   ASSERT_TRUE( list.removeImage( 0 ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/real/Sonic.png" ) ) ) << "game 1 still links to it";
+
+   ASSERT_TRUE( list.removeGame( 0 ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/real/Sonic.zip" ) ) ) << "game 0 was the twin";
+
+   ASSERT_TRUE( list.removeImage( 0 ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/real/Sonic.png" ) ) );
+}
+
+TEST( Gamelist, SharedFileGuardsSeeThroughCaseOnAFoldingVolume )
+{
+   if ( !filesystemIsCaseInsensitive() )
+      GTEST_SKIP() << "filesystem keeps case";
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), R"(<gameList>
+   <game><path>./Sonic.zip</path><image>./media/images/Sonic.png</image></game>
+   <game><path>./sonic.zip</path><image>./media/images/sonic.png</image></game>
+</gameList>)" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 1 } ) );
+
+   const QString image = list.at( 0 ).physicalImagePath;
+   ASSERT_TRUE( list.removeImage( 0 ) );
+   EXPECT_TRUE( QFileInfo::exists( image ) ) << "game 1 still links to it";
+
+   ASSERT_TRUE( list.removeGame( 0 ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) ) << "game 0 was the twin";
 }
 
 TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
