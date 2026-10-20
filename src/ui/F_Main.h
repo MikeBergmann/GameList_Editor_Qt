@@ -44,6 +44,13 @@ protected:
 private:
    void buildMenu();
    void buildCentralWidget();
+   QWidget* buildListColumn( QWidget* aParent );
+   QTabWidget* buildEditorTabs( QWidget* aParent );
+   void connectSignals();
+
+   void onSelectionChanged();
+   void onGameDeleted();
+   void onGenesisToggled();
 
    void LoadFromIni();
    void SaveToIni();

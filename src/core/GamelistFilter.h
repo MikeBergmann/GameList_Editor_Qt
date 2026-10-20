@@ -41,6 +41,8 @@ enum class FilterCategory
    Count,  // not a category: the number of them
 };
 
+const char* filterCategoryName( FilterCategory aCategory );
+
 // Whether the answer depends on which game is selected, so a view must re-run the
 // filter when the selection changes.
 inline bool filterDependsOnSelection( FilterCategory aCategory )

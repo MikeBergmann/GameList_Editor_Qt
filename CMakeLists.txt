@@ -155,6 +155,7 @@ add_executable( tests
    tests/tst_result.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
+   tests/tst_systems.cpp
    Resources/assets.qrc
 )
 target_include_directories( tests PRIVATE tests )

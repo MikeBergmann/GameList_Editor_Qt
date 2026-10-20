@@ -7,6 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include <QSet>
+
 namespace {
 
 struct ModelFixture : Fixture
@@ -32,6 +34,18 @@ struct ModelFixture : Fixture
       return rows;
    }
 };
+
+TEST( GamelistFilterNames, EveryCategoryHasADistinctName )
+{
+   QSet<QString> names;
+   for ( int category = 0; category < static_cast<int>( FilterCategory::Count ); ++category ) {
+      const QString name = QLatin1String( filterCategoryName( static_cast<FilterCategory>( category ) ) );
+      EXPECT_FALSE( name.isEmpty() ) << category;
+      names.insert( name );
+   }
+   EXPECT_EQ( names.size(), static_cast<int>( FilterCategory::Count ) );
+   EXPECT_EQ( QLatin1String( filterCategoryName( FilterCategory::Orphan ) ), QLatin1String( "Orphan" ) );
+}
 
 TEST( GamelistModel, ShowsEveryGameUntilAFilterSaysOtherwise )
 {
