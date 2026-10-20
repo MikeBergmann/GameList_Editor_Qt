@@ -7,6 +7,8 @@
 #include <QMainWindow>
 #include <QPixmap>
 
+#include <functional>
+
 class GameEditPanel;
 class GamelistFilter;
 class GamelistModel;
@@ -46,8 +48,15 @@ private:
    void LoadFromIni();
    void SaveToIni();
 
+   QAction* addOption( QMenu* aMenu, const QString& aText, const char* aKey, bool aDefault );
+
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
+   SystemEntry systemAt( int aItem ) const;
+
+   int findSystemItem( const std::function<bool( const SystemEntry& )>& aMatch ) const;
+   // nullptr: nothing loaded.
+   void bindGamelist( Gamelist* aGamelist );
    void runAction( SystemAction aAction );
    // After games were added or removed: indices shifted, so views start over.
    void resetViews();
@@ -73,15 +82,8 @@ private:
 
    QString FRootPath;
 
-   bool FGodMode = false;
-   bool FAutoHash = false;
-   bool FDelWoPrompt = false;
-   bool FShowTips = false;
-   bool FGenesisLogo = false;
-   bool FAutoplayVideo = false;
-
    // Re-filtering moves the current row, which would re-enter refreshFilter.
-   bool FIsLoading = false;
+   bool FApplyingFilter = false;
 
    Gamelist FGamelist;
    GamelistModel* FModel = nullptr;
@@ -110,7 +112,11 @@ private:
    QAction* Mnu_Genesis = nullptr;
    QAction* Mnu_AutoplayVideo = nullptr;
 
-   QMenu* Mnu_System = nullptr;
-   QMenu* Mnu_Game = nullptr;
-   QMenu* Mnu_Selection = nullptr;
+   struct Option
+   {
+      QAction* action;
+      const char* key;
+      bool fallback;
+   };
+   QList<Option> FOptions;
 };
