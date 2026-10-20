@@ -151,6 +151,7 @@ add_executable( tests
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
    tests/tst_mediaops.cpp
+   tests/tst_pathutil.cpp
    tests/tst_resources.cpp
    tests/tst_result.cpp
    tests/tst_scraper.cpp

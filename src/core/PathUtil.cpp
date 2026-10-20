@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QStringList>
 
 // Gamelist paths are relative to the system folder and start with "./", which
@@ -60,4 +61,14 @@ QString resolvePath( const QString& aPath )
    }
 
    return resolved;
+}
+
+Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent )
+{
+   QSaveFile file( aPath );
+   if ( !file.open( QIODevice::WriteOnly ) || file.write( aContent ) != aContent.size() ||
+        !file.commit() )
+      return Error{ QStringLiteral( "Cannot write %1: %2" ).arg( aPath, file.errorString() ) };
+
+   return {};
 }

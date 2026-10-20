@@ -59,6 +59,8 @@ private:
 
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
+   // The unguarded half: callers have already settled any unsaved edit.
+   void loadSelectedSystem();
    SystemEntry systemAt( int aItem ) const;
 
    int findSystemItem( const std::function<bool( const SystemEntry& )>& aMatch ) const;
@@ -74,6 +76,7 @@ private:
    void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
+   void clearSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
 
    // False means stay put: the user cancelled, or the save failed.
@@ -99,6 +102,7 @@ private:
    ScrapePanel* FScrapePanel = nullptr;
    QTabWidget* Pgc_Editor = nullptr;
    bool FRestoringSelection = false;
+   bool FScrapeBusy = false;
 
    QComboBox* Cbx_Systems = nullptr;
    QComboBox* Cbx_Filter = nullptr;

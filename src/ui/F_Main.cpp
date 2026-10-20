@@ -7,6 +7,7 @@
 #include "GameEditPanel.h"
 #include "GamelistFilter.h"
 #include "GamelistModel.h"
+#include "PathUtil.h"
 #include "Resources.h"
 #include "ScrapePanel.h"
 
@@ -26,7 +27,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPixmap>
-#include <QSaveFile>
+
 #include <QScopedValueRollback>
 #include <QSettings>
 #include <QSplitter>
@@ -170,6 +171,7 @@ QWidget* Frm_Editor::buildListColumn( QWidget* aParent )
    left->setContentsMargins( 0, 0, 0, 0 );
 
    Img_System = new QLabel( column );
+   Img_System->setObjectName( QStringLiteral( "Img_System" ) );
    Img_System->setAlignment( Qt::AlignCenter );
    Img_System->setMinimumHeight( 70 );
    // Ignored: the label's hints would follow the logo and the logo would size
@@ -274,6 +276,7 @@ void Frm_Editor::connectSignals()
    } );
    // Disabling the host keeps each child's own enabled state for when the lock lifts.
    connect( FScrapePanel, &ScrapePanel::busyChanged, this, [this]( bool aBusy ) {
+      FScrapeBusy = aBusy;
       Lbx_Games->parentWidget()->setEnabled( !aBusy );
       Pgc_Editor->setTabEnabled( Pgc_Editor->indexOf( FEditPanel ), !aBusy );
       menuBar()->setEnabled( !aBusy );
@@ -384,6 +387,12 @@ void Frm_Editor::showTipsAtStart()
 
 void Frm_Editor::closeEvent( QCloseEvent* aEvent )
 {
+   // A scrape or save in flight still holds the Gamelist and would land on a closed window.
+   if ( FScrapeBusy ) {
+      aEvent->ignore();
+      return;
+   }
+
    // Quitting mid-edit must not lose the edit silently.
    if ( !confirmLeaveEdits() ) {
       aEvent->ignore();
@@ -493,6 +502,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    if ( !found ) {
       setSystemActionsEnabled( false );
       bindGamelist( nullptr );
+      clearSystemLogo();
       updateCount();
       QMessageBox::information(
          this, QStringLiteral( "Information" ),
@@ -501,7 +511,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
       return;
    }
 
-   Cbx_SystemsChange();
+   loadSelectedSystem();
 }
 
 void Frm_Editor::Cbx_SystemsChange()
@@ -517,10 +527,16 @@ void Frm_Editor::Cbx_SystemsChange()
       return;
    }
 
+   loadSelectedSystem();
+}
+
+void Frm_Editor::loadSelectedSystem()
+{
    bindGamelist( nullptr );
    setSystemActionsEnabled( false );
    const QVariant systemData = Cbx_Systems->currentData();
    if ( !systemData.canConvert<SystemEntry>() ) {
+      clearSystemLogo();
       updateCount();
       return;
    }
@@ -630,11 +646,8 @@ void Frm_Editor::exportGamesList()
    for ( int row = 0; row < FProxy->rowCount(); ++row )
       content += FProxy->index( row, 0 ).data().toString().toUtf8() + '\n';
 
-   QSaveFile file( path );
-   if ( !file.open( QIODevice::WriteOnly ) || file.write( content ) != content.size() ||
-        !file.commit() ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ),
-                            QStringLiteral( "Cannot write %1: %2" ).arg( path, file.errorString() ) );
+   if ( const Result<> written = writeFileAtomically( path, content ); !written ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), written.error() );
       return;
    }
 
@@ -649,12 +662,17 @@ void Frm_Editor::LoadSystemLogo( SystemKind aKind )
    // A missing logo file just clears the label.
    if ( !FSystemLogo.load( QLatin1String( Cst_LogoPicsFolder ) +
                            QLatin1String( Cst_SystemKindImageNames[kind] ) ) ) {
-      FSystemLogo = QPixmap();
-      Img_System->clear();
+      clearSystemLogo();
       return;
    }
 
    scaleSystemLogo();
+}
+
+void Frm_Editor::clearSystemLogo()
+{
+   FSystemLogo = QPixmap();
+   Img_System->clear();
 }
 
 void Frm_Editor::scaleSystemLogo()
