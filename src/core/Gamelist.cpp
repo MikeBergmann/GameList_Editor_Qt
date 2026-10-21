@@ -755,7 +755,7 @@ Result<> Gamelist::removeImage( int aIndex )
    // Only once the gamelist has stopped pointing at it, and only if no other
    // game points at it either - several games can share one picture.
    if ( !file.isEmpty() && !fileShared( aIndex, file, true ) )
-      QFile::remove( file );
+      discardFile( file );
 
    return {};
 }
@@ -780,12 +780,12 @@ Result<> Gamelist::removeVideo( int aIndex )
    }
 
    if ( !file.isEmpty() && !fileShared( aIndex, file, false ) )
-      QFile::remove( file );
+      discardFile( file );
 
    return {};
 }
 
-Result<QStringList> Gamelist::removeGame( int aIndex )
+Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
 {
    if ( const Result<> valid = checkIndex( aIndex ); !valid )
       return valid;
@@ -815,10 +815,13 @@ Result<QStringList> Gamelist::removeGame( int aIndex )
    };
 
    QStringList stuck;
+   if ( !aDeleteFiles )
+      return stuck;
+
    const auto drop = [&]( const QString& aPath, QString Game::*aMember ) {
       if ( aPath.isEmpty() || !QFileInfo::exists( aPath ) || shared( aPath, aMember ) )
          return;
-      if ( !QFile::remove( aPath ) )
+      if ( !discardFile( aPath ) )
          stuck << aPath;
    };
 

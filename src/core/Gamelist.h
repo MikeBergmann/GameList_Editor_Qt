@@ -60,10 +60,11 @@ public:
    Result<> removeImage( int aIndex );
    Result<> removeVideo( int aIndex );
 
-   // Also deletes the ROM and media, except files another game still uses.
+   // Also deletes the ROM and media (to the trash when there is one), except files
+   // another game still uses, unless aDeleteFiles is false.
    // Later indices shift down. The value lists files that could not be deleted;
    // the game is gone regardless. An Error leaves everything as it was.
-   Result<QStringList> removeGame( int aIndex );
+   Result<QStringList> removeGame( int aIndex, bool aDeleteFiles = true );
 
    // Removes the entries only, no files. Later indices shift down.
    Result<> removeGames( const QVector<int>& aIndexes );

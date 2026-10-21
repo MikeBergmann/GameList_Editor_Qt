@@ -13,5 +13,12 @@ QString resolvePath( const QString& aPath );
 // its case settled against the disk. Empty for an empty link.
 QString physicalPath( const QString& aSystemDir, const QString& aRelative );
 
+// Removes a file the user asked to delete: into the trash, or for good where there is
+// none (a network share). False when the file is still there.
+bool discardFile( const QString& aPath );
+
+// Tests turn the trash off so they never fill the real one. On by default.
+void setTrashEnabled( bool aEnabled );
+
 // Atomic: an Error leaves any existing file at aPath as it was.
 Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent );

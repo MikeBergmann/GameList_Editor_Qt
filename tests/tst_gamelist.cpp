@@ -550,6 +550,23 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
    EXPECT_FALSE( list.removeGame( 2 ) );
 }
 
+TEST( Gamelist, RemoveGameCanKeepTheFiles )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   const Result<QStringList> removed = list.removeGame( 0, false );
+   ASSERT_TRUE( removed ) << removed.error().toStdString();
+   EXPECT_TRUE( removed.value().isEmpty() );
+
+   EXPECT_EQ( list.count(), 2 );
+   EXPECT_EQ( reload( fixture ).count(), 2 );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/sonic.PNG" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4" ) ) );
+}
+
 TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
 {
    Fixture fixture;

@@ -3,6 +3,7 @@ build*/
 compile_commands.json
 
 # Local, personal
+.envrc
 *.log
 AGENTS.md
 Android.md

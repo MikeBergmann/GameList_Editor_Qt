@@ -29,12 +29,13 @@ constexpr HelpSection Cst_HelpSections[] = {
    { "Enable God Mode:", "Enabling this option will let you delete games directly from the "
                          "application. A delete button will be added to the GUI, and you will be "
                          "prompted to confirm when you click it.<br>"
-                         "Deleting a game removes its entry from the gamelist, deletes the "
-                         "matching picture and video, and deletes the file from your folder." },
+                         "Deleting a game removes its entry from the gamelist; you choose "
+                         "whether its picture, video and ROM file are also sent to the trash "
+                         "(or deleted where there is no trash, such as a network share)." },
 
    { "Delete without prompt:",
      "Enabling this option will disable the prompt to confirm when you delete "
-     "a game. Use with caution." },
+     "a game, and the files are sent to the trash too. Use with caution." },
 
    { "Auto Hash:", "Enabling this option will hash the files automatically when you click on "
                    "More Infos.<br>"

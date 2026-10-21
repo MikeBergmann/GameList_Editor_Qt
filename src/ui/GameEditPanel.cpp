@@ -204,7 +204,8 @@ void GameEditPanel::buildLayout()
       return QMessageBox::question(
                 this, QStringLiteral( "GameList Editor Qt" ),
                 QStringLiteral( "Delete the %1 of this game?\n"
-                                "The file is deleted from disk unless another game uses it." )
+                                "The file goes to the trash (deleted where there is none) unless "
+                                "another game uses it." )
                    .arg( aWhat ) ) == QMessageBox::Yes;
    };
 
@@ -542,17 +543,31 @@ void GameEditPanel::deleteGame()
       return;
 
    const int index = FSelection.first();
-   if ( !FSkipDeletePrompt &&
-        QMessageBox::question( this, QStringLiteral( "GameList Editor Qt" ),
-                               QStringLiteral( "Delete \"%1\"?\n"
-                                               "Its gamelist entry, picture, video and ROM file "
-                                               "are deleted from disk, unless another game uses "
-                                               "them." )
-                                  .arg( FGamelist->at( index ).name ) ) != QMessageBox::Yes )
-      return;
+   bool deleteFiles = true;
+   if ( !FSkipDeletePrompt ) {
+      QMessageBox box( QMessageBox::Question, QStringLiteral( "GameList Editor Qt" ),
+                       QStringLiteral( "Remove \"%1\" from the gamelist?\n"
+                                       "You can also send its ROM, picture and video to the trash "
+                                       "(deleted where there is no trash), unless another game "
+                                       "uses them." )
+                          .arg( FGamelist->at( index ).name ),
+                       QMessageBox::NoButton, this );
+      QPushButton* entryOnly = box.addButton( QStringLiteral( "Remove entry only" ), QMessageBox::ActionRole );
+      QPushButton* withFiles =
+         box.addButton( QStringLiteral( "Remove entry and delete files" ), QMessageBox::ActionRole );
+      // Same role for all three: Qt then keeps this order, Cancel last, on every platform.
+      QPushButton* cancel = box.addButton( QStringLiteral( "Cancel" ), QMessageBox::ActionRole );
+      box.setDefaultButton( entryOnly );
+      box.setEscapeButton( cancel );
+      box.exec();
+
+      if ( box.clickedButton() != entryOnly && box.clickedButton() != withFiles )
+         return;
+      deleteFiles = box.clickedButton() == withFiles;
+   }
 
    FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
-   const Result<QStringList> removed = FGamelist->removeGame( index );
+   const Result<QStringList> removed = FGamelist->removeGame( index, deleteFiles );
    if ( !removed ) {
       QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), removed.error() );
       syncVideo();

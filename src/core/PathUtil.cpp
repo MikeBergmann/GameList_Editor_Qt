@@ -1,9 +1,14 @@
 #include "PathUtil.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QStringList>
+
+namespace {
+bool GTrashEnabled = true;
+}
 
 // Gamelist paths are relative to the system folder and start with "./", which
 // cleanPath folds away. Always joined with '/', which Qt accepts on every platform.
@@ -61,6 +66,19 @@ QString resolvePath( const QString& aPath )
    }
 
    return resolved;
+}
+
+bool discardFile( const QString& aPath )
+{
+   if ( GTrashEnabled && QFile::moveToTrash( aPath ) )
+      return true;
+
+   return QFile::remove( aPath );
+}
+
+void setTrashEnabled( bool aEnabled )
+{
+   GTrashEnabled = aEnabled;
 }
 
 Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent )

@@ -1,6 +1,8 @@
 // GoogleTest's own main() cannot be used: constructing any QWidget needs a
 // living QApplication, so the dialog tests need one set up before they run.
 
+#include "PathUtil.h"
+
 #include <QApplication>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -21,6 +23,8 @@ int main( int argc, char** argv )
       qputenv( "QT_MEDIA_BACKEND", "ffmpeg" );
 
    QApplication app( argc, argv );
+
+   setTrashEnabled( false );
 
    QCoreApplication::setOrganizationName( QStringLiteral( "GameListEditorTests" ) );
    QCoreApplication::setApplicationName( QStringLiteral( "tests" ) );
