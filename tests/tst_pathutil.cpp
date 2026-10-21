@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 
 namespace {
@@ -35,6 +36,17 @@ TEST( PathUtil, WriteFileAtomicallyFailsWithAMessageWhenTheFolderIsMissing )
    const Result<> written = writeFileAtomically( path, "x" );
    ASSERT_FALSE( written );
    EXPECT_TRUE( written.error().contains( path ) );
+}
+
+TEST( PathUtil, DiscardFileRemovesTheFileAndReportsAMissingOne )
+{
+   QTemporaryDir dir;
+   const QString path = dir.filePath( QStringLiteral( "gone.txt" ) );
+   writeFile( path, "x" );
+
+   EXPECT_TRUE( discardFile( path ) );
+   EXPECT_FALSE( QFileInfo::exists( path ) );
+   EXPECT_FALSE( discardFile( path ) );
 }
 
 }  // namespace
