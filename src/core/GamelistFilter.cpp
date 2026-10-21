@@ -7,6 +7,45 @@
 
 namespace {
 
+// In FilterCategory order.
+const char* const Cst_FilterNames[] = {
+   "All",
+   "Missing Picture",
+   "Missing Video",
+   "Missing Date",
+   "Missing Number of Players",
+   "Missing Rating",
+   "Missing Developer",
+   "Missing Publisher",
+   "Missing Description",
+   "Missing Genre",
+   "Missing Region",
+   "Kid Game",
+   "Hidden",
+   "Favorite",
+   "Orphan",
+   "Same Region",
+   "Same Date",
+   "Same or Earlier Date",
+   "Same or Later Date",
+   "Same Players",
+   "Same Rating",
+   "Same or Lower Rating",
+   "Same or Higher Rating",
+   "Same Publisher",
+   "Same Developer",
+   "Same Genre",
+   "Same Folder",
+   "Same Name",
+   "Same ROM",
+   "Duplicate Names",
+   "Duplicate ROMs",
+};
+
+static_assert( sizeof( Cst_FilterNames ) / sizeof( Cst_FilterNames[0] ) ==
+                  static_cast<size_t>( FilterCategory::Count ),
+               "one name per FilterCategory, in enum order" );
+
 // Ratings are written with either decimal separator; an unparseable one counts as 0.
 double ratingValue( const QString& aRating )
 {
@@ -123,4 +162,9 @@ bool filterAccepts( const Gamelist& aList, int aIndex, const FilterSpec& aFilter
    // Case-insensitive, against whatever the list displays.
    return aFilter.search.isEmpty() ||
           displayName( aList, aIndex, aFilter ).contains( aFilter.search, Qt::CaseInsensitive );
+}
+
+const char* filterCategoryName( FilterCategory aCategory )
+{
+   return Cst_FilterNames[static_cast<size_t>( aCategory )];
 }

@@ -4,7 +4,10 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QSettings>
 #include <QStringList>
+
+#include <algorithm>
 
 QVector<SystemEntry> scanSystems( const QString& aRootPath )
 {
@@ -25,4 +28,38 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath )
    }
 
    return systems;
+}
+
+void applySystemMap( QVector<SystemEntry>& aSystems )
+{
+   QSettings settings;
+   settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+   for ( SystemEntry& system : aSystems )
+      if ( system.kind == skOther && settings.contains( system.folderName ) )
+         system.kind = systemKindFromFolder( settings.value( system.folderName ).toString() );
+}
+
+void setSystemMapping( const QString& aFolderName, SystemKind aKind )
+{
+   QSettings settings;
+   settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+   if ( aKind == skOther )
+      settings.remove( aFolderName );
+   else
+      settings.setValue( aFolderName, QLatin1String( Cst_SystemKindFolderNames[aKind] ) );
+}
+
+QVector<SystemKindChoice> systemKindChoices()
+{
+   QVector<SystemKindChoice> choices;
+   for ( int kind = 0; kind < skOther; ++kind )
+      choices.append( { QStringLiteral( "%1 (%2)" )
+                           .arg( QLatin1String( Cst_SystemKindStr[kind] ),
+                                 QLatin1String( Cst_SystemKindFolderNames[kind] ) ),
+                        static_cast<SystemKind>( kind ) } );
+
+   std::sort( choices.begin(), choices.end(), []( const SystemKindChoice& a, const SystemKindChoice& b ) {
+      return a.label.compare( b.label, Qt::CaseInsensitive ) < 0;
+   } );
+   return choices;
 }

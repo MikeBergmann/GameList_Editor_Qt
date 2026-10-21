@@ -7,6 +7,8 @@
 #include <QMainWindow>
 #include <QPixmap>
 
+#include <functional>
+
 class GameEditPanel;
 class GamelistFilter;
 class GamelistModel;
@@ -42,12 +44,28 @@ protected:
 private:
    void buildMenu();
    void buildCentralWidget();
+   QWidget* buildListColumn( QWidget* aParent );
+   QTabWidget* buildEditorTabs( QWidget* aParent );
+   void connectSignals();
+
+   void onSelectionChanged();
+   void onGameDeleted();
+   void onGenesisToggled();
 
    void LoadFromIni();
    void SaveToIni();
 
+   QAction* addOption( QMenu* aMenu, const QString& aText, const char* aKey, bool aDefault );
+
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
+   // The unguarded half: callers have already settled any unsaved edit.
+   void loadSelectedSystem();
+   SystemEntry systemAt( int aItem ) const;
+
+   int findSystemItem( const std::function<bool( const SystemEntry& )>& aMatch ) const;
+   // nullptr: nothing loaded.
+   void bindGamelist( Gamelist* aGamelist );
    void runAction( SystemAction aAction );
    // After games were added or removed: indices shifted, so views start over.
    void resetViews();
@@ -58,6 +76,7 @@ private:
    void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
+   void clearSystemLogo();
    QString systemDisplayName( const SystemEntry& aSystem ) const;
 
    // False means stay put: the user cancelled, or the save failed.
@@ -73,15 +92,8 @@ private:
 
    QString FRootPath;
 
-   bool FGodMode = false;
-   bool FAutoHash = false;
-   bool FDelWoPrompt = false;
-   bool FShowTips = false;
-   bool FGenesisLogo = false;
-   bool FAutoplayVideo = false;
-
    // Re-filtering moves the current row, which would re-enter refreshFilter.
-   bool FIsLoading = false;
+   bool FApplyingFilter = false;
 
    Gamelist FGamelist;
    GamelistModel* FModel = nullptr;
@@ -90,6 +102,7 @@ private:
    ScrapePanel* FScrapePanel = nullptr;
    QTabWidget* Pgc_Editor = nullptr;
    bool FRestoringSelection = false;
+   bool FScrapeBusy = false;
 
    QComboBox* Cbx_Systems = nullptr;
    QComboBox* Cbx_Filter = nullptr;
@@ -110,7 +123,11 @@ private:
    QAction* Mnu_Genesis = nullptr;
    QAction* Mnu_AutoplayVideo = nullptr;
 
-   QMenu* Mnu_System = nullptr;
-   QMenu* Mnu_Game = nullptr;
-   QMenu* Mnu_Selection = nullptr;
+   struct Option
+   {
+      QAction* action;
+      const char* key;
+      bool fallback;
+   };
+   QList<Option> FOptions;
 };

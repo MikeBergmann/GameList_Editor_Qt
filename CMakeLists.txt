@@ -151,10 +151,12 @@ add_executable( tests
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
    tests/tst_mediaops.cpp
+   tests/tst_pathutil.cpp
    tests/tst_resources.cpp
    tests/tst_result.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
+   tests/tst_systems.cpp
    Resources/assets.qrc
 )
 target_include_directories( tests PRIVATE tests )

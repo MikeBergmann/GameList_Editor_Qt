@@ -329,6 +329,42 @@ TEST( MainWindow, BusyScrapeLocksTheSelectionControls )
    EXPECT_FALSE( fullRomName->isEnabled() );
 }
 
+// A scrape or save in flight must not be cut off by the window's close button.
+TEST( MainWindow, CloseIsIgnoredWhileAScrapeIsBusy )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   editor.show();
+
+   ScrapePanel* scrape = editor.findChild<ScrapePanel*>();
+   ASSERT_NE( scrape, nullptr );
+
+   emit scrape->busyChanged( true );
+   EXPECT_FALSE( editor.close() );
+   EXPECT_TRUE( editor.isVisible() );
+
+   emit scrape->busyChanged( false );
+   EXPECT_TRUE( editor.close() );
+}
+
+// The logo belongs to the loaded system, so it goes when that system does.
+TEST( MainWindow, ChoosingAFolderWithNoSystemsClearsTheSystemLogo )
+{
+   Fixture fixture;
+   QTemporaryDir empty;
+   Frm_Editor editor;
+   QLabel* logo = editor.findChild<QLabel*>( QStringLiteral( "Img_System" ) );
+   ASSERT_NE( logo, nullptr );
+
+   editor.openRootFolder( fixture.dir.path() );
+   ASSERT_FALSE( logo->pixmap().isNull() );
+
+   answerNextBox( QMessageBox::Ok );
+   editor.openRootFolder( empty.path() );
+   EXPECT_TRUE( logo->pixmap().isNull() );
+}
+
 // Every command that works on the loaded system follows one rule, including after a
 // folder with no systems replaces the loaded one.
 TEST( MainWindow, SystemCommandsAreOnlyEnabledWhileASystemIsLoaded )
