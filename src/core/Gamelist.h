@@ -118,6 +118,10 @@ private:
    QDomElement ensureChild( QDomElement aNode, const char* aName );
    void setChildText( QDomElement aNode, const char* aName, const QString& aText );
 
+   // The one place a game's image or video link changes: DOM and Game together.
+   // An empty aPhysical means no media. Does not save.
+   void setMediaLink( int aIndex, bool aIsImage, const QString& aLink, const QString& aPhysical );
+
    // Undo record for one media write. For a rename, undo moves target back to
    // movedFrom instead of deleting it.
    struct MediaWrite
