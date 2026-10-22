@@ -13,6 +13,19 @@ QString resolvePath( const QString& aPath );
 // its case settled against the disk. Empty for an empty link.
 QString physicalPath( const QString& aSystemDir, const QString& aRelative );
 
+// Probed, not assumed from the OS: Linux can mount NTFS, Windows has case-sensitive folders.
+bool volumeFoldsCase( const QString& aGamelistPath );
+
+// A key for sets: a bare toLower() is wrong on Linux, where sonic.zip is not Sonic.zip.
+QString fileKey( const QString& aPath, bool aFoldsCase );
+
+// Both paths are already clean, as every physical path is.
+bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase );
+
+// ponytail: canonicalises only same-named paths, to stay cheap; a symlinked file under
+// another name is missed. Upgrade: compare file identity per entry.
+bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase );
+
 // Removes a file the user asked to delete: into the trash, or for good where there is
 // none (a network share). False when the file is still there.
 bool discardFile( const QString& aPath );

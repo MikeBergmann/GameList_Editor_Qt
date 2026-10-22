@@ -44,7 +44,7 @@ ViewUpdate confirmAndRemove( QWidget* aParent, Gamelist& aGamelist, const QVecto
 ViewUpdate addMissingRoms( QWidget* aParent, Gamelist& aGamelist )
 {
    const QStringList chosen =
-      Frm_AddRoms( aParent ).Execute( aGamelist.systemDir(), aGamelist.unlistedRoms() );
+      Frm_AddRoms( aParent ).Execute( aGamelist.systemDir(), unlistedRoms( aGamelist ) );
    if ( chosen.isEmpty() )
       return ViewUpdate::None;
 
@@ -159,13 +159,13 @@ ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist )
 
 ViewUpdate deleteOrphans( QWidget* aParent, Gamelist& aGamelist )
 {
-   return confirmAndRemove( aParent, aGamelist, aGamelist.orphanIndexes(),
+   return confirmAndRemove( aParent, aGamelist, orphanIndexes( aGamelist ),
                             QStringLiteral( "whose ROM is missing" ) );
 }
 
 ViewUpdate deleteDuplicates( QWidget* aParent, Gamelist& aGamelist )
 {
    return confirmAndRemove(
-      aParent, aGamelist, aGamelist.duplicateIndexes(),
+      aParent, aGamelist, duplicateIndexes( aGamelist ),
       QStringLiteral( "that list a ROM already listed above them (the first stays)" ) );
 }
