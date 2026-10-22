@@ -49,4 +49,12 @@ TEST( PathUtil, DiscardFileRemovesTheFileAndReportsAMissingOne )
    EXPECT_FALSE( discardFile( path ) );
 }
 
+TEST( PathUtil, FileKeyAndSameFileFoldCaseOnlyWhenAsked )
+{
+   EXPECT_EQ( fileKey( QStringLiteral( "/a/./Sonic.zip" ), false ), QStringLiteral( "/a/Sonic.zip" ) );
+   EXPECT_EQ( fileKey( QStringLiteral( "/a/Sonic.zip" ), true ), QStringLiteral( "/a/sonic.zip" ) );
+   EXPECT_FALSE( sameFile( QStringLiteral( "/a/Sonic.zip" ), QStringLiteral( "/a/sonic.zip" ), false ) );
+   EXPECT_TRUE( sameFile( QStringLiteral( "/a/Sonic.zip" ), QStringLiteral( "/a/sonic.zip" ), true ) );
+}
+
 }  // namespace

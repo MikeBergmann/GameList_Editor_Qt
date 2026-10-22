@@ -2,8 +2,11 @@
 
 #include "PathUtil.h"
 
+#include <algorithm>
+
 #include <QBuffer>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
@@ -69,6 +72,85 @@ QString findMedia( const QHash<QString, QString>& aIndex, const QStringList& aBa
 }
 
 }  // namespace
+
+QVector<int> orphanIndexes( const Gamelist& aList )
+{
+   QVector<int> found;
+   for ( int index = 0; index < aList.count(); ++index ) {
+      if ( aList.at( index ).isOrphan )
+         found.append( index );
+   }
+   return found;
+}
+
+QVector<int> duplicateIndexes( const Gamelist& aList )
+{
+   QHash<QString, QStringList> seen;
+   QVector<int> found;
+   for ( int index = 0; index < aList.count(); ++index ) {
+      const QString& path = aList.at( index ).physicalRomPath;
+      if ( path.isEmpty() )
+         continue;
+
+      QStringList& bucket = seen[QFileInfo( path ).fileName().toLower()];
+      const bool repeated = std::any_of( bucket.cbegin(), bucket.cend(), [&]( const QString& aSeen ) {
+         return sameFileOnDisk( aSeen, path, aList.foldsCase() );
+      } );
+      if ( repeated )
+         found.append( index );
+      else
+         bucket.append( path );
+   }
+   return found;
+}
+
+QStringList unlistedRoms( const Gamelist& aList )
+{
+   QSet<QString> listed;
+   for ( int index = 0; index < aList.count(); ++index ) {
+      if ( !aList.at( index ).physicalRomPath.isEmpty() )
+         listed.insert( fileKey( aList.at( index ).physicalRomPath, aList.foldsCase() ) );
+   }
+
+   // Media is not a ROM: skip the folders the gamelist keeps its art in (when
+   // they are subfolders at all) and the usual non-ROM extensions.
+   QSet<QString> mediaDirs;
+   for ( const QString& folder : { aList.imageFolder(), aList.videoFolder() } ) {
+      const QString top = QDir::cleanPath( folder ).split( QLatin1Char( '/' ) ).value( 0 );
+      if ( !top.isEmpty() && top != QLatin1String( "." ) )
+         mediaDirs.insert( top.toLower() );
+   }
+
+   // ponytail: a denylist, since the per-system ROM extensions live in
+   // EmulationStation's config, not here. A stray odd file shows up in the
+   // list and gets unticked; Browse covers anything this hides.
+   static const QSet<QString> notRoms = {
+      QStringLiteral( "xml" ),  QStringLiteral( "txt" ),   QStringLiteral( "png" ),
+      QStringLiteral( "jpg" ),  QStringLiteral( "jpeg" ),  QStringLiteral( "gif" ),
+      QStringLiteral( "bmp" ),  QStringLiteral( "mp4" ),   QStringLiteral( "avi" ),
+      QStringLiteral( "mkv" ),  QStringLiteral( "pdf" ),   QStringLiteral( "srm" ),
+      QStringLiteral( "sav" ),  QStringLiteral( "state" ), QStringLiteral( "cfg" ),
+      QStringLiteral( "ini" ),  QStringLiteral( "nfo" ),   QStringLiteral( "bak" ),
+   };
+
+   const QDir systemDir( aList.systemDir() );
+   QStringList found;
+   QDirIterator files( aList.systemDir(), QDir::Files, QDirIterator::Subdirectories );
+   while ( files.hasNext() ) {
+      const QString path = files.next();
+      const QString relative = systemDir.relativeFilePath( path );
+
+      if ( notRoms.contains( QFileInfo( path ).suffix().toLower() ) ||
+           mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) ||
+           listed.contains( fileKey( path, aList.foldsCase() ) ) )
+         continue;
+
+      found << path;
+   }
+
+   found.sort( Qt::CaseInsensitive );
+   return found;
+}
 
 QVector<MediaLink> unlinkedMedia( const Gamelist& aList )
 {

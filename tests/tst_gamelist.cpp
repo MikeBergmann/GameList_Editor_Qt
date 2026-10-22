@@ -4,6 +4,7 @@
 
 #include "GamelistFilter.h"
 #include "GamelistFixture.h"
+#include "MediaOps.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
@@ -492,7 +493,7 @@ TEST( Gamelist, SharedFileGuardsSeeThroughASymlinkedFolder )
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
-   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 1 } ) );
+   EXPECT_EQ( duplicateIndexes( list ), QVector<int>( { 1 } ) );
 
    ASSERT_TRUE( list.removeImage( 0 ) );
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/real/Sonic.png" ) ) ) << "game 1 still links to it";
@@ -516,7 +517,7 @@ TEST( Gamelist, SharedFileGuardsSeeThroughCaseOnAFoldingVolume )
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
-   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 1 } ) );
+   EXPECT_EQ( duplicateIndexes( list ), QVector<int>( { 1 } ) );
 
    const QString image = list.at( 0 ).physicalImagePath;
    ASSERT_TRUE( list.removeImage( 0 ) );
@@ -574,8 +575,8 @@ TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    // Game 2 (Vanished.zip) is the one orphan; Sonic.zip in two folders is two games.
-   EXPECT_EQ( list.orphanIndexes(), QVector<int>( { 2 } ) );
-   EXPECT_TRUE( list.duplicateIndexes().isEmpty() );
+   EXPECT_EQ( orphanIndexes( list ), QVector<int>( { 2 } ) );
+   EXPECT_TRUE( duplicateIndexes( list ).isEmpty() );
 
    const Result<> dropped = list.removeGames( { 0, 2, 99 } );
    ASSERT_TRUE( dropped ) << dropped.error().toStdString();
@@ -601,13 +602,13 @@ TEST( Gamelist, DuplicateIndexesKeepTheFirstOfEachRom )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   EXPECT_EQ( list.duplicateIndexes(), QVector<int>( { 2, 3 } ) );
+   EXPECT_EQ( duplicateIndexes( list ), QVector<int>( { 2, 3 } ) );
 
-   ASSERT_TRUE( list.removeGames( list.duplicateIndexes() ) );
+   ASSERT_TRUE( list.removeGames( duplicateIndexes( list ) ) );
    EXPECT_EQ( list.count(), 2 );
    EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "A" ) );
    EXPECT_EQ( list.at( 1 ).name, QStringLiteral( "B" ) );
-   EXPECT_TRUE( list.duplicateIndexes().isEmpty() );
+   EXPECT_TRUE( duplicateIndexes( list ).isEmpty() );
 }
 
 TEST( Gamelist, SetAndRemoveVideo )
@@ -705,7 +706,7 @@ TEST( Gamelist, UnlistedRomsAreTheFilesNoGameCoversAndNoMedia )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    // Sonic.zip and sub/SONIC.ZIP are listed, the second under another case.
-   EXPECT_EQ( list.unlistedRoms(), QStringList( { fixture.path( "snes/Streets.zip" ),
+   EXPECT_EQ( unlistedRoms( list ), QStringList( { fixture.path( "snes/Streets.zip" ),
                                                   fixture.path( "snes/sub/Zelda.sfc" ) } ) );
 }
 
@@ -730,7 +731,7 @@ TEST( Gamelist, AddGamesWritesPathAndNameAndSurvivesAReload )
    EXPECT_EQ( list.at( 3 ).name, QStringLiteral( "Streets" ) );
    EXPECT_FALSE( list.at( 3 ).isOrphan );
    EXPECT_EQ( list.at( 4 ).romPath, QStringLiteral( "./sub/Zelda.sfc" ) );
-   EXPECT_TRUE( list.unlistedRoms().isEmpty() );
+   EXPECT_TRUE( unlistedRoms( list ).isEmpty() );
 
    const Gamelist reloaded = reload( fixture );
    ASSERT_EQ( reloaded.count(), 5 );
@@ -938,12 +939,12 @@ TEST( Gamelist, ARomThatDiffersOnlyInCaseIsAnotherFile )
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
-   EXPECT_EQ( list.unlistedRoms(), QStringList( { fixture.path( "snes/sonic.zip" ) } ) );
+   EXPECT_EQ( unlistedRoms( list ), QStringList( { fixture.path( "snes/sonic.zip" ) } ) );
 
    const Result<int> added = list.addGames( { fixture.path( "snes/sonic.zip" ) } );
    ASSERT_TRUE( added ) << added.error().toStdString();
    EXPECT_EQ( added.value(), 1 );
-   EXPECT_TRUE( list.unlistedRoms().isEmpty() );
+   EXPECT_TRUE( unlistedRoms( list ).isEmpty() );
 }
 
 TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )

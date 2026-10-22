@@ -69,15 +69,6 @@ public:
    // Removes the entries only, no files. Later indices shift down.
    Result<> removeGames( const QVector<int>& aIndexes );
 
-   // Games whose ROM is not on disk.
-   QVector<int> orphanIndexes() const;
-
-   // The later entries of each ROM listed more than once. Same file, not same name.
-   QVector<int> duplicateIndexes() const;
-
-   // Absolute paths of unlisted ROM candidates, sorted. Media is excluded.
-   QStringList unlistedRoms() const;
-
    // Appends the new games at the end. Already-listed files are skipped; the value
    // is how many were added. An Error leaves the list as it was.
    Result<int> addGames( const QStringList& aRomPaths );
@@ -103,6 +94,9 @@ public:
    // Where new media goes; copied from the first game that has any.
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
+
+   // Whether the volume treats Sonic.zip and sonic.zip as one file.
+   bool foldsCase() const { return FFoldsCase; }
 
 
    bool nameIsDuplicated( const QString& aName ) const { return FNameCounts.value( aName ) > 1; }

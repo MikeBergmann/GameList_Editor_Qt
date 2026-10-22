@@ -5,7 +5,7 @@
 #include <algorithm>
 
 #include <QDir>
-#include <QDirIterator>
+
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
@@ -37,45 +37,6 @@ QString writeTarget( const QString& aSystemDir, const QString& aLink )
    return QDir( resolvePath( info.path() ) ).filePath( info.fileName() );
 }
 
-// Probed, not assumed from the OS: Linux can mount NTFS, Windows has case-sensitive folders.
-bool volumeFoldsCase( const QString& aGamelistPath )
-{
-   const QFileInfo info( aGamelistPath );
-   const QString upper = info.fileName().toUpper();
-   const QString probe = upper != info.fileName() ? upper : info.fileName().toLower();
-   return probe != info.fileName() && QFileInfo::exists( info.dir().filePath( probe ) );
-}
-
-// A bare toLower() is wrong on Linux, where sonic.zip is not Sonic.zip.
-QString fileKey( const QString& aPath, bool aFoldsCase )
-{
-   const QString clean = QDir::cleanPath( aPath );
-   return aFoldsCase ? clean.toLower() : clean;
-}
-
-// Both paths are already clean, as every physical path is.
-bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase )
-{
-   return aA.compare( aB, aFoldsCase ? Qt::CaseInsensitive : Qt::CaseSensitive ) == 0;
-}
-
-// ponytail: canonicalises only same-named paths, to stay cheap; a symlinked file under
-// another name is missed. Upgrade: compare file identity per entry.
-bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
-{
-   if ( sameFile( aA, aB, aFoldsCase ) )
-      return true;
-   if ( aA.isEmpty() || aB.isEmpty() )
-      return false;
-
-   const QFileInfo infoA( aA );
-   const QFileInfo infoB( aB );
-   if ( infoA.fileName().compare( infoB.fileName(), Qt::CaseInsensitive ) != 0 )
-      return false;
-
-   const QString canonical = infoA.canonicalFilePath();
-   return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
-}
 
 // An empty link counts as missing.
 bool fileMissing( const QString& aPath )
@@ -208,54 +169,6 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
    game.missingImage = fileMissing( game.physicalImagePath );
    game.missingVideo = fileMissing( game.physicalVideoPath );
    return game;
-}
-
-QStringList Gamelist::unlistedRoms() const
-{
-   QSet<QString> listed;
-   for ( const Entry& entry : FEntries ) {
-      if ( !entry.game.physicalRomPath.isEmpty() )
-         listed.insert( fileKey( entry.game.physicalRomPath, FFoldsCase ) );
-   }
-
-   // Media is not a ROM: skip the folders the gamelist keeps its art in (when
-   // they are subfolders at all) and the usual non-ROM extensions.
-   QSet<QString> mediaDirs;
-   for ( const QString& folder : { FImageFolder, FVideoFolder } ) {
-      const QString top = QDir::cleanPath( folder ).split( QLatin1Char( '/' ) ).value( 0 );
-      if ( !top.isEmpty() && top != QLatin1String( "." ) )
-         mediaDirs.insert( top.toLower() );
-   }
-
-   // ponytail: a denylist, since the per-system ROM extensions live in
-   // EmulationStation's config, not here. A stray odd file shows up in the
-   // list and gets unticked; Browse covers anything this hides.
-   static const QSet<QString> notRoms = {
-      QStringLiteral( "xml" ),  QStringLiteral( "txt" ),   QStringLiteral( "png" ),
-      QStringLiteral( "jpg" ),  QStringLiteral( "jpeg" ),  QStringLiteral( "gif" ),
-      QStringLiteral( "bmp" ),  QStringLiteral( "mp4" ),   QStringLiteral( "avi" ),
-      QStringLiteral( "mkv" ),  QStringLiteral( "pdf" ),   QStringLiteral( "srm" ),
-      QStringLiteral( "sav" ),  QStringLiteral( "state" ), QStringLiteral( "cfg" ),
-      QStringLiteral( "ini" ),  QStringLiteral( "nfo" ),   QStringLiteral( "bak" ),
-   };
-
-   const QDir systemDir( FSystemDir );
-   QStringList found;
-   QDirIterator files( FSystemDir, QDir::Files, QDirIterator::Subdirectories );
-   while ( files.hasNext() ) {
-      const QString path = files.next();
-      const QString relative = systemDir.relativeFilePath( path );
-
-      if ( notRoms.contains( QFileInfo( path ).suffix().toLower() ) ||
-           mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) ||
-           listed.contains( fileKey( path, FFoldsCase ) ) )
-         continue;
-
-      found << path;
-   }
-
-   found.sort( Qt::CaseInsensitive );
-   return found;
 }
 
 Result<int> Gamelist::addGames( const QStringList& aRomPaths )
@@ -841,37 +754,6 @@ Result<> Gamelist::removeGames( const QVector<int>& aIndexes )
    FEntries = kept;
    countDuplicates();
    return {};
-}
-
-QVector<int> Gamelist::orphanIndexes() const
-{
-   QVector<int> found;
-   for ( int index = 0; index < FEntries.size(); ++index ) {
-      if ( FEntries.at( index ).game.isOrphan )
-         found.append( index );
-   }
-   return found;
-}
-
-QVector<int> Gamelist::duplicateIndexes() const
-{
-   QHash<QString, QStringList> seen;
-   QVector<int> found;
-   for ( int index = 0; index < FEntries.size(); ++index ) {
-      const QString& path = FEntries.at( index ).game.physicalRomPath;
-      if ( path.isEmpty() )
-         continue;
-
-      QStringList& bucket = seen[QFileInfo( path ).fileName().toLower()];
-      const bool repeated = std::any_of( bucket.cbegin(), bucket.cend(), [&]( const QString& aSeen ) {
-         return sameFileOnDisk( aSeen, path, FFoldsCase );
-      } );
-      if ( repeated )
-         found.append( index );
-      else
-         bucket.append( path );
-   }
-   return found;
 }
 
 void Gamelist::ensureHashes( int aIndex )

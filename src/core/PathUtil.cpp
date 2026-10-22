@@ -90,3 +90,38 @@ Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent )
 
    return {};
 }
+
+bool volumeFoldsCase( const QString& aGamelistPath )
+{
+   const QFileInfo info( aGamelistPath );
+   const QString upper = info.fileName().toUpper();
+   const QString probe = upper != info.fileName() ? upper : info.fileName().toLower();
+   return probe != info.fileName() && QFileInfo::exists( info.dir().filePath( probe ) );
+}
+
+QString fileKey( const QString& aPath, bool aFoldsCase )
+{
+   const QString clean = QDir::cleanPath( aPath );
+   return aFoldsCase ? clean.toLower() : clean;
+}
+
+bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase )
+{
+   return aA.compare( aB, aFoldsCase ? Qt::CaseInsensitive : Qt::CaseSensitive ) == 0;
+}
+
+bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
+{
+   if ( sameFile( aA, aB, aFoldsCase ) )
+      return true;
+   if ( aA.isEmpty() || aB.isEmpty() )
+      return false;
+
+   const QFileInfo infoA( aA );
+   const QFileInfo infoB( aB );
+   if ( infoA.fileName().compare( infoB.fileName(), Qt::CaseInsensitive ) != 0 )
+      return false;
+
+   const QString canonical = infoA.canonicalFilePath();
+   return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
+}

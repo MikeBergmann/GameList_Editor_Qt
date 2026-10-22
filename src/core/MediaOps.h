@@ -7,6 +7,15 @@
 
 // Read-only helpers over a Gamelist. The edits themselves live on Gamelist.
 
+// Games whose ROM is not on disk.
+QVector<int> orphanIndexes( const Gamelist& aList );
+
+// The later entries of each ROM listed more than once. Same file, not same name.
+QVector<int> duplicateIndexes( const Gamelist& aList );
+
+// Absolute paths of unlisted ROM candidates, sorted. Media is excluded.
+QStringList unlistedRoms( const Gamelist& aList );
+
 // Files named after a game's ROM, for games whose link is empty or dead.
 QVector<MediaLink> unlinkedMedia( const Gamelist& aList );
 
