@@ -460,6 +460,17 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
    }
 }
 
+void Gamelist::setMediaLink( int aIndex, bool aIsImage, const QString& aLink,
+                             const QString& aPhysical )
+{
+   Entry& entry = FEntries[aIndex];
+   Game& game = entry.game;
+   setChildText( entry.node, aIsImage ? Cst_ImageLink : Cst_VideoLink, aLink );
+   ( aIsImage ? game.imagePath : game.videoPath ) = aLink;
+   ( aIsImage ? game.physicalImagePath : game.physicalVideoPath ) = aPhysical;
+   ( aIsImage ? game.missingImage : game.missingVideo ) = aPhysical.isEmpty();
+}
+
 Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPicture )
 {
    Game& game = FEntries[aIndex].game;
@@ -487,10 +498,7 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
       return backup;
    write.backup = backup.value();
 
-   setChildText( FEntries[aIndex].node, Cst_ImageLink, link );
-   game.imagePath = link;
-   game.physicalImagePath = target;
-   game.missingImage = false;
+   setMediaLink( aIndex, true, link, target );
 
    return write;
 }
@@ -613,10 +621,7 @@ Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
       writes.append( write );
 
       const QString text = QStringLiteral( "./" ) + systemDir.relativeFilePath( link.path );
-      setChildText( FEntries[link.index].node, link.isImage ? Cst_ImageLink : Cst_VideoLink, text );
-      ( link.isImage ? game.imagePath : game.videoPath ) = text;
-      ( link.isImage ? game.physicalImagePath : game.physicalVideoPath ) = link.path;
-      ( link.isImage ? game.missingImage : game.missingVideo ) = false;
+      setMediaLink( link.index, link.isImage, text, link.path );
    }
 
    if ( writes.isEmpty() )
@@ -655,9 +660,7 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
       // Only the file name changes: the folder part of the link stays as written.
       const QString oldLink = rename.isImage ? game.imagePath : game.videoPath;
       const QString text = folderOf( oldLink ) + QFileInfo( rename.newPath ).fileName();
-      setChildText( FEntries[rename.index].node, rename.isImage ? Cst_ImageLink : Cst_VideoLink, text );
-      ( rename.isImage ? game.imagePath : game.videoPath ) = text;
-      ( rename.isImage ? game.physicalImagePath : game.physicalVideoPath ) = rename.newPath;
+      setMediaLink( rename.index, rename.isImage, text, rename.newPath );
    }
 
    if ( writes.isEmpty() )
@@ -708,10 +711,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
       write.target = target;
    }
 
-   setChildText( FEntries[aIndex].node, Cst_VideoLink, link );
-   game.videoPath = link;
-   game.physicalVideoPath = target;
-   game.missingVideo = false;
+   setMediaLink( aIndex, false, link, target );
 
    return commitMedia( { write } );
 }
@@ -742,10 +742,7 @@ Result<> Gamelist::removeImage( int aIndex )
    const QString file = game.physicalImagePath;
    const Game before = game;
 
-   setChildText( FEntries[aIndex].node, Cst_ImageLink, QString() );
-   game.imagePath.clear();
-   game.physicalImagePath.clear();
-   game.missingImage = true;
+   setMediaLink( aIndex, true, QString(), QString() );
 
    if ( const Result<> saved = save(); !saved ) {
       restoreLink( aIndex, true, before );
@@ -769,10 +766,7 @@ Result<> Gamelist::removeVideo( int aIndex )
    const QString file = game.physicalVideoPath;
    const Game before = game;
 
-   setChildText( FEntries[aIndex].node, Cst_VideoLink, QString() );
-   game.videoPath.clear();
-   game.physicalVideoPath.clear();
-   game.missingVideo = true;
+   setMediaLink( aIndex, false, QString(), QString() );
 
    if ( const Result<> saved = save(); !saved ) {
       restoreLink( aIndex, false, before );
@@ -790,19 +784,9 @@ Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
    if ( const Result<> valid = checkIndex( aIndex ); !valid )
       return valid;
 
-   QDomElement node = FEntries.at( aIndex ).node;
-   QDomNode parent = node.parentNode();
-   const QDomNode next = node.nextSibling();
-   parent.removeChild( node );
-
-   if ( const Result<> saved = save(); !saved ) {
-      parent.insertBefore( node, next );
-      return saved;
-   }
-
    const Game game = FEntries.at( aIndex ).game;
-   FEntries.remove( aIndex );
-   countDuplicates();
+   if ( const Result<> removed = removeGames( { aIndex } ); !removed )
+      return removed;
 
    // Only once the gamelist has stopped listing it, and not what another entry
    // (a duplicate, a shared picture) still points at.
