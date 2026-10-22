@@ -112,6 +112,11 @@ private:
 
    Result<> checkIndex( int aIndex ) const;
 
+   // Whether an entry other than aSkip (-1: none) has the same file in aMember.
+   bool sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const;
+
+   Result<> removeMedia( int aIndex, bool aIsImage );
+
 
    Game gameFromNode( const QDomElement& aNode ) const;
 

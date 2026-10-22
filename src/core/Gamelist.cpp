@@ -716,67 +716,57 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
    return commitMedia( { write } );
 }
 
-bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
+bool Gamelist::sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const
 {
-   if ( aPhysicalPath.isEmpty() )
+   if ( aPath.isEmpty() )
       return false;
 
    for ( int index = 0; index < FEntries.size(); ++index ) {
-      if ( index == aIndex )
-         continue;
-      const Game& other = FEntries.at( index ).game;
-      if ( sameFileOnDisk( aIsImage ? other.physicalImagePath : other.physicalVideoPath,
-                           aPhysicalPath, FFoldsCase ) )
+      if ( index != aSkip &&
+           sameFileOnDisk( FEntries.at( index ).game.*aMember, aPath, FFoldsCase ) )
          return true;
    }
 
    return false;
 }
 
-Result<> Gamelist::removeImage( int aIndex )
+bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
+{
+   return sharedFile( aIndex, aPhysicalPath,
+                      aIsImage ? &Game::physicalImagePath : &Game::physicalVideoPath );
+}
+
+Result<> Gamelist::removeMedia( int aIndex, bool aIsImage )
 {
    if ( const Result<> valid = checkIndex( aIndex ); !valid )
       return valid;
 
-   Game& game = FEntries[aIndex].game;
-   const QString file = game.physicalImagePath;
-   const Game before = game;
+   const Game before = FEntries.at( aIndex ).game;
+   const QString file = aIsImage ? before.physicalImagePath : before.physicalVideoPath;
 
-   setMediaLink( aIndex, true, QString(), QString() );
+   setMediaLink( aIndex, aIsImage, QString(), QString() );
 
    if ( const Result<> saved = save(); !saved ) {
-      restoreLink( aIndex, true, before );
+      restoreLink( aIndex, aIsImage, before );
       return saved;
    }
 
    // Only once the gamelist has stopped pointing at it, and only if no other
-   // game points at it either - several games can share one picture.
-   if ( !file.isEmpty() && !fileShared( aIndex, file, true ) )
+   // game points at it either - several games can share one file.
+   if ( !file.isEmpty() && !fileShared( aIndex, file, aIsImage ) )
       discardFile( file );
 
    return {};
 }
 
+Result<> Gamelist::removeImage( int aIndex )
+{
+   return removeMedia( aIndex, true );
+}
+
 Result<> Gamelist::removeVideo( int aIndex )
 {
-   if ( const Result<> valid = checkIndex( aIndex ); !valid )
-      return valid;
-
-   Game& game = FEntries[aIndex].game;
-   const QString file = game.physicalVideoPath;
-   const Game before = game;
-
-   setMediaLink( aIndex, false, QString(), QString() );
-
-   if ( const Result<> saved = save(); !saved ) {
-      restoreLink( aIndex, false, before );
-      return saved;
-   }
-
-   if ( !file.isEmpty() && !fileShared( aIndex, file, false ) )
-      discardFile( file );
-
-   return {};
+   return removeMedia( aIndex, false );
 }
 
 Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
@@ -788,22 +778,14 @@ Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
    if ( const Result<> removed = removeGames( { aIndex } ); !removed )
       return removed;
 
-   // Only once the gamelist has stopped listing it, and not what another entry
-   // (a duplicate, a shared picture) still points at.
-   const auto shared = [this]( const QString& aPath, QString Game::*aMember ) {
-      for ( const Entry& other : std::as_const( FEntries ) ) {
-         if ( sameFileOnDisk( other.game.*aMember, aPath, FFoldsCase ) )
-            return true;
-      }
-      return false;
-   };
-
    QStringList stuck;
    if ( !aDeleteFiles )
       return stuck;
 
    const auto drop = [&]( const QString& aPath, QString Game::*aMember ) {
-      if ( aPath.isEmpty() || !QFileInfo::exists( aPath ) || shared( aPath, aMember ) )
+      // Only once the gamelist has stopped listing it, and not what another entry
+      // (a duplicate, a shared picture) still points at.
+      if ( aPath.isEmpty() || !QFileInfo::exists( aPath ) || sharedFile( -1, aPath, aMember ) )
          return;
       if ( !discardFile( aPath ) )
          stuck << aPath;
