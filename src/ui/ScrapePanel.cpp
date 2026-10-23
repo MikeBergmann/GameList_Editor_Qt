@@ -536,37 +536,22 @@ void ScrapePanel::save()
 void ScrapePanel::finishSave( const QString& aVideoPath )
 {
    const int index = FIndex;
-   const GameFields before = gameFields( FGamelist->at( index ) );
    const GameFieldSet which = Chk_ScrapeInfos->isChecked()
                                  ? changedFields( FGamelist->at( index ), fields() )
                                  : GameFieldSet();
-   if ( which )
-      FGamelist->setFields( { index }, fields(), which );
 
-   Result<> result;
-   bool saved = false;  // a save went through, infos included
+   // Each step saves by itself: a failure stops the later ones, the earlier ones stay saved.
+   Result<> result = FGamelist->setFields( { index }, fields(), which );
 
-   if ( Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull() ) {
+   if ( result && Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull() )
       result = FGamelist->setImage( index, FSelectedPicture );
-      saved = bool( result );
-   }
 
-   if ( result && !aVideoPath.isEmpty() ) {
+   if ( result && !aVideoPath.isEmpty() )
       result = FGamelist->setVideo( index, aVideoPath );
-      saved = saved || bool( result );
-   }
 
-   // Also when the image failed and the video was never used.
+   // Also when an earlier step failed and the video was never used.
    if ( !aVideoPath.isEmpty() )
       QFile::remove( aVideoPath );
-
-   // setFields() alone does not save, so an infos-only save has to ask for it.
-   if ( result && which && !saved )
-      result = FGamelist->save();
-
-   // Without a save the infos are only in memory; the next media save would write them unasked.
-   if ( !result && which && !saved )
-      FGamelist->setFields( { index }, before, which );
 
    report( result );
 }

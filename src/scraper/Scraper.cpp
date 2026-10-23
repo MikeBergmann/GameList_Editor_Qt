@@ -230,7 +230,11 @@ bool devCredentialsConfigured()
    return !decodeDevSecret( Cst_DevIdXor ).isEmpty() && !decodeDevSecret( Cst_DevPwdXor ).isEmpty();
 }
 
-Scraper::Scraper( QObject* aParent ) : QObject( aParent ) {}
+Scraper::Scraper( QObject* aParent ) : QObject( aParent )
+{
+   // Qt's default is no timeout, and a stalled reply would hold the window busy for good.
+   FManager.setTransferTimeout( QNetworkRequest::DefaultTransferTimeoutConstant );
+}
 
 void Scraper::setProxy( const QString& aServer, int aPort, const QString& aUser,
                         const QString& aPassword )

@@ -293,8 +293,7 @@ TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
    const GameFieldSet which = changedFields( list.at( 0 ), values );
    EXPECT_EQ( which, GameFieldSet( gfGenre | gfFavorite ) );
 
-   list.setFields( { 0 }, values, which );
-   const Result<> written = list.save();
+   const Result<> written = list.setFields( { 0 }, values, which );
    ASSERT_TRUE( written ) << written.error().toStdString();
 
    const Gamelist saved = reload( fixture );
@@ -321,8 +320,7 @@ TEST( Gamelist, SetFieldsCreatesMissingNodes )
    values.hidden = 1;
 
    ASSERT_TRUE( list.at( 2 ).genre.isEmpty() );
-   list.setFields( { 2 }, values, filledFields( values ) );
-   ASSERT_TRUE( list.save() );
+   ASSERT_TRUE( list.setFields( { 2 }, values, filledFields( values ) ) );
 
    const Gamelist saved = reload( fixture );
    EXPECT_EQ( saved.at( 2 ).genre, QStringLiteral( "Shooter" ) );
@@ -341,8 +339,7 @@ TEST( Gamelist, BatchSetFieldsLeavesTheBlanksAlone )
    values.publisher = QStringLiteral( "Sega of America" );
    values.kidGame = 0;
 
-   list.setFields( { 0, 1, 2 }, values, filledFields( values ) );
-   ASSERT_TRUE( list.save() );
+   ASSERT_TRUE( list.setFields( { 0, 1, 2 }, values, filledFields( values ) ) );
 
    const Gamelist saved = reload( fixture );
    for ( int index = 0; index < saved.count(); ++index ) {
@@ -366,16 +363,14 @@ TEST( Gamelist, AnUnparseableDateIsStoredBlank )
 
    GameFields values = gameFields( list.at( 0 ) );
    values.releaseDate = QStringLiteral( "june 1991" );
-   list.setFields( { 0 }, values, changedFields( list.at( 0 ), values ) );
+   ASSERT_TRUE( list.setFields( { 0 }, values, changedFields( list.at( 0 ), values ) ) );
 
    EXPECT_TRUE( list.at( 0 ).releaseDate.isEmpty() );
-   ASSERT_TRUE( list.save() );
    EXPECT_TRUE( reload( fixture ).at( 0 ).releaseDate.isEmpty() );
 
    // And a good one still converts on the way out.
    values.releaseDate = QStringLiteral( "06/1991" );
-   list.setFields( { 0 }, values, GameFieldSet( gfReleaseDate ) );
-   ASSERT_TRUE( list.save() );
+   ASSERT_TRUE( list.setFields( { 0 }, values, GameFieldSet( gfReleaseDate ) ) );
    EXPECT_EQ( reload( fixture ).at( 0 ).releaseDate, QStringLiteral( "06/1991" ) );
 }
 
@@ -783,17 +778,42 @@ TEST( Gamelist, SavingBacksUpTheOriginalOncePerLoad )
 
    GameFields values = gameFields( list.at( 0 ) );
    values.genre = QStringLiteral( "First" );
-   list.setFields( { 0 }, values, GameFieldSet( gfGenre ) );
-   ASSERT_TRUE( list.save() );
+   ASSERT_TRUE( list.setFields( { 0 }, values, GameFieldSet( gfGenre ) ) );
 
    ASSERT_EQ( backups().size(), 1 );
    EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
 
    values.genre = QStringLiteral( "Second" );
-   list.setFields( { 0 }, values, GameFieldSet( gfGenre ) );
-   ASSERT_TRUE( list.save() );
+   ASSERT_TRUE( list.setFields( { 0 }, values, GameFieldSet( gfGenre ) ) );
    EXPECT_EQ( backups().size(), 1 ) << "a second save in the same load must not add one";
    EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
+}
+
+TEST( Gamelist, AFailedSetFieldsLeavesGameAndDocumentAsTheyWere )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   breakSave( fixture, list );
+
+   GameFields values;
+   values.name = QStringLiteral( "Renamed" );
+   values.genre = QStringLiteral( "Shooter" );
+   values.hidden = 1;
+
+   EXPECT_FALSE( list.setFields( { 2 }, values, filledFields( values ) ) );
+   EXPECT_EQ( list.at( 2 ).name, QStringLiteral( "Vanished" ) );
+   EXPECT_TRUE( list.at( 2 ).genre.isEmpty() );
+   EXPECT_EQ( list.at( 2 ).hidden, 0 );
+   EXPECT_EQ( list.domText( 2, "name" ), QStringLiteral( "Vanished" ) );
+
+   ASSERT_TRUE( QDir( fixture.snes.gamelistPath ).removeRecursively() );
+   writeFile( fixture.snes.gamelistPath, Cst_Gamelist );
+   ASSERT_TRUE( list.save() );
+   const QByteArray saved = readAll( fixture.snes.gamelistPath );
+   EXPECT_EQ( saved.count( "<genre" ), 1 ) << "the undo must remove the <genre> it created, not empty it";
+   EXPECT_EQ( saved.count( "<hidden" ), 1 ) << "nor leave a <hidden>false</hidden> behind";
+   EXPECT_TRUE( saved.contains( "<name>Vanished</name>" ) );
 }
 
 TEST( Gamelist, DeleteOldBackupsKeepsTheNewestAndNothingElse )

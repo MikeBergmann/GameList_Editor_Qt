@@ -117,5 +117,6 @@ private:
    };
    void startNextMedia( const std::shared_ptr<MediaBatch>& aState );
 
-   QNetworkAccessManager FManager;
+   // A child, so a test can reach it with findChild.
+   QNetworkAccessManager FManager{ this };
 };
