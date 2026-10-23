@@ -24,3 +24,6 @@ ViewUpdate renameMediaAfterRoms( QWidget* aParent, Gamelist& aGamelist );
 ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist );
 ViewUpdate deleteOrphans( QWidget* aParent, Gamelist& aGamelist );
 ViewUpdate deleteDuplicates( QWidget* aParent, Gamelist& aGamelist );
+
+// Touches no game, so it never owes the views anything and needs no save-first guard.
+void cleanUpBackups( QWidget* aParent, const Gamelist& aGamelist );

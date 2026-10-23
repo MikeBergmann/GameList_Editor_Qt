@@ -161,6 +161,7 @@ private:
    QString FImageFolder;
    QString FVideoFolder;
    bool FFoldsCase = false;
+   bool FBackedUp = false;
 
    QHash<QString, int> FNameCounts;
    QHash<QString, int> FRomCounts;

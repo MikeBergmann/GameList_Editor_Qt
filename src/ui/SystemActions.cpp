@@ -5,6 +5,8 @@
 #include "Gamelist.h"
 #include "MediaOps.h"
 
+#include <algorithm>
+
 #include <QInputDialog>
 #include <QLocale>
 #include <QMessageBox>
@@ -155,6 +157,32 @@ ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist )
 
    // The links are unchanged, but the editor may be showing a picture that just changed.
    return ViewUpdate::Refresh;
+}
+
+void cleanUpBackups( QWidget* aParent, const Gamelist& aGamelist )
+{
+   const int found = static_cast<int>( gamelistBackups( aGamelist ).size() );
+   if ( found == 0 ) {
+      QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
+                                QStringLiteral( "This system has no gamelist backups." ) );
+      return;
+   }
+
+   bool ok = false;
+   const int keep = QInputDialog::getInt(
+      aParent, QStringLiteral( "Clean up backups" ),
+      QStringLiteral( "%1 backup(s) found. Keep the newest:" ).arg( found ), std::min( found, 3 ), 0,
+      found, 1, &ok );
+   if ( !ok )
+      return;
+
+   const Result<int> removed = deleteOldBackups( aGamelist, keep );
+   if ( !removed ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), removed.error() );
+      return;
+   }
+   QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
+                             QStringLiteral( "%1 backup(s) deleted." ).arg( removed.value() ) );
 }
 
 ViewUpdate deleteOrphans( QWidget* aParent, Gamelist& aGamelist )

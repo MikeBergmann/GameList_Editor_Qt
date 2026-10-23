@@ -152,6 +152,34 @@ QStringList unlistedRoms( const Gamelist& aList )
    return found;
 }
 
+QStringList gamelistBackups( const Gamelist& aList )
+{
+   const QFileInfo gamelist( aList.system().gamelistPath );
+   QStringList found = gamelist.dir().entryList(
+      { gamelist.fileName() + QStringLiteral( ".????????" "-??????.bak" ) }, QDir::Files,
+      QDir::Name | QDir::Reversed );
+   for ( QString& name : found )
+      name = gamelist.dir().filePath( name );
+   return found;
+}
+
+Result<int> deleteOldBackups( const Gamelist& aList, int aKeep )
+{
+   const QStringList backups = gamelistBackups( aList );
+   int removed = 0;
+   QStringList stuck;
+   for ( int index = std::max( aKeep, 0 ); index < backups.size(); ++index ) {
+      if ( discardFile( backups.at( index ) ) )
+         ++removed;
+      else
+         stuck << backups.at( index );
+   }
+
+   if ( !stuck.isEmpty() )
+      return Error{ QStringLiteral( "Could not delete:\n%1" ).arg( stuck.join( QLatin1Char( '\n' ) ) ) };
+   return removed;
+}
+
 QVector<MediaLink> unlinkedMedia( const Gamelist& aList )
 {
    struct Kind
