@@ -4,9 +4,12 @@
 #include "F_LinkMedia.h"
 #include "Gamelist.h"
 #include "MediaOps.h"
+#include "PathUtil.h"
 
 #include <algorithm>
 
+#include <QDir>
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QLocale>
 #include <QMessageBox>
@@ -159,6 +162,39 @@ ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist )
    return ViewUpdate::Refresh;
 }
 
+std::optional<SystemKind> chooseSystemKind( QWidget* aParent, const SystemEntry& aSystem )
+{
+   // The mapping is only consulted for folders the tables do not know, so for a
+   // known one it would be saved and then silently ignored.
+   if ( systemKindFromFolder( aSystem.folderName ) != skOther ) {
+      QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
+                                QStringLiteral( "This folder name is already a known system." ) );
+      return std::nullopt;
+   }
+
+   const QVector<SystemKindChoice> choices = systemKindChoices();
+   QStringList labels{ QStringLiteral( "Other (no mapping)" ) };
+   int current = 0;
+   for ( int i = 0; i < choices.size(); ++i ) {
+      labels.append( choices[i].label );
+      if ( choices[i].kind == aSystem.kind )
+         current = i + 1;
+   }
+
+   bool ok = false;
+   const QString chosen = QInputDialog::getItem(
+      aParent, QStringLiteral( "Set system type" ),
+      QStringLiteral( "Treat the folder \"%1\" as:" ).arg( aSystem.folderName ), labels, current,
+      false, &ok );
+   if ( !ok )
+      return std::nullopt;
+
+   const int picked = static_cast<int>( labels.indexOf( chosen ) );
+   const SystemKind kind = picked <= 0 ? skOther : choices[picked - 1].kind;
+   setSystemMapping( aSystem.folderName, kind );
+   return kind;
+}
+
 void cleanUpBackups( QWidget* aParent, const Gamelist& aGamelist )
 {
    const int found = static_cast<int>( gamelistBackups( aGamelist ).size() );
@@ -183,6 +219,28 @@ void cleanUpBackups( QWidget* aParent, const Gamelist& aGamelist )
    }
    QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
                              QStringLiteral( "%1 backup(s) deleted." ).arg( removed.value() ) );
+}
+
+void exportGamesList( QWidget* aParent, const Gamelist& aGamelist, const QStringList& aNames )
+{
+   const QString path = QFileDialog::getSaveFileName(
+      aParent, QStringLiteral( "Export games list" ),
+      QDir( aGamelist.systemDir() ).filePath( aGamelist.system().folderName + QStringLiteral( ".txt" ) ),
+      QStringLiteral( "Text files (*.txt)" ) );
+   if ( path.isEmpty() )
+      return;
+
+   QByteArray content;
+   for ( const QString& name : aNames )
+      content += name.toUtf8() + '\n';
+
+   if ( const Result<> written = writeFileAtomically( path, content ); !written ) {
+      QMessageBox::warning( aParent, QStringLiteral( "GameList Editor Qt" ), written.error() );
+      return;
+   }
+
+   QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
+                             QStringLiteral( "%1 game(s) exported." ).arg( aNames.size() ) );
 }
 
 ViewUpdate deleteOrphans( QWidget* aParent, Gamelist& aGamelist )
