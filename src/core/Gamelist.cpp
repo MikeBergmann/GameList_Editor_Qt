@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include <QDateTime>
 #include <QDir>
 
 #include <QFile>
@@ -84,6 +85,7 @@ QString Gamelist::domText( int aIndex, const char* aName ) const
 Result<> Gamelist::load( const SystemEntry& aSystem )
 {
    FSystem = aSystem;
+   FBackedUp = false;
    FSystemDir.clear();
    FDocument = QDomDocument();
    FEntries.clear();
@@ -245,6 +247,16 @@ Result<> Gamelist::checkIndex( int aIndex ) const
 
 Result<> Gamelist::save()
 {
+   // ponytail: one copy per load, never pruned; cap or age them out if they pile up.
+   if ( !FBackedUp ) {
+      const QString backup =
+         FSystem.gamelistPath + QDateTime::currentDateTime().toString( ".yyyyMMdd-HHmmss" ) + ".bak";
+      if ( !QFile::exists( backup ) && !QFile::copy( FSystem.gamelistPath, backup ) )
+         return Error{ QStringLiteral( "Cannot back up %1 to %2" )
+                          .arg( FSystem.gamelistPath, backup ) };
+      FBackedUp = true;
+   }
+
    QSaveFile file( FSystem.gamelistPath );
    if ( !file.open( QIODevice::WriteOnly ) )
       return Error{ QStringLiteral( "Cannot write %1: %2" )

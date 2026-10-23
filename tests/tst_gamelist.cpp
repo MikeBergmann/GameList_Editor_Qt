@@ -768,6 +768,55 @@ QByteArray readAll( const QString& aPath )
    return file.open( QIODevice::ReadOnly ) ? file.readAll() : QByteArray( "<unreadable>" );
 }
 
+TEST( Gamelist, SavingBacksUpTheOriginalOncePerLoad )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const QByteArray original = readAll( fixture.snes.gamelistPath );
+
+   const auto backups = [&fixture]() {
+      return QFileInfo( fixture.snes.gamelistPath )
+         .dir()
+         .entryList( { QStringLiteral( "gamelist.xml.*.bak" ) }, QDir::Files );
+   };
+
+   GameFields values = gameFields( list.at( 0 ) );
+   values.genre = QStringLiteral( "First" );
+   list.setFields( { 0 }, values, GameFieldSet( gfGenre ) );
+   ASSERT_TRUE( list.save() );
+
+   ASSERT_EQ( backups().size(), 1 );
+   EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
+
+   values.genre = QStringLiteral( "Second" );
+   list.setFields( { 0 }, values, GameFieldSet( gfGenre ) );
+   ASSERT_TRUE( list.save() );
+   EXPECT_EQ( backups().size(), 1 ) << "a second save in the same load must not add one";
+   EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
+}
+
+TEST( Gamelist, DeleteOldBackupsKeepsTheNewestAndNothingElse )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   for ( const char* stamp : { "20200101-000000", "20210101-000000", "20220101-000000" } )
+      writeFile( fixture.path( "snes/gamelist.xml." ) + QLatin1String( stamp ) + ".bak", "x" );
+   writeFile( fixture.path( "snes/gamelist.xml.notes.bak" ), "mine" );
+
+   const QStringList found = gamelistBackups( list );
+   ASSERT_EQ( found.size(), 3 );
+   EXPECT_TRUE( found.first().contains( QStringLiteral( "2022" ) ) ) << "newest first";
+
+   const Result<int> removed = deleteOldBackups( list, 1 );
+   ASSERT_TRUE( removed ) << removed.error().toStdString();
+   EXPECT_EQ( removed.value(), 2 );
+   EXPECT_EQ( gamelistBackups( list ), QStringList( found.first() ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/gamelist.xml.notes.bak" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.snes.gamelistPath ) );
+}
+
 QString linkInDom( const Gamelist& aList, int aIndex, const char* aName )
 {
    return aList.domText( aIndex, aName );

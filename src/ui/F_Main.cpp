@@ -113,6 +113,8 @@ void Frm_Editor::buildMenu()
    addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) );
    system->addSeparator();
    addSystemAction( QStringLiteral( "Export games list to txt file..." ), &Frm_Editor::exportGamesList );
+   addSystemAction( QStringLiteral( "Clean up gamelist backups..." ),
+                    [this] { cleanUpBackups( this, FGamelist ); } );
    addPendingMenu( actions, QStringLiteral( "Game" ),
                    { QStringLiteral( "Convert text to lowercase" ),
                      QStringLiteral( "Convert text to uppercase" ) } );

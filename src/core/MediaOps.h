@@ -23,6 +23,13 @@ QVector<MediaLink> unlinkedMedia( const Gamelist& aList );
 // not be renamed carry a problem. aStrict accepts only the plain ROM name.
 QVector<MediaRename> misnamedMedia( const Gamelist& aList, bool aStrict = false );
 
+// The session backups Gamelist::save leaves next to the gamelist, newest first.
+QStringList gamelistBackups( const Gamelist& aList );
+
+// Discards all but the newest aKeep backups (to the trash when there is one). The
+// value is how many went; an Error names those that could not be discarded.
+Result<int> deleteOldBackups( const Gamelist& aList, int aKeep );
+
 // A linked picture that is bigger than the limit the user set.
 struct OversizedImage
 {
