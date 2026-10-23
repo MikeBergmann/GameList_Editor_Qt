@@ -73,11 +73,9 @@ private:
    void refreshViews();
    void setSystemActionsEnabled( bool aEnabled );
    void setSystemType();
-   void exportGamesList();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    void clearSystemLogo();
-   QString systemDisplayName( const SystemEntry& aSystem ) const;
 
    // False means stay put: the user cancelled, or the save failed.
    bool confirmLeaveEdits();

@@ -31,4 +31,8 @@ struct SystemKindChoice
 };
 QVector<SystemKindChoice> systemKindChoices();
 
+// The combo text: the table name, plus the folder name when it differs (a mapped folder).
+// aGenesis shows the Mega Drive under its US name.
+QString systemDisplayName( const SystemEntry& aSystem, bool aGenesis );
+
 Q_DECLARE_METATYPE( SystemEntry )

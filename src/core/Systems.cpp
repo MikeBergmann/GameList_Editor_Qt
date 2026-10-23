@@ -63,3 +63,19 @@ QVector<SystemKindChoice> systemKindChoices()
    } );
    return choices;
 }
+
+QString systemDisplayName( const SystemEntry& aSystem, bool aGenesis )
+{
+   // skOther is every folder no table knows, so its own name is all there is.
+   if ( aSystem.kind == skOther )
+      return aSystem.folderName;
+
+   QString name = QLatin1String( Cst_SystemKindStr[aSystem.kind] );
+   if ( aSystem.kind == skMegaDrive && aGenesis )
+      name = QLatin1String( Cst_SystemKindStr[skGenesis] );
+
+   // A mapped folder ("amiga500" treated as Amiga) keeps its own name visible.
+   if ( aSystem.folderName != QLatin1String( Cst_SystemKindFolderNames[aSystem.kind] ) )
+      name += QStringLiteral( " (%1)" ).arg( aSystem.folderName );
+   return name;
+}

@@ -19,7 +19,6 @@
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
@@ -112,7 +111,12 @@ void Frm_Editor::buildMenu()
    addSystemAction( QStringLiteral( "Delete orphans from gamelist..." ), command( &deleteOrphans ) );
    addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) );
    system->addSeparator();
-   addSystemAction( QStringLiteral( "Export games list to txt file..." ), &Frm_Editor::exportGamesList );
+   addSystemAction( QStringLiteral( "Export games list to txt file..." ), [this] {
+      QStringList names;
+      for ( int row = 0; row < FProxy->rowCount(); ++row )
+         names.append( FProxy->index( row, 0 ).data().toString() );
+      exportGamesList( this, FGamelist, names );
+   } );
    addSystemAction( QStringLiteral( "Clean up gamelist backups..." ),
                     [this] { cleanUpBackups( this, FGamelist ); } );
    addPendingMenu( actions, QStringLiteral( "Game" ),
@@ -344,7 +348,7 @@ void Frm_Editor::onGenesisToggled()
    const int item =
       findSystemItem( []( const SystemEntry& aSystem ) { return aSystem.kind == skMegaDrive; } );
    if ( item >= 0 )
-      Cbx_Systems->setItemText( item, systemDisplayName( systemAt( item ) ) );
+      Cbx_Systems->setItemText( item, systemDisplayName( systemAt( item ), Mnu_Genesis->isChecked() ) );
 
    if ( Cbx_Systems->currentIndex() >= 0 )
       LoadSystemLogo( systemAt( Cbx_Systems->currentIndex() ).kind );
@@ -493,7 +497,8 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    const QSignalBlocker blocked( Cbx_Systems );
    Cbx_Systems->clear();
    for ( const SystemEntry& system : systems )
-      Cbx_Systems->addItem( systemDisplayName( system ), QVariant::fromValue( system ) );
+      Cbx_Systems->addItem( systemDisplayName( system, Mnu_Genesis->isChecked() ),
+                            QVariant::fromValue( system ) );
 
    const bool found = !systems.isEmpty();
    Cbx_Systems->setEnabled( found );
@@ -633,30 +638,6 @@ void Frm_Editor::setSystemActionsEnabled( bool aEnabled )
       action->setEnabled( aEnabled );
 }
 
-void Frm_Editor::exportGamesList()
-{
-   const QString path = QFileDialog::getSaveFileName(
-      this, QStringLiteral( "Export games list" ),
-      QDir( FGamelist.systemDir() ).filePath( FGamelist.system().folderName + QStringLiteral( ".txt" ) ),
-      QStringLiteral( "Text files (*.txt)" ) );
-   if ( path.isEmpty() )
-      return;
-
-   // What the list shows, in the order it shows it: filter, search and the
-   // ROM / name toggles all apply.
-   QByteArray content;
-   for ( int row = 0; row < FProxy->rowCount(); ++row )
-      content += FProxy->index( row, 0 ).data().toString().toUtf8() + '\n';
-
-   if ( const Result<> written = writeFileAtomically( path, content ); !written ) {
-      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), written.error() );
-      return;
-   }
-
-   QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                             QStringLiteral( "%1 game(s) exported." ).arg( FProxy->rowCount() ) );
-}
-
 void Frm_Editor::LoadSystemLogo( SystemKind aKind )
 {
    const SystemKind kind = ( aKind == skMegaDrive && Mnu_Genesis->isChecked() ) ? skGenesis : aKind;
@@ -694,22 +675,6 @@ bool Frm_Editor::eventFilter( QObject* aWatched, QEvent* aEvent )
    return QMainWindow::eventFilter( aWatched, aEvent );
 }
 
-QString Frm_Editor::systemDisplayName( const SystemEntry& aSystem ) const
-{
-   // skOther is every folder no table knows, so its own name is all there is.
-   if ( aSystem.kind == skOther )
-      return aSystem.folderName;
-
-   QString name = QLatin1String( Cst_SystemKindStr[aSystem.kind] );
-   if ( aSystem.kind == skMegaDrive && Mnu_Genesis->isChecked() )
-      name = QLatin1String( Cst_SystemKindStr[skGenesis] );
-
-   // A mapped folder ("amiga500" treated as Amiga) keeps its own name visible.
-   if ( aSystem.folderName != QLatin1String( Cst_SystemKindFolderNames[aSystem.kind] ) )
-      name += QStringLiteral( " (%1)" ).arg( aSystem.folderName );
-   return name;
-}
-
 void Frm_Editor::setSystemType()
 {
    const int item = Cbx_Systems->currentIndex();
@@ -717,41 +682,15 @@ void Frm_Editor::setSystemType()
       return;
 
    SystemEntry system = systemAt( item );
-
-   // The mapping is only consulted for folders the tables do not know, so for a
-   // known one it would be saved and then silently ignored.
-   if ( systemKindFromFolder( system.folderName ) != skOther ) {
-      QMessageBox::information( this, QStringLiteral( "GameList Editor Qt" ),
-                                QStringLiteral( "This folder name is already a known system." ) );
-      return;
-   }
-
-   const QVector<SystemKindChoice> choices = systemKindChoices();
-   QStringList labels{ QStringLiteral( "Other (no mapping)" ) };
-   int current = 0;
-   for ( int i = 0; i < choices.size(); ++i ) {
-      labels.append( choices[i].label );
-      if ( choices[i].kind == system.kind )
-         current = i + 1;
-   }
-
-   bool ok = false;
-   const QString chosen = QInputDialog::getItem(
-      this, QStringLiteral( "Set system type" ),
-      QStringLiteral( "Treat the folder \"%1\" as:" ).arg( system.folderName ), labels, current,
-      false, &ok );
-   if ( !ok )
+   const std::optional<SystemKind> kind = chooseSystemKind( this, system );
+   if ( !kind )
       return;
 
-   const int picked = static_cast<int>( labels.indexOf( chosen ) );
-   const SystemKind kind = picked <= 0 ? skOther : choices[picked - 1].kind;
-   setSystemMapping( system.folderName, kind );
-
-   system.kind = kind;
+   system.kind = *kind;
    Cbx_Systems->setItemData( item, QVariant::fromValue( system ) );
-   Cbx_Systems->setItemText( item, systemDisplayName( system ) );
-   FGamelist.setSystemKind( kind );
-   LoadSystemLogo( kind );
+   Cbx_Systems->setItemText( item, systemDisplayName( system, Mnu_Genesis->isChecked() ) );
+   FGamelist.setSystemKind( *kind );
+   LoadSystemLogo( *kind );
 }
 
 void Frm_Editor::refreshFilter()
