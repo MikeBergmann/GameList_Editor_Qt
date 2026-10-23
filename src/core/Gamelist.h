@@ -51,7 +51,8 @@ public:
 
    Result<> save();
 
-   void setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
+   // Saves. An Error leaves games, document and file as they were.
+   Result<> setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
    Result<> setImage( int aIndex, const QString& aSourcePath );
    Result<> setImage( int aIndex, const QImage& aPicture );
@@ -110,6 +111,9 @@ private:
    bool sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const;
 
    Result<> removeMedia( int aIndex, bool aIsImage );
+
+   // Does not save.
+   void applyFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
 
    Game gameFromNode( const QDomElement& aNode ) const;

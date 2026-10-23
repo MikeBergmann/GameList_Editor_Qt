@@ -224,4 +224,13 @@ TEST( Scraper, FailsWithoutDevCredentials )
    EXPECT_TRUE( message.contains( QStringLiteral( "GLE_SS_DEVID" ) ) );
 }
 
+TEST( Scraper, RequestsTimeOut )
+{
+   Scraper scraper;
+   const QNetworkAccessManager* manager = scraper.findChild<QNetworkAccessManager*>();
+   ASSERT_NE( manager, nullptr );
+   EXPECT_GT( manager->transferTimeout(), 0 )
+      << "a stalled reply would keep the scrape panel, and so the window, busy for good";
+}
+
 }  // namespace

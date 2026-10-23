@@ -3,6 +3,7 @@
 #include "PathUtil.h"
 
 #include <algorithm>
+#include <utility>
 
 #include <QDateTime>
 #include <QDir>
@@ -301,11 +302,36 @@ void Gamelist::setChildText( QDomElement aNode, const char* aName, const QString
       child.appendChild( FDocument.createTextNode( aText ) );
 }
 
-void Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValues,
-                          GameFieldSet aWhich )
+Result<> Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValues,
+                              GameFieldSet aWhich )
 {
-   if ( !aWhich )
-      return;
+   // Whole <game> copies, so the undo also drops the elements applyFields created.
+   QVector<std::pair<int, Entry>> before;
+   for ( int index : aTargets ) {
+      if ( aWhich && index >= 0 && index < FEntries.size() )
+         before.append( { index, { FEntries.at( index ).game,
+                                   FEntries.at( index ).node.cloneNode().toElement() } } );
+   }
+   if ( before.isEmpty() )
+      return {};
+
+   applyFields( aTargets, aValues, aWhich );
+
+   if ( const Result<> saved = save(); !saved ) {
+      for ( const auto& [index, entry] : std::as_const( before ) ) {
+         FEntries[index].node.parentNode().replaceChild( entry.node, FEntries[index].node );
+         FEntries[index] = entry;
+      }
+      countDuplicates();
+      return saved;
+   }
+
+   return {};
+}
+
+void Gamelist::applyFields( const QVector<int>& aTargets, const GameFields& aValues,
+                            GameFieldSet aWhich )
+{
 
    for ( int index : aTargets ) {
       if ( index < 0 || index >= FEntries.size() )

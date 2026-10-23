@@ -498,22 +498,7 @@ bool GameEditPanel::save()
    if ( !which )
       return true;
 
-   // Kept to undo a failed write. Otherwise the Gamelist would hold edits the
-   // file does not, the panel would compare clean against them, and closing
-   // would lose them without a prompt.
-   QVector<GameFields> before;
-   for ( int index : FSelection )
-      before.append( gameFields( FGamelist->at( index ) ) );
-
-   FGamelist->setFields( FSelection, values, which );
-
-   if ( const Result<> saved = FGamelist->save(); !saved ) {
-      // ponytail: the undo writes stored values back, so it can leave an empty or
-      // "false" element where the <game> had none. Harmless; a true undo would
-      // need Gamelist to snapshot the DOM nodes.
-      for ( qsizetype n = 0; n < FSelection.size(); ++n )
-         FGamelist->setFields( { FSelection.at( n ) }, before.at( n ), which );
-
+   if ( const Result<> saved = FGamelist->setFields( FSelection, values, which ); !saved ) {
       QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), saved.error() );
       return false;
    }
