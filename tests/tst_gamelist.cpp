@@ -816,6 +816,54 @@ TEST( Gamelist, AFailedSetFieldsLeavesGameAndDocumentAsTheyWere )
    EXPECT_TRUE( saved.contains( "<name>Vanished</name>" ) );
 }
 
+TEST( Gamelist, EditNamesRenamesEachTargetFromItsOwnName )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
+
+   NameEdit edit;
+   edit.addChars = true;
+   edit.endString = QStringLiteral( " (USA)" );
+   const Result<> renamed = list.editNames( { 0, 2 }, edit );
+   ASSERT_TRUE( renamed ) << renamed.error().toStdString();
+
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog (USA)" ) );
+   EXPECT_EQ( saved.at( 1 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( saved.at( 2 ).name, QStringLiteral( "Vanished (USA)" ) );
+   EXPECT_FALSE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) )
+      << "the duplicate counts must follow the rename";
+}
+
+TEST( Gamelist, EditNamesThatChangeNothingDoNotSave )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   breakSave( fixture, list );
+
+   EXPECT_TRUE( list.editNames( { 0, 1, 2 }, NameEdit() ) ) << "a save here would have failed";
+}
+
+TEST( Gamelist, AFailedEditNamesLeavesGamesAndDocumentAsTheyWere )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   breakSave( fixture, list );
+
+   NameEdit edit;
+   edit.changeCase = true;
+   edit.caseIndex = 1;
+   EXPECT_FALSE( list.editNames( { 0, 2 }, edit ) );
+
+   EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( list.domText( 2, "name" ), QStringLiteral( "Vanished" ) );
+   EXPECT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
+}
+
 TEST( Gamelist, DeleteOldBackupsKeepsTheNewestAndNothingElse )
 {
    Fixture fixture;

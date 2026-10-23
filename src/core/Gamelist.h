@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Game.h"
+#include "NameEdit.h"
 #include "Resources.h"
 #include "Result.h"
 #include "Systems.h"
@@ -11,6 +12,8 @@
 #include <QString>
 #include <QStringList>
 #include <QVector>
+
+#include <functional>
 
 // One system's gamelist.xml held open as a DOM. Each Game is stored with its
 // <game> element so the two cannot drift apart.
@@ -53,6 +56,9 @@ public:
 
    // Saves. An Error leaves games, document and file as they were.
    Result<> setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
+
+   // Renames each target with applyNameEdit, in one save. Same Error rule as setFields.
+   Result<> editNames( const QVector<int>& aTargets, const NameEdit& aEdit );
 
    Result<> setImage( int aIndex, const QString& aSourcePath );
    Result<> setImage( int aIndex, const QImage& aPicture );
@@ -111,6 +117,9 @@ private:
    bool sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const;
 
    Result<> removeMedia( int aIndex, bool aIsImage );
+
+   // Runs aApply on the targets, then saves; if that fails, puts the targets back.
+   Result<> applyAndSave( const QVector<int>& aTargets, const std::function<void()>& aApply );
 
    // Does not save.
    void applyFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );

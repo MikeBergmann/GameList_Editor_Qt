@@ -1,6 +1,7 @@
 // Frm_Editor, driven the way a user would drive it: point it at a ROM root and
 // then work the widgets that decide what the list shows and what the editor holds.
 
+#include "F_AdvNameEditor.h"
 #include "F_Main.h"
 #include "GamelistFilter.h"
 #include "GamelistFixture.h"
@@ -13,12 +14,14 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -396,6 +399,53 @@ TEST( MainWindow, SystemCommandsAreOnlyEnabledWhileASystemIsLoaded )
    answerNextBox( QMessageBox::Ok );  // "you selected the wrong folder"
    editor.openRootFolder( empty.path() );
    expectAll( false );
+}
+
+TEST( MainWindow, SelectionMenuSetsFavoriteAndHiddenOnEveryGameSelected )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->setCurrentIndex( 1 );  // snes
+   editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) )->selectAll();
+
+   findAction( editor, QStringLiteral( "Add to Hidden" ) )->trigger();
+   findAction( editor, QStringLiteral( "Remove from Favorites" ) )->trigger();
+
+   const Gamelist saved = reload( fixture );
+   for ( int index = 0; index < saved.count(); ++index ) {
+      EXPECT_EQ( saved.at( index ).hidden, 1 ) << index;
+      EXPECT_EQ( saved.at( index ).favorite, 0 ) << index;
+   }
+   EXPECT_EQ( saved.at( 1 ).kidGame, 1 ) << "the flags not asked for stay as they were";
+
+   findAction( editor, QStringLiteral( "Add to Favorites" ) )->trigger();
+   EXPECT_EQ( reload( fixture ).at( 2 ).favorite, 1 );
+}
+
+TEST( MainWindow, AdvancedNameEditorRenamesTheSelection )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   editor.findChild<QComboBox*>( QStringLiteral( "Cbx_Systems" ) )->setCurrentIndex( 1 );  // snes
+   editor.findChild<QListView*>( QStringLiteral( "Lbx_Games" ) )->selectAll();
+
+   QTimer::singleShot( 0, [] {
+      auto* dialog = qobject_cast<Frm_AdvNameEditor*>( QApplication::activeModalWidget() );
+      ASSERT_NE( dialog, nullptr );
+      for ( QGroupBox* group : dialog->findChildren<QGroupBox*>() )
+         if ( group->title() == QStringLiteral( "Case" ) )
+            group->setChecked( true );
+      dialog->findChildren<QRadioButton*>().at( 1 )->setChecked( true );  // Uppercase
+      dialog->accept();
+   } );
+   findAction( editor, QStringLiteral( "Advanced name editor" ) )->trigger();
+
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 0 ).name, QStringLiteral( "SONIC THE HEDGEHOG" ) );
+   EXPECT_EQ( saved.at( 2 ).name, QStringLiteral( "VANISHED" ) );
+   EXPECT_EQ( shown( editor ).first(), QStringLiteral( "SONIC THE HEDGEHOG" ) );
 }
 
 }  // namespace
