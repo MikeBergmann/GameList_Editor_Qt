@@ -56,12 +56,7 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Video playback
 - [x] Windows build (experimental)
 - [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
-
-### Stubbed
-
-- [ ] Actions → System: lowercase or uppercase all text, remove region from names
-- [ ] Actions → Game: lowercase or uppercase all text
-- [ ] Actions → Selection: add to or remove from Hidden and Favorites, and the Advanced name editor
+- [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
 
 ### Features to add
 

@@ -1,6 +1,7 @@
 #include "F_Main.h"
 
 #include "F_About.h"
+#include "F_AdvNameEditor.h"
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
 #include "F_MoreInfos.h"
@@ -42,20 +43,6 @@ FilterCategory currentCategory( const QComboBox* aFilterCombo )
 {
    const QVariant data = aFilterCombo->currentData();
    return data.isValid() ? static_cast<FilterCategory>( data.toInt() ) : FilterCategory::All;
-}
-
-// A submenu of placeholder entries with no handler yet, shown disabled. An empty item is a
-// separator.
-QMenu* addPendingMenu( QMenu* aParent, const QString& aTitle, const QStringList& aItems )
-{
-   QMenu* menu = aParent->addMenu( aTitle );
-   for ( const QString& item : aItems )
-      if ( item.isEmpty() )
-         menu->addSeparator();
-      else
-         menu->addAction( item );
-   menu->setEnabled( false );
-   return menu;
 }
 
 }  // namespace
@@ -103,11 +90,6 @@ void Frm_Editor::buildMenu()
    addSystemAction( QStringLiteral( "Shrink large pictures..." ), command( &shrinkLargeImages ) );
    addSystemAction( QStringLiteral( "Set system type..." ), &Frm_Editor::setSystemType );
    system->addSeparator();
-   // Not implemented yet, so always disabled.
-   for ( const char* text : { "Convert all text to lowercase", "Convert all text to uppercase",
-                              "Remove region from games names" } )
-      system->addAction( QLatin1String( text ) )->setEnabled( false );
-   system->addSeparator();
    addSystemAction( QStringLiteral( "Delete orphans from gamelist..." ), command( &deleteOrphans ) );
    addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) );
    system->addSeparator();
@@ -119,14 +101,27 @@ void Frm_Editor::buildMenu()
    } );
    addSystemAction( QStringLiteral( "Clean up gamelist backups..." ),
                     [this] { cleanUpBackups( this, FGamelist ); } );
-   addPendingMenu( actions, QStringLiteral( "Game" ),
-                   { QStringLiteral( "Convert text to lowercase" ),
-                     QStringLiteral( "Convert text to uppercase" ) } );
-   addPendingMenu( actions, QStringLiteral( "Selection" ),
-                   { QStringLiteral( "Add to Favorites" ), QStringLiteral( "Remove from Favorites" ),
-                     QString(), QStringLiteral( "Add to Hidden" ),
-                     QStringLiteral( "Remove from Hidden" ), QString(),
-                     QStringLiteral( "Advanced name editor" ) } );
+
+   QMenu* selection = actions->addMenu( QStringLiteral( "Selection" ) );
+   const auto addSelectionAction = [this, selection]( const QString& aText, auto aHandler ) {
+      FSelectionActions.append( selection->addAction( aText, this, aHandler ) );
+   };
+   const auto flag = [this]( int GameFields::*aFlag, GameField aField, int aValue ) {
+      return [this, aFlag, aField, aValue] { setSelectionFlag( aFlag, aField, aValue ); };
+   };
+   addSelectionAction( QStringLiteral( "Add to Favorites" ), flag( &GameFields::favorite, gfFavorite, 1 ) );
+   addSelectionAction( QStringLiteral( "Remove from Favorites" ), flag( &GameFields::favorite, gfFavorite, 0 ) );
+   selection->addSeparator();
+   addSelectionAction( QStringLiteral( "Add to Hidden" ), flag( &GameFields::hidden, gfHidden, 1 ) );
+   addSelectionAction( QStringLiteral( "Remove from Hidden" ), flag( &GameFields::hidden, gfHidden, 0 ) );
+   selection->addSeparator();
+   addSelectionAction( QStringLiteral( "Advanced name editor" ), &Frm_Editor::editSelectedNames );
+   // Checked when the menu opens, so no selection signal has to keep them current.
+   connect( selection, &QMenu::aboutToShow, this, [this] {
+      const bool any = !selectedGameIndexes().isEmpty();
+      for ( QAction* action : std::as_const( FSelectionActions ) )
+         action->setEnabled( any );
+   } );
 
    QMenu* options = menuBar()->addMenu( QStringLiteral( "Options" ) );
    QMenu* general = options->addMenu( QStringLiteral( "General" ) );
@@ -673,6 +668,40 @@ bool Frm_Editor::eventFilter( QObject* aWatched, QEvent* aEvent )
       scaleSystemLogo();
 
    return QMainWindow::eventFilter( aWatched, aEvent );
+}
+
+void Frm_Editor::setSelectionFlag( int GameFields::*aFlag, GameField aField, int aValue )
+{
+   const QVector<int> selected = selectedGameIndexes();
+   if ( selected.isEmpty() || !confirmLeaveEdits() )
+      return;
+
+   GameFields values;
+   values.*aFlag = aValue;
+   if ( const Result<> saved = FGamelist.setFields( selected, values, aField ); !saved ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), saved.error() );
+      return;
+   }
+
+   refreshViews();
+}
+
+void Frm_Editor::editSelectedNames()
+{
+   const QVector<int> selected = selectedGameIndexes();
+   if ( selected.isEmpty() || !confirmLeaveEdits() )
+      return;
+
+   NameEdit edit;
+   if ( !Frm_AdvNameEditor( this ).Execute( FGamelist.at( selected.first() ).name, edit ) )
+      return;
+
+   if ( const Result<> saved = FGamelist.editNames( selected, edit ); !saved ) {
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), saved.error() );
+      return;
+   }
+
+   refreshViews();
 }
 
 void Frm_Editor::setSystemType()

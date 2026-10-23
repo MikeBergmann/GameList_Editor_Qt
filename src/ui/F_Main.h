@@ -73,6 +73,8 @@ private:
    void refreshViews();
    void setSystemActionsEnabled( bool aEnabled );
    void setSystemType();
+   void setSelectionFlag( int GameFields::*aFlag, GameField aField, int aValue );
+   void editSelectedNames();
    void LoadSystemLogo( SystemKind aKind );
    void scaleSystemLogo();
    void clearSystemLogo();
@@ -114,6 +116,7 @@ private:
 
    QAction* Mnu_Reload = nullptr;
    QList<QAction*> FSystemActions;  // off while no system is loaded
+   QList<QAction*> FSelectionActions;  // off while no game is selected
    QAction* Mnu_GodMode = nullptr;
    QAction* Mnu_DeleteWoPrompt = nullptr;
    QAction* Mnu_AutoHash = nullptr;

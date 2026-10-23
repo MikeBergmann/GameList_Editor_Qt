@@ -305,17 +305,43 @@ void Gamelist::setChildText( QDomElement aNode, const char* aName, const QString
 Result<> Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValues,
                               GameFieldSet aWhich )
 {
-   // Whole <game> copies, so the undo also drops the elements applyFields created.
+   if ( !aWhich )
+      return {};
+
+   return applyAndSave( aTargets, [&] { applyFields( aTargets, aValues, aWhich ); } );
+}
+
+Result<> Gamelist::editNames( const QVector<int>& aTargets, const NameEdit& aEdit )
+{
+   QVector<int> changed;
+   for ( int index : aTargets )
+      if ( index >= 0 && index < FEntries.size() &&
+           applyNameEdit( FEntries.at( index ).game.name, aEdit ) != FEntries.at( index ).game.name )
+         changed.append( index );
+
+   return applyAndSave( changed, [&] {
+      for ( int index : std::as_const( changed ) ) {
+         const QString name = applyNameEdit( FEntries.at( index ).game.name, aEdit );
+         setChildText( FEntries[index].node, Cst_Name, name );
+         FEntries[index].game.name = name;
+      }
+      countDuplicates();
+   } );
+}
+
+Result<> Gamelist::applyAndSave( const QVector<int>& aTargets, const std::function<void()>& aApply )
+{
+   // Whole <game> copies, so the undo also drops the elements aApply created.
    QVector<std::pair<int, Entry>> before;
    for ( int index : aTargets ) {
-      if ( aWhich && index >= 0 && index < FEntries.size() )
+      if ( index >= 0 && index < FEntries.size() )
          before.append( { index, { FEntries.at( index ).game,
                                    FEntries.at( index ).node.cloneNode().toElement() } } );
    }
    if ( before.isEmpty() )
       return {};
 
-   applyFields( aTargets, aValues, aWhich );
+   aApply();
 
    if ( const Result<> saved = save(); !saved ) {
       for ( const auto& [index, entry] : std::as_const( before ) ) {
