@@ -128,6 +128,22 @@ TEST( ParseScrapeResponse, IgnoresATextNoteAfterTheDocument )
    EXPECT_EQ( parsed.value().name, QStringLiteral( "Sonic Ball (Europe)" ) );
 }
 
+TEST( ParseScrapeResponse, AcceptsANameOnlyMatchWithTrailingNote )
+{
+   const QByteArray reply = QByteArrayLiteral(
+      "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n\n<Data>\n<ssuser><maxthreads>1</maxthreads></ssuser>\n"
+      "<jeu id=\"322378\" notgame=\"false\"><noms><nom region=\"ss\">Neoteria</nom></noms>\n"
+      "<systeme id=\"138\">PC Windows</systeme><medias>\n"
+      "<media parent=\"jeu\" type=\"mixrbv2\" region=\"wor\" format=\"png\">https://x/?a=1&amp;b=2</media>\n"
+      "</medias>\n</jeu>\n</Data>\nCRC non trouv\xC3\xA9 : Champ systemeid obligatoire\n" );
+
+   const Result<ScrapedInfo> parsed =
+      parseScrapeResponse( reply, { QStringLiteral( "mixrbv2" ) }, false, lnEnglish );
+   ASSERT_TRUE( parsed ) << parsed.error().toStdString();
+   EXPECT_EQ( parsed.value().name, QStringLiteral( "Neoteria" ) );
+   EXPECT_EQ( parsed.value().pictures.size(), 1 );
+}
+
 TEST( ParseScrapeResponse, FailsOnMalformedXml )
 {
    const Result<ScrapedInfo> parsed =
@@ -161,7 +177,7 @@ TEST( SanitizeUrl, ScrubsBothDevAndUserPasswordAnywhereInTheMessage )
 }
 
 // A password such as p&ss#w+rd%41 used to go into the URL raw: '&' ended the value,
-// '#' started a fragment and dropped everything after it (crc, systemid, romnom), '+'
+// '#' started a fragment and dropped everything after it (crc, systemeid, romnom), '+'
 // read as a space. The only reliable check is to parse the URL back the way the server
 // does and compare every value with what went in.
 TEST( Scraper, QueryRoundTripsValuesWithReservedCharacters )
@@ -184,9 +200,22 @@ TEST( Scraper, QueryRoundTripsValuesWithReservedCharacters )
    EXPECT_EQ( value( "ssid" ), request.ssLogin );
    EXPECT_EQ( value( "sspassword" ), request.ssPassword );
    EXPECT_EQ( value( "crc" ), request.crc32 );
-   EXPECT_EQ( value( "systemid" ), request.systemId );
+   EXPECT_EQ( value( "systemeid" ), request.systemId );
    EXPECT_EQ( value( "romnom" ), request.romName );
    EXPECT_EQ( value( "romtaille" ), QStringLiteral( "901120" ) );
+}
+
+TEST( Scraper, QueryOmitsSystemButKeepsCrcForAnUnknownSystem )
+{
+   ScrapeRequest request;
+   request.systemId = QStringLiteral( "0" );
+   request.crc32 = QStringLiteral( "AB629B2B" );
+   request.romName = QStringLiteral( "Neoteria.app" );
+
+   const QUrlQuery query{ QUrl( buildGameQuery( request ) ) };
+   EXPECT_FALSE( query.hasQueryItem( QStringLiteral( "systemeid" ) ) );
+   EXPECT_EQ( query.queryItemValue( QStringLiteral( "crc" ) ), request.crc32 );
+   EXPECT_EQ( query.queryItemValue( QStringLiteral( "romnom" ) ), request.romName );
 }
 
 TEST( Scraper, QueryOmitsUserLoginWhenEitherHalfIsMissing )

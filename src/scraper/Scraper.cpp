@@ -215,8 +215,10 @@ QString buildGameQuery( const ScrapeRequest& aRequest )
       query += QLatin1String( Cst_SSId ) + encoded( aRequest.ssLogin ) + QLatin1String( Cst_SSPwd ) +
                encoded( aRequest.ssPassword );
 
-   query += QLatin1String( Cst_Crc ) + encoded( aRequest.crc32 ) + QLatin1String( Cst_SystemId ) +
-            encoded( aRequest.systemId );
+   query += QLatin1String( Cst_Crc ) + encoded( aRequest.crc32 );
+   // systemeid=0 is rejected (HTTP 400). Without it the server skips the CRC and matches romnom.
+   if ( aRequest.systemId != QLatin1String( "0" ) )
+      query += QLatin1String( Cst_SystemId ) + encoded( aRequest.systemId );
 
    if ( !aRequest.manualCrc )
       query += QLatin1String( Cst_RomName ) + encoded( aRequest.romName ) +
@@ -248,7 +250,7 @@ void Scraper::setProxy( const QString& aServer, int aPort, const QString& aUser,
 }
 
 // What the server actually sent, for the error dialog's details box and its export. Not
-// truncated. The request comes first so the details show which systemid/crc/romnom were sent.
+// truncated. The request comes first so the details show which systemeid/crc/romnom were sent.
 static QString responseDetails( const QString& aQuery, const QByteArray& aBody )
 {
    return sanitizeUrl( QStringLiteral( "Request:\n%1\n\nReply:\n%2" )
@@ -272,34 +274,36 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
             [this, reply, aMediaTypes, aWantVideo, aLanguage, query] {
                reply->deleteLater();
 
+               const QByteArray data = reply->readAll();
+               // A name-only match comes back as HTTP 400 with a complete document.
+               const Result<ScrapedInfo> info =
+                  parseScrapeResponse( data, aMediaTypes, aWantVideo, aLanguage );
+               if ( info ) {
+                  emit gameInfoReady( info.value() );
+                  return;
+               }
+
                if ( reply->error() != QNetworkReply::NoError ) {
                   // screenscraper.fr answers 404 when it has no match for the game.
                   if ( reply->attribute( QNetworkRequest::HttpStatusCodeAttribute ).toInt() == 404 ) {
                      emit gameInfoFailed( QStringLiteral( "Game not found" ),
-                                          responseDetails( query, reply->readAll() ) );
+                                          responseDetails( query, data ) );
                      return;
                   }
                   // errorString() embeds Qt's own copy of the request URL (credentials
                   // and all), so the whole message needs sanitizing, not just query.
                   emit gameInfoFailed(
                      sanitizeUrl( query + QStringLiteral( "\n" ) + describeError( reply ) ),
-                     responseDetails( query, reply->readAll() ) );
+                     responseDetails( query, data ) );
                   return;
                }
 
-               const QByteArray data = reply->readAll();
                if ( data.isEmpty() ) {
                   emit gameInfoFailed( QLatin1String( Cst_StreamError ) );
                   return;
                }
 
-               const Result<ScrapedInfo> info =
-                  parseScrapeResponse( data, aMediaTypes, aWantVideo, aLanguage );
-               if ( !info ) {
-                  emit gameInfoFailed( info.error(), responseDetails( query, data ) );
-                  return;
-               }
-               emit gameInfoReady( info.value() );
+               emit gameInfoFailed( info.error(), responseDetails( query, data ) );
             } );
 }
 

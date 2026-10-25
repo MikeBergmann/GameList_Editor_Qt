@@ -256,7 +256,7 @@ inline constexpr const char* Cst_Output = "&output=xml";
 inline constexpr const char* Cst_SSId = "&ssid=";
 inline constexpr const char* Cst_SSPwd = "&sspassword=";
 inline constexpr const char* Cst_Crc = "&crc=";
-inline constexpr const char* Cst_SystemId = "&systemid=";
+inline constexpr const char* Cst_SystemId = "&systemeid=";
 inline constexpr const char* Cst_RomName = "&romnom=";
 inline constexpr const char* Cst_RomSize = "&romtaille=";
 
