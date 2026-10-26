@@ -63,8 +63,20 @@ ViewUpdate addMissingRoms( QWidget* aParent, Gamelist& aGamelist )
    return added.value() == 0 ? ViewUpdate::None : ViewUpdate::Reset;
 }
 
+// ES-DE names media after the ROM, so linking and renaming have nothing to do.
+static bool esdeNotice( QWidget* aParent, const Gamelist& aGamelist )
+{
+   if ( aGamelist.conventionalMedia() )
+      QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
+                                QStringLiteral( "ES-DE finds media by the ROM's name, so there is nothing to do here." ) );
+   return aGamelist.conventionalMedia();
+}
+
 ViewUpdate linkExistingMedia( QWidget* aParent, Gamelist& aGamelist )
 {
+   if ( esdeNotice( aParent, aGamelist ) )
+      return ViewUpdate::None;
+
    const QVector<MediaLink> candidates = unlinkedMedia( aGamelist );
    if ( candidates.isEmpty() ) {
       QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),
@@ -87,6 +99,9 @@ ViewUpdate linkExistingMedia( QWidget* aParent, Gamelist& aGamelist )
 
 ViewUpdate renameMediaAfterRoms( QWidget* aParent, Gamelist& aGamelist )
 {
+   if ( esdeNotice( aParent, aGamelist ) )
+      return ViewUpdate::None;
+
    // Strict is the superset: if it finds nothing, no checkbox state can.
    if ( misnamedMedia( aGamelist, true ).isEmpty() ) {
       QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ),

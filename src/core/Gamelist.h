@@ -102,6 +102,10 @@ public:
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 
+   // ES-DE layout: media sits at <media>/<type>/<ROM path without extension>.<ext>, found by
+   // that name. <image>/<video> are neither read nor written, and linking is not offered.
+   bool conventionalMedia() const { return !FMediaDir.isEmpty(); }
+
    // Whether the volume treats Sonic.zip and sonic.zip as one file.
    bool foldsCase() const { return FFoldsCase; }
 
@@ -143,15 +147,25 @@ private:
       QString target;     // the file written, or the new name of a renamed one
       QString backup;     // what was there before, moved aside; empty if nothing was
       QString movedFrom;  // the old name of a renamed file; empty unless a rename
+      QString stale;      // ES-DE: the same media in another format, dropped once committed
       Game before;        // the game as it was, link text included
    };
 
    // Does not save. On an Error nothing has changed.
    Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
 
-   // Never a file another game has.
+   // ES-DE: where aGame's image or video goes by the ROM's name.
+   QString conventionalPath( const Game& aGame, bool aIsImage ) const;
+
+   // ES-DE: fills the media paths of aGame from the indexes, else conventionalPath.
+   void findConventionalMedia( Game& aGame ) const;
+   void indexMedia();
+
+   // Never a file another game has. ES-DE: the absolute path by the ROM's name.
    QString freeMediaLink( int aIndex, bool aIsImage ) const;
 
+   // Saves; ES-DE media changes nothing in the gamelist, so there it does not.
+   Result<> saveLinks();
    Result<> commitMedia( const QVector<MediaWrite>& aWrites );
    // Newest first: a game written twice in one batch holds its first snapshot last.
    void rollbackMedia( const QVector<MediaWrite>& aWrites );
@@ -162,6 +176,9 @@ private:
 
    SystemEntry FSystem;
    QString FRomDir;
+   QString FMediaDir;
+   QHash<QString, QString> FImageIndex;  // ES-DE: key of the ROM's media stem -> file found
+   QHash<QString, QString> FVideoIndex;
    QDomDocument FDocument;
    QDomElement FGameList;
 

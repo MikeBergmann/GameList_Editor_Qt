@@ -115,11 +115,12 @@ files; they are the user's manual stand-in for the sync feature.
   - Not done: asking the user when neither exists. Games then show as orphans.
 - **Scan:** `gamelists/*/gamelist.xml` → `SystemEntry{ sys, kind, gamelist, romDir/<sys> }`.
   Systems with no gamelist are ignored in both layouts (decided).
-- **Not done:** `LegacyGamelistFileLocation=true` (gamelists inside the ROM folders), `mediaDir`.
+- **Not done:** `LegacyGamelistFileLocation=true` (gamelists inside the ROM folders).
 - **Seen on the sample card:** all 23 systems load; ES-DE's system names (`sg1000`, …) that the
   tables do not know land in `skOther` and can be mapped by the user as today.
-- **Still to do (Phase 2):** `MediaDirectory` (empty means `<appdata>/downloaded_media`,
-  `%ESPATH%` allowed) and `mediaDir/<sys>` on `SystemEntry`.
+- **Media folder:** `MediaDirectory` from the settings (`~` and `%ESPATH%` expanded), else
+  `<appdata>/downloaded_media`; `SystemEntry::mediaDir` is `<media>/<sys>`. A non-empty `mediaDir`
+  is the ES-DE layout switch (`Gamelist::conventionalMedia()`); there is no enum.
 
 ### Phase 1b: multi-root `gamelist.xml` (needed by any ES-DE load) — done
 
@@ -131,41 +132,34 @@ files; they are the user's manual stand-in for the sync feature.
   (a file declared ISO-8859-1 used to keep that declaration over UTF-8 bytes).
 - A file with no `<gameList>` is now an error (it used to accept any root name).
 
-### Phase 2: conventional media in `Gamelist`
+### Phase 2: conventional media in `Gamelist` — done
 
-- **Reading (`gameFromNode`):** in `Conventional` mode, ignore `<image>`/`<video>` (ES-DE does
-  too), but leave existing tags in the DOM: they are the legacy links the sync reads. Probe
-  `mediaDir/<imageType>/<romRelNoExt>.{png,jpg,webp}` and `videos/…{mp4,mkv,avi,wmv,mov,webm,m4v}`
-  through `resolvePath`.
-  - `ponytail:` note: up to 3+7 stats per game at load time. Upgrade path: one directory listing
-    per type folder, which the private `mediaIndex()` in `MediaOps` almost already does.
-  - Folder games keep their suffix in the media name: `dig.scummvm.png`.
-- **Writing:**
-  - `setImage` targets `<imageType>/<romRelNoExt>.png`. `setVideo` keeps the source extension,
-    lowercased, because ES-DE on Linux only matches lowercase extensions.
-  - Neither writes a DOM tag, and neither needs a `save()`.
-  - A stale `.jpg`/`.webp` sibling would compete with the new file, so the same `MediaWrite`
-    journal moves it to `.gle-bak`.
-  - `freeMediaLink` and the `_N` suffixes do not apply: one ROM means exactly one name.
-- **Removing:**
-  - `removeImage`/`removeVideo` delete the file directly. `sharedFile` does not apply, because a
-    conventional name belongs to one ROM.
-  - `removeGame(s)` also deletes that ROM's files across the media type folders (all types, or
-    only image and video: open question 3).
-- **Disabled in this layout:** `linkMedia`, `renameMedia`, `unlinkedMedia`, `misnamedMedia`, and
-  their UI. The ES-DE counterpart, media files with no matching ROM, is a later feature.
-- **`addGames`:** must write `./`-prefixed paths relative to `romDir`. Check what it writes today.
-- **`unlistedRoms`:** the ES-DE ROM folder can still contain legacy `gamelist.xml`, `images/`,
-  `videos/`, `media/`; keep skipping them there.
-- **ES-DE-only fields** need nothing: the editor only rewrites tags it knows and leaves the rest
-  of the DOM alone.
+- **Stem:** the ROM path cleaned (`./a/b.zip` → `a/b`), minus its last extension; subfolders are
+  mirrored. A folder ROM keeps its whole name (`dig.scummvm.png`). Two ROMs with one stem share
+  the media, as in ES-DE.
+- **Reading:** `load()` indexes `covers/` and `videos/` once each (`QDirIterator`), keyed by stem;
+  `<image>`/`<video>` are ignored in this view (`imagePath`/`videoPath` stay empty) but stay in
+  the DOM. Image extensions `jpg` (preferred), `png`, `webp`; video `mp4 mkv avi wmv mov webm m4v`.
+  Lowercase only on case-sensitive volumes, like ES-DE, so `.jpeg` shows as missing (decided).
+  A missing file reports the path it would get (`covers/<stem>.png`, `videos/<stem>.mp4`).
+- **Image type:** the constant `Cst_EsdeImageType = "covers"` (decided); no settings key.
+- **Writing:** `setImage`/`setVideo` write `covers/<stem>.png` and `videos/<stem>.mp4`, set no DOM
+  tag and do not save the gamelist. A file of the same media in another format (`X.jpg` beside the
+  new `X.png`) is removed after the commit, because it would hide the new one.
+  `removeImage`/`removeVideo` delete the file unless another ROM with the stem uses it.
+- **Removing a game:** deletes the ROM and that ROM's files in all 12 ES-DE type folders (decided),
+  unless another game has the same stem. Files go to the trash.
+- **Linking and renaming** return an Error in this layout; the two menu actions show a notice
+  instead. `unlinkedMedia`/`misnamedMedia` are not reached.
+- **Known limit:** after a write, another game with the same stem keeps its old paths until reload.
+- **Not checked against the sample card:** it was not mounted when Phase 2 landed; the tests use a
+  fixture in the same shape.
 
 ### Phase 3: UI
 
 - **Opening a root:** the open-root dialog accepts both kinds of root, and the status bar or title
   shows `ES-DE` / `Linked`.
-- **One new settings key:** `EsdeImageType`, default open (question 2).
-- **Menus:** link/rename entries are disabled in `Conventional` mode.
+- **Menus:** link/rename show a notice in the ES-DE view (done in Phase 2).
 - **`GameEditPanel`:** no change; it already shows `physicalImagePath`.
 - **Help text:** one line that ES-DE must be stopped while editing.
 - **Scraping (optional):** `ScrapePanel::finishSave` could save every downloaded type into its
@@ -209,15 +203,12 @@ Phase 0 already gives the sync what it needs: every game has a layout-independen
 ## 4. Risks and open questions
 
 1. ~~Multi-root `gamelist.xml`~~ **Confirmed** on the sample install; handled by Phase 1b.
-2. **Which ES-DE type is "the" image?** The sample install uses `covers` almost exclusively, so
-   that is the default; `EsdeImageType` stays as the switch for `miximages` users.
-3. **What should `removeGame` delete?** All media types (manuals and fanart too), or only the
-   image and video the editor manages.
+2. ~~Which ES-DE type is "the" image?~~ **Decided:** `covers`, a constant.
+3. ~~What should `removeGame` delete?~~ **Decided:** all 12 type folders.
 4. **ES-DE systems with ROMs but no `gamelist.xml` yet:** list them in v1, or skip them like today.
 5. **Portable `%ESPATH%` / Android:** "app-data parent, else ask" fits the sample card; still
    unverified on a desktop install with a custom `ROMDirectory`.
-6. **`.jpeg` media:** ES-DE ignores it. Show it as missing (what ES-DE shows), or offer to
-   re-encode it to `.png`?
+6. ~~`.jpeg` media~~ **Decided:** shown as missing, like ES-DE.
 
 ## 5. Tests to leave behind
 

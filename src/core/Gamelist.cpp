@@ -7,6 +7,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 
 #include <QFile>
 #include <QFileInfo>
@@ -24,6 +25,47 @@ constexpr const char* Cst_GameList = "gameList";
 // The layout EmulationStation writes, for systems with no media yet.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
+
+// ES-DE keeps one folder per media type; covers and videos are the types this editor writes.
+constexpr const char* Cst_EsdeImageType = "covers";
+constexpr const char* Cst_EsdeVideoType = "videos";
+const QStringList Cst_EsdeMediaTypes = {
+   QStringLiteral( "3dboxes" ),   QStringLiteral( "backcovers" ),    QStringLiteral( "covers" ),
+   QStringLiteral( "custom" ),    QStringLiteral( "fanart" ),        QStringLiteral( "manuals" ),
+   QStringLiteral( "marquees" ),  QStringLiteral( "miximages" ),     QStringLiteral( "physicalmedia" ),
+   QStringLiteral( "screenshots" ), QStringLiteral( "titlescreens" ), QStringLiteral( "videos" ) };
+
+// Best first. ES-DE tries lowercase names only, so .jpeg and .PNG count as missing there.
+const QStringList Cst_EsdeImageExtensions = { QStringLiteral( "jpg" ), QStringLiteral( "png" ),
+                                              QStringLiteral( "webp" ) };
+const QStringList Cst_EsdeVideoExtensions = {
+   QStringLiteral( "mp4" ), QStringLiteral( "mkv" ), QStringLiteral( "avi" ), QStringLiteral( "wmv" ),
+   QStringLiteral( "mov" ), QStringLiteral( "webm" ), QStringLiteral( "m4v" ) };
+
+// The ROM's path without its extension, and a folder ROM (ScummVM) keeps its whole name.
+QString mediaStem( const Game& aGame )
+{
+   const QFileInfo info( QDir::cleanPath( aGame.romPath ) );
+   const QString base = QFileInfo( aGame.physicalRomPath ).isDir() ? info.fileName() : info.completeBaseName();
+   return info.path() == QLatin1String( "." ) ? base : info.path() + QLatin1Char( '/' ) + base;
+}
+
+// Every type folder, so a deleted game leaves no screenshot or manual behind. Returns what stayed.
+QStringList discardEsdeMedia( const QString& aMediaDir, const Game& aGame, bool aFoldsCase )
+{
+   QStringList stuck;
+   const QFileInfo stem( mediaStem( aGame ) );
+   const Qt::CaseSensitivity sensitivity = aFoldsCase ? Qt::CaseInsensitive : Qt::CaseSensitive;
+
+   for ( const QString& type : Cst_EsdeMediaTypes ) {
+      const QDir folder( resolvePath( QDir::cleanPath( aMediaDir + QLatin1Char( '/' ) + type + QLatin1Char( '/' ) + stem.path() ) ) );
+      for ( const QFileInfo& file : folder.entryInfoList( QDir::Files ) ) {
+         if ( file.completeBaseName().compare( stem.fileName(), sensitivity ) == 0 && !discardFile( file.filePath() ) )
+            stuck << file.filePath();
+      }
+   }
+   return stuck;
+}
 
 QString folderOf( const QString& aLink )
 {
@@ -93,6 +135,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    FSystem = aSystem;
    FBackedUp = false;
    FRomDir.clear();
+   FMediaDir.clear();
    FDocument = QDomDocument();
    FGameList = QDomElement();
    FEntries.clear();
@@ -133,6 +176,9 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    FRomDir = aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
                                       : QDir( aSystem.romDir ).absolutePath();
    FFoldsCase = volumeFoldsCase( aSystem.gamelistPath );
+   if ( !aSystem.mediaDir.isEmpty() )
+      FMediaDir = QDir( aSystem.mediaDir ).absolutePath();
+   indexMedia();
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
@@ -186,17 +232,76 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
    game.favorite = gamelistFlag( childText( aNode, Cst_Favorite ) );
 
    game.physicalRomPath = physicalPath( FRomDir, game.romPath );
-   game.physicalImagePath = physicalPath( FRomDir, game.imagePath );
-   game.physicalVideoPath = physicalPath( FRomDir, game.videoPath );
    game.isOrphan = fileMissing( game.physicalRomPath );
-   game.missingImage = fileMissing( game.physicalImagePath );
-   game.missingVideo = fileMissing( game.physicalVideoPath );
+   if ( conventionalMedia() ) {
+      game.imagePath.clear();
+      game.videoPath.clear();
+      findConventionalMedia( game );
+   } else {
+      game.physicalImagePath = physicalPath( FRomDir, game.imagePath );
+      game.physicalVideoPath = physicalPath( FRomDir, game.videoPath );
+      game.missingImage = fileMissing( game.physicalImagePath );
+      game.missingVideo = fileMissing( game.physicalVideoPath );
+   }
    return game;
+}
+
+QString Gamelist::conventionalPath( const Game& aGame, bool aIsImage ) const
+{
+   return FMediaDir + QLatin1Char( '/' ) + QLatin1String( aIsImage ? Cst_EsdeImageType : Cst_EsdeVideoType ) +
+          QLatin1Char( '/' ) + mediaStem( aGame ) + QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
+}
+
+void Gamelist::findConventionalMedia( Game& aGame ) const
+{
+   const QString key = fileKey( mediaStem( aGame ), FFoldsCase );
+   const QString image = FImageIndex.value( key );
+   const QString video = FVideoIndex.value( key );
+
+   aGame.missingImage = image.isEmpty();
+   aGame.missingVideo = video.isEmpty();
+   aGame.physicalImagePath = aGame.missingImage ? conventionalPath( aGame, true ) : image;
+   aGame.physicalVideoPath = aGame.missingVideo ? conventionalPath( aGame, false ) : video;
+}
+
+// One walk per type folder; a directory lookup per game would list folders for every miss.
+void Gamelist::indexMedia()
+{
+   FImageIndex.clear();
+   FVideoIndex.clear();
+   if ( !conventionalMedia() )
+      return;
+
+   const auto index = [this]( const char* aType, const QStringList& aExtensions, QHash<QString, QString>& aIndex ) {
+      const QDir folder( resolvePath( FMediaDir + QLatin1Char( '/' ) + QLatin1String( aType ) ) );
+      const auto rank = [&]( const QString& aPath ) {
+         const QString extension = QFileInfo( aPath ).suffix();
+         return aExtensions.indexOf( FFoldsCase ? extension.toLower() : extension );
+      };
+
+      QDirIterator it( folder.path(), QDir::Files, QDirIterator::Subdirectories );
+      while ( it.hasNext() ) {
+         const QString path = it.next();
+         if ( rank( path ) < 0 )
+            continue;
+
+         const QFileInfo info( path );
+         const QString stem = folder.relativeFilePath( info.path() + QLatin1Char( '/' ) + info.completeBaseName() );
+         const QString key = fileKey( stem, FFoldsCase );
+         const auto found = aIndex.constFind( key );
+         if ( found == aIndex.constEnd() || rank( path ) < rank( found.value() ) )
+            aIndex.insert( key, path );
+      }
+   };
+
+   index( Cst_EsdeImageType, Cst_EsdeImageExtensions, FImageIndex );
+   index( Cst_EsdeVideoType, Cst_EsdeVideoExtensions, FVideoIndex );
 }
 
 Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 {
    const QDir systemDir( FRomDir );
+   indexMedia();
    QSet<QString> seen;
    for ( const Entry& entry : FEntries ) {
       if ( !entry.game.physicalRomPath.isEmpty() )
@@ -434,6 +539,10 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
    const QString folder = aIsImage ? FImageFolder : FVideoFolder;
    const QLatin1String suffix( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
 
+   // ES-DE has one file per stem, so a taken name is not a reason to pick another.
+   if ( conventionalMedia() )
+      return conventionalPath( game, aIsImage );
+
    for ( int attempt = 0;; ++attempt ) {
       const QString stem = attempt == 0   ? game.romNameWoExt()
                            : attempt == 1 ? game.romName()
@@ -462,6 +571,14 @@ void Gamelist::setMediaLink( int aIndex, bool aIsImage, const QString& aLink,
 {
    Entry& entry = FEntries[aIndex];
    Game& game = entry.game;
+   if ( conventionalMedia() ) {
+      // ponytail: a game sharing this media stem keeps its old paths until the next load.
+      ( aIsImage ? game.physicalImagePath : game.physicalVideoPath ) =
+         aPhysical.isEmpty() ? conventionalPath( game, aIsImage ) : aPhysical;
+      ( aIsImage ? game.missingImage : game.missingVideo ) = aPhysical.isEmpty();
+      return;
+   }
+
    setChildText( entry.node, aIsImage ? Cst_ImageLink : Cst_VideoLink, aLink );
    ( aIsImage ? game.imagePath : game.videoPath ) = aLink;
    ( aIsImage ? game.physicalImagePath : game.physicalVideoPath ) = aPhysical;
@@ -490,6 +607,8 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
    write.isImage = true;
    write.target = target;
    write.before = game;
+   if ( conventionalMedia() && !game.missingImage && !sameFile( game.physicalImagePath, target, FFoldsCase ) )
+      write.stale = game.physicalImagePath;
    const Result<QString> backup = swapIn( staged, target );
    if ( !backup )
       return backup;
@@ -505,8 +624,9 @@ void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
    // ponytail: a game that had no <image>/<video> element ends up with an empty one;
    // EmulationStation reads that as unset. Upgrade: remember the node and remove it.
    FEntries[aIndex].game = aBefore;
-   setChildText( FEntries[aIndex].node, aIsImage ? Cst_ImageLink : Cst_VideoLink,
-                 aIsImage ? aBefore.imagePath : aBefore.videoPath );
+   if ( !conventionalMedia() )
+      setChildText( FEntries[aIndex].node, aIsImage ? Cst_ImageLink : Cst_VideoLink,
+                    aIsImage ? aBefore.imagePath : aBefore.videoPath );
 }
 
 void Gamelist::undoMedia( const MediaWrite& aWrite )
@@ -529,9 +649,14 @@ void Gamelist::rollbackMedia( const QVector<MediaWrite>& aWrites )
       undoMedia( *it );
 }
 
+Result<> Gamelist::saveLinks()
+{
+   return conventionalMedia() ? Result<>{} : save();
+}
+
 Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 {
-   if ( const Result<> saved = save(); !saved ) {
+   if ( const Result<> saved = saveLinks(); !saved ) {
       rollbackMedia( aWrites );
       return saved;
    }
@@ -539,6 +664,8 @@ Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
    for ( const MediaWrite& write : aWrites ) {
       if ( !write.backup.isEmpty() )
          QFile::remove( write.backup );
+      if ( !write.stale.isEmpty() )
+         QFile::remove( write.stale );
    }
    return {};
 }
@@ -601,6 +728,9 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
 Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
+   if ( conventionalMedia() )
+      return Error{ QStringLiteral( "ES-DE finds media by the ROM's name; there is nothing to link." ) };
+
    const QDir systemDir( FRomDir );
 
    // No file is touched, so the journal holds only the games as they were.
@@ -632,6 +762,9 @@ Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 
 Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
 {
+   if ( conventionalMedia() )
+      return Error{ QStringLiteral( "ES-DE finds media by the ROM's name; renaming it would lose it." ) };
+
    QVector<MediaWrite> writes;
 
    for ( const MediaRename& rename : aRenames ) {
@@ -691,6 +824,8 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
    write.index = aIndex;
    write.isImage = false;
    write.before = game;
+   if ( conventionalMedia() && !game.missingVideo && !sameFile( game.physicalVideoPath, target, FFoldsCase ) )
+      write.stale = game.physicalVideoPath;
 
    if ( source != QFileInfo( target ).canonicalFilePath() ) {
       // Copy beside the target and swap, so a failed copy cannot cost the old video.
@@ -743,7 +878,7 @@ Result<> Gamelist::removeMedia( int aIndex, bool aIsImage )
 
    setMediaLink( aIndex, aIsImage, QString(), QString() );
 
-   if ( const Result<> saved = save(); !saved ) {
+   if ( const Result<> saved = saveLinks(); !saved ) {
       restoreLink( aIndex, aIsImage, before );
       return saved;
    }
@@ -778,6 +913,20 @@ Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
    QStringList stuck;
    if ( !aDeleteFiles )
       return stuck;
+
+   if ( conventionalMedia() ) {
+      // Games with one media stem (Sonic.zip, Sonic.7z) share it, so it stays while one is left.
+      const QString key = fileKey( mediaStem( game ), FFoldsCase );
+      const bool shared = std::any_of( FEntries.cbegin(), FEntries.cend(), [&]( const Entry& aEntry ) {
+         return fileKey( mediaStem( aEntry.game ), FFoldsCase ) == key;
+      } );
+      if ( !shared )
+         stuck << discardEsdeMedia( FMediaDir, game, FFoldsCase );
+      if ( !game.physicalRomPath.isEmpty() && QFileInfo::exists( game.physicalRomPath ) &&
+           !sharedFile( -1, game.physicalRomPath, &Game::physicalRomPath ) && !discardFile( game.physicalRomPath ) )
+         stuck << game.physicalRomPath;
+      return stuck;
+   }
 
    const auto drop = [&]( const QString& aPath, QString Game::*aMember ) {
       // Only once the gamelist has stopped listing it, and not what another entry

@@ -67,12 +67,22 @@ TEST( ScanEsde, ARomDirectoryThatIsGoneFallsBackToTheFolderBesideTheAppData )
    EXPECT_EQ( systems.at( 0 ).romDir, esde.dir.filePath( QStringLiteral( "ROMs/snes" ) ) );
 }
 
-TEST( ScanEsde, ALegacyRootHasNoSeparateRomDir )
+TEST( ScanEsde, MediaIsInDownloadedMediaUnlessTheSettingsNameAnotherFolder )
+{
+   EsdeFolder plain( "<string name=\"MediaDirectory\" value=\"\" />\n" );
+   EXPECT_EQ( scanSystems( plain.appData ).at( 0 ).mediaDir,
+              plain.appData + QStringLiteral( "/downloaded_media/snes" ) );
+
+   EsdeFolder moved( "<string name=\"MediaDirectory\" value=\"%ESPATH%/art\" />\n" );
+   EXPECT_EQ( scanSystems( moved.appData ).at( 0 ).mediaDir, moved.dir.filePath( QStringLiteral( "art/snes" ) ) );
+}
+
+TEST( ScanEsde, ALegacyRootHasNoSeparateRomOrMediaDir )
 {
    Fixture fixture;
 
    for ( const SystemEntry& system : scanSystems( fixture.dir.path() ) )
-      EXPECT_TRUE( system.romDir.isEmpty() );
+      EXPECT_TRUE( system.romDir.isEmpty() && system.mediaDir.isEmpty() );
 }
 
 QVector<SystemEntry> unknownFolder( const QString& aFolder )

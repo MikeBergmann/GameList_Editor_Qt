@@ -24,28 +24,41 @@ QString expandEsdePath( QString aPath, const QString& aAppData )
 }
 
 // es_settings.xml is a flat list of <string name="…" value="…"/>, with no root element.
+QString esdeSetting( const QString& aAppData, const char* aName )
+{
+   QFile file( aAppData + QLatin1String( "/settings/es_settings.xml" ) );
+   QDomDocument settings;
+   if ( !file.open( QIODevice::ReadOnly ) || !settings.setContent( wrapInRoot( file.readAll(), "settings" ) ) )
+      return {};
+
+   for ( QDomElement node = settings.documentElement().firstChildElement( QStringLiteral( "string" ) );
+         !node.isNull(); node = node.nextSiblingElement( QStringLiteral( "string" ) ) ) {
+      if ( node.attribute( QStringLiteral( "name" ) ) == QLatin1String( aName ) )
+         return node.attribute( QStringLiteral( "value" ) );
+   }
+   return {};
+}
+
 QString esdeRomRoot( const QString& aAppData )
 {
    // Desktop, portable and Android installs all keep ROMs beside the app-data folder.
    QStringList candidates{ QDir::cleanPath( aAppData + QLatin1String( "/../ROMs" ) ) };
 
-   QFile file( aAppData + QLatin1String( "/settings/es_settings.xml" ) );
-   QDomDocument settings;
-   if ( file.open( QIODevice::ReadOnly ) &&
-        settings.setContent( wrapInRoot( file.readAll(), "settings" ) ) ) {
-      for ( QDomElement node = settings.documentElement().firstChildElement( QStringLiteral( "string" ) );
-            !node.isNull(); node = node.nextSiblingElement( QStringLiteral( "string" ) ) ) {
-         const QString value = node.attribute( QStringLiteral( "value" ) );
-         if ( node.attribute( QStringLiteral( "name" ) ) == QLatin1String( "ROMDirectory" ) && !value.isEmpty() )
-            candidates.prepend( expandEsdePath( value, aAppData ) );
-      }
-   }
+   if ( const QString value = esdeSetting( aAppData, "ROMDirectory" ); !value.isEmpty() )
+      candidates.prepend( expandEsdePath( value, aAppData ) );
 
    // A card moved to another device keeps the old absolute path in the settings.
    for ( const QString& candidate : std::as_const( candidates ) )
       if ( QDir( candidate ).exists() )
          return candidate;
    return candidates.first();
+}
+
+QString esdeMediaRoot( const QString& aAppData )
+{
+   const QString value = esdeSetting( aAppData, "MediaDirectory" );
+   return value.isEmpty() ? QDir::cleanPath( aAppData + QLatin1String( "/downloaded_media" ) )
+                          : expandEsdePath( value, aAppData );
 }
 
 }  // namespace
@@ -60,6 +73,7 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath )
                      root.exists( QStringLiteral( "gamelists" ) );
    const QDir lists( esde ? root.filePath( QStringLiteral( "gamelists" ) ) : aRootPath );
    const QString romRoot = esde ? esdeRomRoot( aRootPath ) : QString();
+   const QString mediaRoot = esde ? esdeMediaRoot( aRootPath ) : QString();
 
    // Folders by attribute, not by a '*.*' name filter, which needs a literal dot and
    // so would miss folder names like "snes". Hidden folders are left out.
@@ -72,7 +86,8 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath )
          continue;
 
       systems.append( { folder, systemKindFromFolder( folder ), gamelist,
-                        esde ? romRoot + QLatin1Char( '/' ) + folder : QString() } );
+                        esde ? romRoot + QLatin1Char( '/' ) + folder : QString(),
+                        esde ? mediaRoot + QLatin1Char( '/' ) + folder : QString() } );
    }
 
    return systems;

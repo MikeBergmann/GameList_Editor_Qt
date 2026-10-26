@@ -13,16 +13,18 @@
 struct SystemEntry
 {
    SystemEntry() = default;
-   SystemEntry( QString aFolderName, SystemKind aKind, QString aGamelistPath, QString aRomDir = {} )
+   SystemEntry( QString aFolderName, SystemKind aKind, QString aGamelistPath, QString aRomDir = {},
+                 QString aMediaDir = {} )
       : folderName( std::move( aFolderName ) ), kind( aKind ), gamelistPath( std::move( aGamelistPath ) ),
-        romDir( std::move( aRomDir ) )
+        romDir( std::move( aRomDir ) ), mediaDir( std::move( aMediaDir ) )
    {
    }
 
    QString folderName;
    SystemKind kind = skOther;
    QString gamelistPath;
-   QString romDir;  // base of <path> and media links; empty: the gamelist's folder
+   QString romDir;    // base of <path> and media links; empty: the gamelist's folder
+   QString mediaDir;  // ES-DE: media found by the ROM's name, <image>/<video> ignored; empty: by link
 };
 
 // aRootPath is a ROM root (a gamelist.xml per system folder) or an ES-DE app-data folder

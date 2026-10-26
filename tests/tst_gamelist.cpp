@@ -1165,4 +1165,154 @@ TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )
    EXPECT_TRUE( QFileInfo::exists( before.physicalVideoPath ) );
 }
 
+// ES-DE layout: ROMs under roms/snes, media by the ROM's name under media/snes.
+struct EsdeLayout
+{
+   QTemporaryDir dir;
+   SystemEntry system;
+
+   explicit EsdeLayout( const QByteArray& aGames = "<game><path>./Sub/Game.zip</path><name>Game</name>"
+                                                   "<image>./images/legacy.png</image></game>"
+                                                   "<game><path>./dig.scummvm</path><name>Dig</name></game>"
+                                                   "<game><path>./Other.zip</path><name>Other</name></game>" )
+   {
+      writeFile( path( "gl/gamelist.xml" ), "<?xml version=\"1.0\"?>\n<gameList>" + aGames + "</gameList>\n" );
+      writeFile( path( "roms/snes/Sub/Game.zip" ), "rom" );
+      writeFile( path( "roms/snes/Sub/Game.7z" ), "rom" );
+      writeFile( path( "roms/snes/dig.scummvm/dig.001" ), "rom" );
+      writeFile( path( "roms/snes/Other.zip" ), "rom" );
+      writeFile( path( "media/snes/covers/Sub/Game.jpg" ), "jpg" );
+      writeFile( path( "media/snes/videos/Sub/Game.mp4" ), "mp4" );
+      writeFile( path( "media/snes/screenshots/Sub/Game.png" ), "png" );
+      writeFile( path( "media/snes/manuals/Sub/Game.pdf" ), "pdf" );
+      writeFile( path( "media/snes/covers/Other.jpeg" ), "jpeg" );
+      system = { QStringLiteral( "snes" ), skSNES, path( "gl/gamelist.xml" ), path( "roms/snes" ),
+                 path( "media/snes" ) };
+   }
+
+   QString path( const char* aRelative ) const { return dir.filePath( QLatin1String( aRelative ) ); }
+};
+
+QImage tinyPicture()
+{
+   QImage picture( 4, 4, QImage::Format_RGB32 );
+   picture.fill( Qt::red );
+   return picture;
+}
+
+TEST( GamelistEsde, MediaIsFoundByTheRomNameAndTheLinkTagsAreIgnored )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   EXPECT_TRUE( list.conventionalMedia() );
+   EXPECT_EQ( list.at( 0 ).physicalImagePath, esde.path( "media/snes/covers/Sub/Game.jpg" ) );
+   EXPECT_EQ( list.at( 0 ).physicalVideoPath, esde.path( "media/snes/videos/Sub/Game.mp4" ) );
+   EXPECT_FALSE( list.at( 0 ).missingImage );
+   EXPECT_TRUE( list.at( 0 ).imagePath.isEmpty() ) << "the legacy <image> must not be read";
+   EXPECT_TRUE( list.at( 1 ).missingImage );
+   EXPECT_EQ( list.at( 1 ).physicalImagePath, esde.path( "media/snes/covers/dig.scummvm.png" ) )
+      << "a folder ROM keeps its whole name";
+   EXPECT_TRUE( list.at( 2 ).missingImage ) << ".jpeg is not an extension ES-DE looks for";
+   EXPECT_EQ( list.at( 2 ).physicalImagePath, esde.path( "media/snes/covers/Other.png" ) );
+}
+
+TEST( GamelistEsde, SetImageWritesCoversDropsTheOtherFormatAndLeavesTheGamelistAlone )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+   const QByteArray before = readAll( esde.system.gamelistPath );
+
+   const Result<> set = list.setImage( 0, tinyPicture() );
+   ASSERT_TRUE( set ) << set.error().toStdString();
+
+   EXPECT_EQ( list.at( 0 ).physicalImagePath, esde.path( "media/snes/covers/Sub/Game.png" ) );
+   EXPECT_TRUE( QFileInfo::exists( list.at( 0 ).physicalImagePath ) );
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/covers/Sub/Game.jpg" ) ) )
+      << "the jpg would hide the new png";
+   EXPECT_EQ( readAll( esde.system.gamelistPath ), before );
+   EXPECT_EQ( list.domText( 0, "image" ), QStringLiteral( "./images/legacy.png" ) );
+}
+
+TEST( GamelistEsde, SetImageForAFolderRomKeepsTheFolderNameAndAddsNoTag )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   ASSERT_TRUE( list.setImage( 1, tinyPicture() ) );
+
+   EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/dig.scummvm.png" ) ) );
+   EXPECT_TRUE( list.domText( 1, "image" ).isEmpty() );
+   EXPECT_FALSE( list.at( 1 ).missingImage );
+}
+
+TEST( GamelistEsde, SetVideoReplacesAVideoOfAnotherFormat )
+{
+   EsdeLayout esde;
+   writeFile( esde.path( "media/snes/videos/Other.mkv" ), "mkv" );
+   writeFile( esde.path( "source.mp4" ), "new" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   ASSERT_TRUE( list.setVideo( 2, esde.path( "source.mp4" ) ) );
+
+   EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/videos/Other.mp4" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/videos/Other.mkv" ) ) );
+}
+
+TEST( GamelistEsde, RemoveImageDeletesTheFileAndReportsTheExpectedPath )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   ASSERT_TRUE( list.removeImage( 0 ) );
+
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/covers/Sub/Game.jpg" ) ) );
+   EXPECT_TRUE( list.at( 0 ).missingImage );
+   EXPECT_EQ( list.at( 0 ).physicalImagePath, esde.path( "media/snes/covers/Sub/Game.png" ) );
+}
+
+TEST( GamelistEsde, RemoveGameDeletesItsMediaInEveryTypeFolder )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   const Result<QStringList> removed = list.removeGame( 0 );
+
+   ASSERT_TRUE( removed ) << removed.error().toStdString();
+   EXPECT_TRUE( removed.value().isEmpty() );
+   for ( const char* file : { "roms/snes/Sub/Game.zip", "media/snes/covers/Sub/Game.jpg",
+                              "media/snes/videos/Sub/Game.mp4", "media/snes/screenshots/Sub/Game.png",
+                              "media/snes/manuals/Sub/Game.pdf" } )
+      EXPECT_FALSE( QFileInfo::exists( esde.path( file ) ) ) << file;
+   EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/Other.jpeg" ) ) );
+}
+
+TEST( GamelistEsde, RemoveGameKeepsMediaAnotherRomWithTheSameStemStillUses )
+{
+   EsdeLayout esde( "<game><path>./Sub/Game.zip</path></game><game><path>./Sub/Game.7z</path></game>" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   ASSERT_TRUE( list.removeGame( 0 ) );
+
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "roms/snes/Sub/Game.zip" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/Sub/Game.jpg" ) ) );
+}
+
+TEST( GamelistEsde, LinkingAndRenamingMediaAreRefused )
+{
+   EsdeLayout esde;
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   EXPECT_FALSE( list.linkMedia( { { 0, true, esde.path( "media/snes/covers/Other.jpeg" ) } } ) );
+   EXPECT_FALSE( list.renameMedia( { { 0, true, QString(), QString(), QString() } } ) );
+}
+
 }  // namespace
