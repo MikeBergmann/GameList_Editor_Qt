@@ -125,3 +125,15 @@ bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
    const QString canonical = infoA.canonicalFilePath();
    return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
 }
+
+QByteArray wrapInRoot( const QByteArray& aXml, const char* aRoot )
+{
+   qsizetype at = aXml.startsWith( "\xEF\xBB\xBF" ) ? 3 : 0;
+   if ( aXml.mid( at ).startsWith( "<?xml" ) ) {
+      const qsizetype end = aXml.indexOf( "?>", at );
+      if ( end >= 0 )
+         at = end + 2;
+   }
+
+   return aXml.left( at ) + '<' + aRoot + '>' + aXml.mid( at ) + "</" + aRoot + '>';
+}

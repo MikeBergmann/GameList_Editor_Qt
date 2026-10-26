@@ -1,3 +1,4 @@
+#include "GamelistFixture.h"
 #include "QtPrinters.h"
 #include "Systems.h"
 
@@ -15,6 +16,64 @@ struct CleanMap : testing::Test
 };
 
 using SystemMap = CleanMap;
+
+// <tmp>/ES-DE is the app-data folder; gamelists exist for snes only, gb has none.
+struct EsdeFolder
+{
+   QTemporaryDir dir;
+   QString appData = dir.filePath( QStringLiteral( "ES-DE" ) );
+
+   explicit EsdeFolder( const QByteArray& aSettings )
+   {
+      writeFile( appData + QStringLiteral( "/settings/es_settings.xml" ),
+                 "<?xml version=\"1.0\"?>\n" + aSettings );
+      writeFile( appData + QStringLiteral( "/gamelists/snes/gamelist.xml" ), Cst_Gamelist );
+      EXPECT_TRUE( QDir().mkpath( appData + QStringLiteral( "/gamelists/gb" ) ) );
+   }
+};
+
+TEST( ScanEsde, SettingsWithSeveralRootsGiveTheRomFolderAndSkipSystemsWithoutGamelist )
+{
+   EsdeFolder esde( "<bool name=\"DebugMode\" value=\"false\" />\n"
+                    "<string name=\"ROMDirectory\" value=\"%ESPATH%/games\" />\n" );
+   ASSERT_TRUE( QDir().mkpath( esde.dir.filePath( QStringLiteral( "games" ) ) ) );
+
+   const QVector<SystemEntry> systems = scanSystems( esde.appData );
+
+   ASSERT_EQ( systems.size(), 1 );
+   EXPECT_EQ( systems.at( 0 ).folderName, QStringLiteral( "snes" ) );
+   EXPECT_EQ( systems.at( 0 ).gamelistPath, esde.appData + QStringLiteral( "/gamelists/snes/gamelist.xml" ) );
+   EXPECT_EQ( systems.at( 0 ).romDir, esde.dir.filePath( QStringLiteral( "games/snes" ) ) );
+}
+
+TEST( ScanEsde, WithoutARomDirectoryKeyTheRomsSitBesideTheAppDataFolder )
+{
+   EsdeFolder esde( "<string name=\"MediaDirectory\" value=\"\" />\n" );
+
+   const QVector<SystemEntry> systems = scanSystems( esde.appData );
+
+   ASSERT_EQ( systems.size(), 1 );
+   EXPECT_EQ( systems.at( 0 ).romDir, esde.dir.filePath( QStringLiteral( "ROMs/snes" ) ) );
+}
+
+TEST( ScanEsde, ARomDirectoryThatIsGoneFallsBackToTheFolderBesideTheAppData )
+{
+   EsdeFolder esde( "<string name=\"ROMDirectory\" value=\"/nonexistent/old-card/ROMs\" />\n" );
+   ASSERT_TRUE( QDir().mkpath( esde.dir.filePath( QStringLiteral( "ROMs" ) ) ) );
+
+   const QVector<SystemEntry> systems = scanSystems( esde.appData );
+
+   ASSERT_EQ( systems.size(), 1 );
+   EXPECT_EQ( systems.at( 0 ).romDir, esde.dir.filePath( QStringLiteral( "ROMs/snes" ) ) );
+}
+
+TEST( ScanEsde, ALegacyRootHasNoSeparateRomDir )
+{
+   Fixture fixture;
+
+   for ( const SystemEntry& system : scanSystems( fixture.dir.path() ) )
+      EXPECT_TRUE( system.romDir.isEmpty() );
+}
 
 QVector<SystemEntry> unknownFolder( const QString& aFolder )
 {

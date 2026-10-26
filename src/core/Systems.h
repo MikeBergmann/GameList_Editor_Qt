@@ -8,7 +8,8 @@
 
 #include <utility>
 
-// One system folder under the ROM root that holds a gamelist.xml.
+// One system folder that holds a gamelist.xml: under the ROM root, or (ES-DE) under
+// the app-data folder's gamelists/, with the ROMs in romDir.
 struct SystemEntry
 {
    SystemEntry() = default;
@@ -24,6 +25,8 @@ struct SystemEntry
    QString romDir;  // base of <path> and media links; empty: the gamelist's folder
 };
 
+// aRootPath is a ROM root (a gamelist.xml per system folder) or an ES-DE app-data folder
+// (gamelists/<system>/gamelist.xml). Systems with no gamelist are left out.
 QVector<SystemEntry> scanSystems( const QString& aRootPath );
 
 // Only folders the tables do not know (skOther) are looked up in the user's mapping.

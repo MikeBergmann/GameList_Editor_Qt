@@ -469,7 +469,7 @@ void Frm_Editor::BuildSystemsList( bool aReload )
    }
 
    const QString root = QFileDialog::getExistingDirectory(
-      this, QStringLiteral( "Select the folder that holds your system folders" ), start );
+      this, QStringLiteral( "Select the folder that holds your system folders (or the ES-DE folder)" ), start );
    if ( root.isEmpty() )
       return;
 
@@ -509,7 +509,8 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
       QMessageBox::information(
          this, QStringLiteral( "Information" ),
          QStringLiteral( "Oops !! It looks like you selected the wrong folder !\n"
-                         "Please select the root folder where your systems folders are stored." ) );
+                         "Please select the root folder where your systems folders are stored,\n"
+                         "or the ES-DE folder (the one with gamelists and settings)." ) );
       return;
    }
 

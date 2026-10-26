@@ -21,19 +21,6 @@ namespace {
 constexpr const char* Cst_Wrapper = "gle-root";
 constexpr const char* Cst_GameList = "gameList";
 
-// The wrapper goes after the declaration, which must stay first for its encoding to apply.
-QByteArray wrapped( const QByteArray& aXml )
-{
-   qsizetype at = aXml.startsWith( "\xEF\xBB\xBF" ) ? 3 : 0;
-   if ( aXml.mid( at ).startsWith( "<?xml" ) ) {
-      const qsizetype end = aXml.indexOf( "?>", at );
-      if ( end >= 0 )
-         at = end + 2;
-   }
-
-   return aXml.left( at ) + '<' + Cst_Wrapper + '>' + aXml.mid( at ) + "</" + Cst_Wrapper + '>';
-}
-
 // The layout EmulationStation writes, for systems with no media yet.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
@@ -122,7 +109,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    QString parseError;
    int line = 0;
    int column = 0;
-   if ( !FDocument.setContent( wrapped( file.readAll() ), &parseError, &line, &column ) ) {
+   if ( !FDocument.setContent( wrapInRoot( file.readAll(), Cst_Wrapper ), &parseError, &line, &column ) ) {
       return Error{ QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
                        .arg( aSystem.gamelistPath, parseError )
                        .arg( line )

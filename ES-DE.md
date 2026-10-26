@@ -103,22 +103,23 @@ files; they are the user's manual stand-in for the sync feature.
 - **Tests:** the existing suite passes unchanged; one new test loads a gamelist whose ROMs and
   media live in another folder.
 
-### Phase 1: detect and scan ES-DE (`Systems.cpp`)
+### Phase 1: detect and scan ES-DE (`Systems.cpp`) — done
 
-- **Detection:** the user opens a root. If it contains `gamelists/` and
-  `settings/es_settings.xml`, it is an ES-DE app-data folder.
-- **Read `ROMDirectory` and `MediaDirectory`:**
-  - Expand `~` and `%ESPATH%`. Empty `MediaDirectory` means `<appdata>/downloaded_media`.
-  - `es_settings.xml` is most likely multi-root (a flat list of `<string …/>`). Parse it wrapped
-    in a fake root, or read it with `QXmlStreamReader`, which handles multiple roots.
-  - `%ESPATH%` is the folder of the ES-DE executable, which we cannot know. Assume the app-data
-    parent (portable layout). If the resulting ROM folder does not exist, ask the user and store
-    the answer in `QSettings` per app-data path.
-  - Android writes no `ROMDirectory` at all: fall back to `<appdata>/../ROMs`, then ask.
-- **Scan:** list `gamelists/*/gamelist.xml` →
-  `SystemEntry{ sys, kind, gamelist, romDir/<sys>, mediaDir/<sys>, Conventional }`.
-- **Return type:** `Result<QVector<SystemEntry>>`. A missing or unreadable `es_settings.xml`
-  returns an error message, not an empty list.
+- **Detection:** `scanSystems` treats a root as ES-DE when it holds `settings/es_settings.xml` and
+  `gamelists/`. Any other root is scanned as before (legacy view, `romDir` empty).
+- **`ROMDirectory`:** read from `es_settings.xml` (parsed under a wrapper, like the gamelist),
+  `~` and `%ESPATH%` expanded. Candidates in order: the setting, then `<appdata>/../ROMs`
+  (also the answer when the key is absent, as on Android). The first that exists wins, so a
+  card moved to another device still works.
+  - `%ESPATH%` is assumed to be the app-data folder's parent (portable layout).
+  - Not done: asking the user when neither exists. Games then show as orphans.
+- **Scan:** `gamelists/*/gamelist.xml` → `SystemEntry{ sys, kind, gamelist, romDir/<sys> }`.
+  Systems with no gamelist are ignored in both layouts (decided).
+- **Not done:** `LegacyGamelistFileLocation=true` (gamelists inside the ROM folders), `mediaDir`.
+- **Seen on the sample card:** all 23 systems load; ES-DE's system names (`sg1000`, …) that the
+  tables do not know land in `skOther` and can be mapped by the user as today.
+- **Still to do (Phase 2):** `MediaDirectory` (empty means `<appdata>/downloaded_media`,
+  `%ESPATH%` allowed) and `mediaDir/<sys>` on `SystemEntry`.
 
 ### Phase 1b: multi-root `gamelist.xml` (needed by any ES-DE load) — done
 

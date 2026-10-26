@@ -3,28 +3,76 @@
 #include "PathUtil.h"
 
 #include <QDir>
+#include <QDomDocument>
+#include <QFile>
 #include <QFileInfo>
 #include <QSettings>
 #include <QStringList>
 
 #include <algorithm>
 
+namespace {
+
+// %ESPATH% is the folder of the ES-DE program, which a file editor cannot know; the app-data
+// folder's parent is where portable and Android installs keep both.
+QString expandEsdePath( QString aPath, const QString& aAppData )
+{
+   aPath.replace( QLatin1String( "%ESPATH%" ), QDir::cleanPath( aAppData + QLatin1String( "/.." ) ) );
+   if ( aPath == QLatin1String( "~" ) || aPath.startsWith( QLatin1String( "~/" ) ) )
+      aPath.replace( 0, 1, QDir::homePath() );
+   return QDir::cleanPath( aPath );
+}
+
+// es_settings.xml is a flat list of <string name="…" value="…"/>, with no root element.
+QString esdeRomRoot( const QString& aAppData )
+{
+   // Desktop, portable and Android installs all keep ROMs beside the app-data folder.
+   QStringList candidates{ QDir::cleanPath( aAppData + QLatin1String( "/../ROMs" ) ) };
+
+   QFile file( aAppData + QLatin1String( "/settings/es_settings.xml" ) );
+   QDomDocument settings;
+   if ( file.open( QIODevice::ReadOnly ) &&
+        settings.setContent( wrapInRoot( file.readAll(), "settings" ) ) ) {
+      for ( QDomElement node = settings.documentElement().firstChildElement( QStringLiteral( "string" ) );
+            !node.isNull(); node = node.nextSiblingElement( QStringLiteral( "string" ) ) ) {
+         const QString value = node.attribute( QStringLiteral( "value" ) );
+         if ( node.attribute( QStringLiteral( "name" ) ) == QLatin1String( "ROMDirectory" ) && !value.isEmpty() )
+            candidates.prepend( expandEsdePath( value, aAppData ) );
+      }
+   }
+
+   // A card moved to another device keeps the old absolute path in the settings.
+   for ( const QString& candidate : std::as_const( candidates ) )
+      if ( QDir( candidate ).exists() )
+         return candidate;
+   return candidates.first();
+}
+
+}  // namespace
+
 QVector<SystemEntry> scanSystems( const QString& aRootPath )
 {
    QVector<SystemEntry> systems;
 
+   // An ES-DE app-data folder keeps its gamelists apart from the ROMs.
+   const QDir root( aRootPath );
+   const bool esde = root.exists( QStringLiteral( "settings/es_settings.xml" ) ) &&
+                     root.exists( QStringLiteral( "gamelists" ) );
+   const QDir lists( esde ? root.filePath( QStringLiteral( "gamelists" ) ) : aRootPath );
+   const QString romRoot = esde ? esdeRomRoot( aRootPath ) : QString();
+
    // Folders by attribute, not by a '*.*' name filter, which needs a literal dot and
    // so would miss folder names like "snes". Hidden folders are left out.
-   const QDir root( aRootPath );
-   const QStringList folders = root.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
+   const QStringList folders = lists.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
 
    for ( const QString& folder : folders ) {
       const QString gamelist = resolvePath(
-         root.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
+         lists.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
       if ( !QFileInfo::exists( gamelist ) )
          continue;
 
-      systems.append( { folder, systemKindFromFolder( folder ), gamelist } );
+      systems.append( { folder, systemKindFromFolder( folder ), gamelist,
+                        esde ? romRoot + QLatin1Char( '/' ) + folder : QString() } );
    }
 
    return systems;
