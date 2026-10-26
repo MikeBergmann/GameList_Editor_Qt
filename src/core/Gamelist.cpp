@@ -16,6 +16,24 @@
 
 namespace {
 
+// ES-DE writes <alternativeEmulator> beside <gameList>, and XML allows one root: the file
+// is parsed under this wrapper, which load() then takes out again.
+constexpr const char* Cst_Wrapper = "gle-root";
+constexpr const char* Cst_GameList = "gameList";
+
+// The wrapper goes after the declaration, which must stay first for its encoding to apply.
+QByteArray wrapped( const QByteArray& aXml )
+{
+   qsizetype at = aXml.startsWith( "\xEF\xBB\xBF" ) ? 3 : 0;
+   if ( aXml.mid( at ).startsWith( "<?xml" ) ) {
+      const qsizetype end = aXml.indexOf( "?>", at );
+      if ( end >= 0 )
+         at = end + 2;
+   }
+
+   return aXml.left( at ) + '<' + Cst_Wrapper + '>' + aXml.mid( at ) + "</" + Cst_Wrapper + '>';
+}
+
 // The layout EmulationStation writes, for systems with no media yet.
 constexpr const char* Cst_DefaultImageFolder = "./media/images/";
 constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
@@ -89,6 +107,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    FBackedUp = false;
    FRomDir.clear();
    FDocument = QDomDocument();
+   FGameList = QDomElement();
    FEntries.clear();
    FImageFolder = QLatin1String( Cst_DefaultImageFolder );
    FVideoFolder = QLatin1String( Cst_DefaultVideoFolder );
@@ -103,12 +122,26 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    QString parseError;
    int line = 0;
    int column = 0;
-   if ( !FDocument.setContent( &file, &parseError, &line, &column ) ) {
+   if ( !FDocument.setContent( wrapped( file.readAll() ), &parseError, &line, &column ) ) {
       return Error{ QStringLiteral( "%1 is not valid XML: %2 (line %3, column %4)" )
                        .arg( aSystem.gamelistPath, parseError )
                        .arg( line )
                        .arg( column ) };
    }
+
+   FGameList = FDocument.documentElement().firstChildElement( QLatin1String( Cst_GameList ) );
+   if ( FGameList.isNull() )
+      return Error{ QStringLiteral( "%1 has no <gameList>." ).arg( aSystem.gamelistPath ) };
+
+   // Back to the file's own shape: the wrapper's children become the document's.
+   QDomElement wrapper = FDocument.documentElement();
+   while ( !wrapper.firstChild().isNull() )
+      FDocument.appendChild( wrapper.firstChild() );
+   FDocument.removeChild( wrapper );
+
+   // save() writes UTF-8, whatever encoding the file declared.
+   if ( QDomNode declaration = FDocument.firstChild(); declaration.isProcessingInstruction() )
+      declaration.toProcessingInstruction().setData( QStringLiteral( "version=\"1.0\"" ) );
 
    FRomDir = aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
                                       : QDir( aSystem.romDir ).absolutePath();
@@ -116,8 +149,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
-   for ( QDomElement node =
-            FDocument.documentElement().firstChildElement( QLatin1String( Cst_Game ) );
+   for ( QDomElement node = FGameList.firstChildElement( QLatin1String( Cst_Game ) );
          !node.isNull(); node = node.nextSiblingElement( QLatin1String( Cst_Game ) ) ) {
 
       if ( !node.hasChildNodes() )
@@ -189,7 +221,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 
    const auto rollback = [&] {
       for ( QDomElement node : std::as_const( added ) )
-         FDocument.documentElement().removeChild( node );
+         FGameList.removeChild( node );
       FEntries.resize( firstNew );
    };
 
@@ -209,7 +241,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
       seen.insert( key );
 
       QDomElement node = FDocument.createElement( QLatin1String( Cst_Game ) );
-      FDocument.documentElement().appendChild( node );
+      FGameList.appendChild( node );
       setChildText( node, Cst_Path, QStringLiteral( "./" ) + relative );
       setChildText( node, Cst_Name, info.completeBaseName() );
 

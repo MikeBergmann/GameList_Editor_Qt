@@ -163,6 +163,7 @@ private:
    SystemEntry FSystem;
    QString FRomDir;
    QDomDocument FDocument;
+   QDomElement FGameList;
 
    struct Entry
    {

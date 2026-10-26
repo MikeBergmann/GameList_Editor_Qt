@@ -120,12 +120,15 @@ files; they are the user's manual stand-in for the sync feature.
 - **Return type:** `Result<QVector<SystemEntry>>`. A missing or unreadable `es_settings.xml`
   returns an error message, not an empty list.
 
-### Phase 1b: multi-root `gamelist.xml` (needed by any ES-DE load)
+### Phase 1b: multi-root `gamelist.xml` (needed by any ES-DE load) — done
 
-- `load` wraps the file content in a fake root before `setContent`, and works on the
-  `<gameList>` child; `save()` writes the children of the fake root back out. Top-level siblings
-  such as `<alternativeEmulator>` and their order survive the round trip.
-- Applies to every layout: it costs nothing for single-root files.
+- `load` parses the file under a wrapper element (after the declaration, so a declared encoding
+  still applies), finds `<gameList>` in it, then moves the wrapper's children up to the
+  document and drops the wrapper. `save()` is unchanged; top-level siblings such as
+  `<alternativeEmulator>` and their order survive the round trip.
+- The declaration is rewritten to `<?xml version="1.0"?>`, because `save()` always writes UTF-8
+  (a file declared ISO-8859-1 used to keep that declaration over UTF-8 bytes).
+- A file with no `<gameList>` is now an error (it used to accept any root name).
 
 ### Phase 2: conventional media in `Gamelist`
 

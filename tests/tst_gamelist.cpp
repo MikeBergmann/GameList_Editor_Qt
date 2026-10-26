@@ -780,6 +780,67 @@ QByteArray readAll( const QString& aPath )
    return file.open( QIODevice::ReadOnly ) ? file.readAll() : QByteArray( "<unreadable>" );
 }
 
+
+TEST( Gamelist, KeepsEveryTopLevelElementThroughASave )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "mame/gamelist.xml" ), R"(<?xml version="1.0"?>
+<alternativeEmulator>
+	<label>MAME 2003-Plus</label>
+</alternativeEmulator>
+<gameList>
+	<folder>
+		<path>./Dir</path>
+		<name>Dir</name>
+	</folder>
+	<game>
+		<path>./a.zip</path>
+		<name>A</name>
+	</game>
+</gameList>
+)" );
+
+   Gamelist list;
+   const SystemEntry mame{ QStringLiteral( "mame" ), skOther, fixture.path( "mame/gamelist.xml" ) };
+   ASSERT_TRUE( list.load( mame ) );
+   ASSERT_EQ( list.count(), 1 );
+   EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "A" ) );
+
+   writeFile( fixture.path( "mame/b.zip" ), "rom" );
+   ASSERT_TRUE( list.addGames( { fixture.path( "mame/b.zip" ) } ) );
+
+   const QByteArray saved = readAll( mame.gamelistPath );
+   EXPECT_TRUE( saved.startsWith( "<?xml version=\"1.0\"?>\n<alternativeEmulator>" ) ) << saved.toStdString();
+   EXPECT_EQ( saved.count( "<alternativeEmulator>" ), 1 );
+   EXPECT_LT( saved.indexOf( "</alternativeEmulator>" ), saved.indexOf( "<gameList>" ) );
+   EXPECT_FALSE( saved.contains( "gle-root" ) );
+   EXPECT_TRUE( saved.contains( "<folder>" ) );
+
+   Gamelist reloaded;
+   ASSERT_TRUE( reloaded.load( mame ) );
+   EXPECT_EQ( reloaded.count(), 2 );
+}
+
+TEST( Gamelist, ReadsADeclaredEncodingAndWritesUtf8 )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "gb/gamelist.xml" ),
+              QByteArray( "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<gameList><game><path>./a.gb</path>"
+                          "<name>K\xE4se</name></game></gameList>\n" ) );
+
+   Gamelist list;
+   const SystemEntry gb{ QStringLiteral( "gb" ), skOther, fixture.path( "gb/gamelist.xml" ) };
+   ASSERT_TRUE( list.load( gb ) );
+   EXPECT_EQ( list.at( 0 ).name, QString::fromUtf8( "K\xC3\xA4se" ) );
+
+   ASSERT_TRUE( list.save() );
+   EXPECT_TRUE( readAll( gb.gamelistPath ).contains( "K\xC3\xA4se" ) );
+
+   Gamelist reloaded;
+   ASSERT_TRUE( reloaded.load( gb ) );
+   EXPECT_EQ( reloaded.at( 0 ).name, QString::fromUtf8( "K\xC3\xA4se" ) ) << "the declaration must match the bytes";
+}
+
 TEST( Gamelist, SavingBacksUpTheOriginalOncePerLoad )
 {
    Fixture fixture;
