@@ -46,7 +46,7 @@ public:
    const SystemEntry& system() const { return FSystem; }
 
    void setSystemKind( SystemKind aKind ) { FSystem.kind = aKind; }
-   const QString& systemDir() const { return FSystemDir; }
+   const QString& romDir() const { return FRomDir; }
 
    // int, not qsizetype: indices are int throughout, like QAbstractItemModel's rows.
    int count() const { return static_cast<int>( FEntries.size() ); }
@@ -161,7 +161,7 @@ private:
    void countDuplicates();
 
    SystemEntry FSystem;
-   QString FSystemDir;
+   QString FRomDir;
    QDomDocument FDocument;
 
    struct Entry

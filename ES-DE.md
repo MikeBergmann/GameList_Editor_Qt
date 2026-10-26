@@ -92,19 +92,16 @@ files; they are the user's manual stand-in for the sync feature.
 
 ### Phase 0: split the folders (refactor, no behaviour change)
 
-- **`SystemEntry` (`Systems.h`):** add `romDir`, `mediaDir` and
-  `enum MediaLayout { Linked, Conventional }`. `scanSystems` fills `romDir = gamelist dir` and
-  `Linked`, so nothing changes for current users.
-- **`Gamelist::load`:** take the `SystemEntry`, or `romDir` as a second argument. Rename
-  `FSystemDir` to `FRomDir` and store the gamelist path on its own.
-- **`systemDir()` callers:** check each one and switch it to `romDir()` or `gamelistDir()`:
-  - `SystemActions` (add ROMs, export)
-  - `F_LinkMedia` (relative-path display)
-  - `MediaOps::unlistedRoms`
-  - `gamelistBackups`, which stays next to the gamelist
+- **`SystemEntry` (`Systems.h`):** add `romDir` (empty means the gamelist's folder, so nothing
+  changes for current users). **Done.** `mediaDir` and `enum MediaLayout { Linked, Conventional }`
+  arrive with Phase 2, where something reads them.
+- **`Gamelist::load`:** `FSystemDir` is now `FRomDir`, taken from `SystemEntry::romDir`. **Done.**
+- **`systemDir()` callers:** all renamed to `romDir()`; `gamelistBackups` already used
+  `system().gamelistPath`. **Done.**
 - **Side benefit:** this also covers RetroPie's `~/.emulationstation/gamelists/<sys>`, which is
   the same split with linked media.
-- **Tests:** the existing suite must pass unchanged. That is the whole check for this phase.
+- **Tests:** the existing suite passes unchanged; one new test loads a gamelist whose ROMs and
+  media live in another folder.
 
 ### Phase 1: detect and scan ES-DE (`Systems.cpp`)
 

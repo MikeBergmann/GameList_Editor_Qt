@@ -133,9 +133,9 @@ QStringList unlistedRoms( const Gamelist& aList )
       QStringLiteral( "ini" ),  QStringLiteral( "nfo" ),   QStringLiteral( "bak" ),
    };
 
-   const QDir systemDir( aList.systemDir() );
+   const QDir systemDir( aList.romDir() );
    QStringList found;
-   QDirIterator files( aList.systemDir(), QDir::Files, QDirIterator::Subdirectories );
+   QDirIterator files( aList.romDir(), QDir::Files, QDirIterator::Subdirectories );
    while ( files.hasNext() ) {
       const QString path = files.next();
       const QString relative = systemDir.relativeFilePath( path );
@@ -209,7 +209,7 @@ QVector<MediaLink> unlinkedMedia( const Gamelist& aList )
       QStringList seen;
       for ( const QString& link : kind.folders ) {
          // An empty folder (a link with no '/') would be QDir(""): the working directory.
-         const QString path = physicalPath( aList.systemDir(), link );
+         const QString path = physicalPath( aList.romDir(), link );
          if ( path.isEmpty() || seen.contains( path ) )
             continue;
          seen << path;

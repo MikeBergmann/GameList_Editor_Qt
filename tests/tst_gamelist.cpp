@@ -67,6 +67,23 @@ TEST( Gamelist, ParsesGamesAndSkipsEmptyNodes )
    EXPECT_TRUE( list.at( 2 ).physicalImagePath.isEmpty() );
 }
 
+TEST( Gamelist, RomDirIsIndependentOfTheGamelistFolder )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "elsewhere/Sonic.zip" ), "rom" );
+   writeFile( fixture.path( "elsewhere/media/images/Sonic.png" ), "png" );
+
+   SystemEntry system = fixture.snes;
+   system.romDir = fixture.path( "elsewhere" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( system ) );
+
+   EXPECT_EQ( list.romDir(), fixture.path( "elsewhere" ) );
+   EXPECT_EQ( list.at( 0 ).physicalRomPath, fixture.path( "elsewhere/Sonic.zip" ) );
+   EXPECT_FALSE( list.at( 0 ).missingImage ) << "media links resolve against romDir";
+   EXPECT_TRUE( list.at( 0 ).missingVideo );
+}
+
 TEST( Gamelist, NodesStayAlignedWithGames )
 {
    Fixture fixture;

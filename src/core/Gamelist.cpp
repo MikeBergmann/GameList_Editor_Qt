@@ -87,7 +87,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
 {
    FSystem = aSystem;
    FBackedUp = false;
-   FSystemDir.clear();
+   FRomDir.clear();
    FDocument = QDomDocument();
    FEntries.clear();
    FImageFolder = QLatin1String( Cst_DefaultImageFolder );
@@ -110,7 +110,8 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
                        .arg( column ) };
    }
 
-   FSystemDir = QFileInfo( aSystem.gamelistPath ).absolutePath();
+   FRomDir = aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
+                                      : QDir( aSystem.romDir ).absolutePath();
    FFoldsCase = volumeFoldsCase( aSystem.gamelistPath );
    bool imageFolderFound = false;
    bool videoFolderFound = false;
@@ -165,9 +166,9 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
    game.hidden = gamelistFlag( childText( aNode, Cst_Hidden ) );
    game.favorite = gamelistFlag( childText( aNode, Cst_Favorite ) );
 
-   game.physicalRomPath = physicalPath( FSystemDir, game.romPath );
-   game.physicalImagePath = physicalPath( FSystemDir, game.imagePath );
-   game.physicalVideoPath = physicalPath( FSystemDir, game.videoPath );
+   game.physicalRomPath = physicalPath( FRomDir, game.romPath );
+   game.physicalImagePath = physicalPath( FRomDir, game.imagePath );
+   game.physicalVideoPath = physicalPath( FRomDir, game.videoPath );
    game.isOrphan = fileMissing( game.physicalRomPath );
    game.missingImage = fileMissing( game.physicalImagePath );
    game.missingVideo = fileMissing( game.physicalVideoPath );
@@ -176,7 +177,7 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
 
 Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 {
-   const QDir systemDir( FSystemDir );
+   const QDir systemDir( FRomDir );
    QSet<QString> seen;
    for ( const Entry& entry : FEntries ) {
       if ( !entry.game.physicalRomPath.isEmpty() )
@@ -198,7 +199,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
 
       if ( !info.isFile() || relative.startsWith( QLatin1String( ".." ) ) ) {
          rollback();
-         return Error{ QStringLiteral( "%1 is not a file inside %2." ).arg( path, FSystemDir ) };
+         return Error{ QStringLiteral( "%1 is not a file inside %2." ).arg( path, FRomDir ) };
       }
 
       // Already listed, or picked twice: nothing to add, and not an error.
@@ -420,7 +421,7 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
                                           : game.romNameWoExt() + QLatin1Char( '_' ) +
                                                QString::number( attempt );
       const QString link = folder + stem + suffix;
-      const QString target = writeTarget( FSystemDir, link );
+      const QString target = writeTarget( FRomDir, link );
 
       // ponytail: a scan of every game per attempt, so a ChangeAll over N games is O(N^2)
       // (~25M compares at 5000). Upgrade: a set of the taken keys, built once per batch.
@@ -452,7 +453,7 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
 {
    Game& game = FEntries[aIndex].game;
    const QString link = freeMediaLink( aIndex, true );
-   const QString target = writeTarget( FSystemDir, link );
+   const QString target = writeTarget( FRomDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
       return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };
@@ -581,7 +582,7 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
 
 Result<int> Gamelist::linkMedia( const QVector<MediaLink>& aLinks )
 {
-   const QDir systemDir( FSystemDir );
+   const QDir systemDir( FRomDir );
 
    // No file is touched, so the journal holds only the games as they were.
    QVector<MediaWrite> writes;
@@ -656,7 +657,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
 
    Game& game = FEntries[aIndex].game;
    const QString link = freeMediaLink( aIndex, false );
-   const QString target = writeTarget( FSystemDir, link );
+   const QString target = writeTarget( FRomDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
       return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };

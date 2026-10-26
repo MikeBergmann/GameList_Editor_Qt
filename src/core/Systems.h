@@ -6,12 +6,22 @@
 #include <QString>
 #include <QVector>
 
+#include <utility>
+
 // One system folder under the ROM root that holds a gamelist.xml.
 struct SystemEntry
 {
+   SystemEntry() = default;
+   SystemEntry( QString aFolderName, SystemKind aKind, QString aGamelistPath, QString aRomDir = {} )
+      : folderName( std::move( aFolderName ) ), kind( aKind ), gamelistPath( std::move( aGamelistPath ) ),
+        romDir( std::move( aRomDir ) )
+   {
+   }
+
    QString folderName;
    SystemKind kind = skOther;
    QString gamelistPath;
+   QString romDir;  // base of <path> and media links; empty: the gamelist's folder
 };
 
 QVector<SystemEntry> scanSystems( const QString& aRootPath );

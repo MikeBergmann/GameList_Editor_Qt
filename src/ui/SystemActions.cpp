@@ -49,7 +49,7 @@ ViewUpdate confirmAndRemove( QWidget* aParent, Gamelist& aGamelist, const QVecto
 ViewUpdate addMissingRoms( QWidget* aParent, Gamelist& aGamelist )
 {
    const QStringList chosen =
-      Frm_AddRoms( aParent ).Execute( aGamelist.systemDir(), unlistedRoms( aGamelist ) );
+      Frm_AddRoms( aParent ).Execute( aGamelist.romDir(), unlistedRoms( aGamelist ) );
    if ( chosen.isEmpty() )
       return ViewUpdate::None;
 
@@ -225,7 +225,7 @@ void exportGamesList( QWidget* aParent, const Gamelist& aGamelist, const QString
 {
    const QString path = QFileDialog::getSaveFileName(
       aParent, QStringLiteral( "Export games list" ),
-      QDir( aGamelist.systemDir() ).filePath( aGamelist.system().folderName + QStringLiteral( ".txt" ) ),
+      QDir( aGamelist.romDir() ).filePath( aGamelist.system().folderName + QStringLiteral( ".txt" ) ),
       QStringLiteral( "Text files (*.txt)" ) );
    if ( path.isEmpty() )
       return;

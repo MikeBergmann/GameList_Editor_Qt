@@ -81,7 +81,7 @@ void Frm_LinkMedia::fill( const QVector<Row>& aRows )
 QVector<MediaLink> Frm_LinkMedia::Execute( const Gamelist& aGamelist,
                                            const QVector<MediaLink>& aCandidates )
 {
-   const QDir systemDir( aGamelist.systemDir() );
+   const QDir systemDir( aGamelist.romDir() );
 
    QVector<Row> rows;
    for ( const MediaLink& link : aCandidates ) {
@@ -102,7 +102,7 @@ QVector<MediaLink> Frm_LinkMedia::Execute( const Gamelist& aGamelist,
 QVector<OversizedImage> Frm_LinkMedia::ExecuteShrink( const Gamelist& aGamelist, qint64 aMaxBytes,
                                                       const QVector<OversizedImage>& aCandidates )
 {
-   const QDir systemDir( aGamelist.systemDir() );
+   const QDir systemDir( aGamelist.romDir() );
    const QLocale locale;
 
    QVector<Row> rows;
@@ -127,7 +127,7 @@ QVector<OversizedImage> Frm_LinkMedia::ExecuteShrink( const Gamelist& aGamelist,
 
 QVector<MediaRename> Frm_LinkMedia::ExecuteRename( const Gamelist& aGamelist )
 {
-   const QDir systemDir( aGamelist.systemDir() );
+   const QDir systemDir( aGamelist.romDir() );
 
    QVector<MediaRename> candidates;
    const auto rows = [&]() {
