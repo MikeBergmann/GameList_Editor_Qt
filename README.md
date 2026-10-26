@@ -16,7 +16,7 @@
 
 There are a lot of great ROMs for vintage computers/consoles or for their emulators on itch.io.
 
-To manage these ROMs, I use [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scraping my gamelist.xml.
+To manage these ROMs, I used [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scraping my gamelist.xml.
 
 I want to add some features, but unfortunately, it is written in Delphi (which I don't have a dev toolchain for).
 
@@ -54,13 +54,12 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Linking existing media, and renaming linked media after their ROM (both with a review before anything changes)
 - [x] Shrinking large pictures: re-encodes linked pictures over a chosen size.
 - [x] Video playback
-- [x] Windows build (experimental)
+- [x] Windows build
 - [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
 - [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
 
-### Features to add
+### WIP
 
-- [ ] Additional Scrapers (e.g., Launchbox)
 - [ ] Specific handling of the xml/media folders, e.g like es-de:
 
 ```
@@ -73,10 +72,13 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
         ├── screenshots/
         ├── videos/
 ```
+### Features to add
 
+- [ ] Additional Scrapers (e.g., Launchbox)
 - [ ] Auto-Fix invalid media links
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
+- [ ] Android version
 
 ## screenscraper.fr credentials
 
@@ -92,7 +94,7 @@ Scraping needs two separate sets of credentials:
 
 ## Still undecided
 
-Unfortunately, my Mac no longer runs macOS, so there won't be a macOS version until someone volunteers to test.
+Unfortunately, my Mac no longer runs MacOS, so there won't be a MacOS app bundle to download until someone volunteers to test. Nevertheless, I added a CI runner to make sure it builds on MacOS. 
 
 ## Third-party components
 
