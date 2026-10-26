@@ -155,13 +155,14 @@ files; they are the user's manual stand-in for the sync feature.
 - **Not checked against the sample card:** it was not mounted when Phase 2 landed; the tests use a
   fixture in the same shape.
 
-### Phase 3: UI
+### Phase 3: UI — done
 
-- **Opening a root:** the open-root dialog accepts both kinds of root, and the status bar or title
-  shows `ES-DE` / `Linked`.
-- **Menus:** link/rename show a notice in the ES-DE view (done in Phase 2).
-- **`GameEditPanel`:** no change; it already shows `physicalImagePath`.
-- **Help text:** one line that ES-DE must be stopped while editing.
+- **Opening a root:** the dialog already accepted both kinds (Phase 1). The window title reads
+  `GameList Editor Qt - ES-DE` while an ES-DE system is loaded (set in `bindGamelist`).
+- **Menus:** link/rename show a notice in the ES-DE view (Phase 2).
+- **`GameEditPanel`:** shows `physicalImagePath` as before; the delete prompt says "all its media"
+  in the ES-DE view.
+- **Help text:** names the ES-DE folder, the title indicator, and that ES-DE must be stopped.
 - **Scraping (optional):** `ScrapePanel::finishSave` could save every downloaded type into its
   own folder. YAGNI until someone asks for it. Mapping:
 

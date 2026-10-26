@@ -585,6 +585,9 @@ void Frm_Editor::bindGamelist( Gamelist* aGamelist )
    FModel->setGamelist( aGamelist );
    FEditPanel->setGamelist( aGamelist );
    FScrapePanel->setGamelist( aGamelist );
+
+   setWindowTitle( aGamelist && aGamelist->conventionalMedia() ? QStringLiteral( "GameList Editor Qt - ES-DE" )
+                                                               : QStringLiteral( "GameList Editor Qt" ) );
 }
 
 void Frm_Editor::runAction( SystemAction aAction )

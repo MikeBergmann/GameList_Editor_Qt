@@ -54,13 +54,11 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Linking existing media, and renaming linked media after their ROM (both with a review before anything changes)
 - [x] Shrinking large pictures: re-encodes linked pictures over a chosen size.
 - [x] Video playback
+<<<<<<< HEAD
 - [x] Windows build
 - [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
 - [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
-
-### WIP
-
-- [ ] Specific handling of the xml/media folders, e.g like es-de:
+- [x] Specific handling of the xml/media folders, e.g like es-de (open the ES-DE folder; syncing with a legacy gamelist is not built yet):
 
 ```
 ├── gamelists/
@@ -75,6 +73,36 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 ### Features to add
 
 - [ ] Additional Scrapers (e.g., Launchbox)
+=======
+- [x] ES-DE folders (see below)
+- [x] Windows build (experimental)
+- [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
+- [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
+
+### ES-DE
+
+Choose the ES-DE folder (the one holding `gamelists` and `settings`) instead of a ROM folder:
+
+```
+ES-DE/
+├── settings/es_settings.xml
+├── gamelists/nes/gamelist.xml
+└── downloaded_media/nes/{covers,videos,screenshots,...}
+ROMs/nes/
+```
+
+The title bar then reads "GameList Editor Qt - ES-DE". Choosing a ROM folder gives the usual view.
+
+The ROM folder used is `ROMDirectory` from `es_settings.xml`, else the `ROMs` folder beside the ES-DE folder. 
+
+Current limitation: A scraped picture is saved as the cover, whichever type you picked.
+
+### Features to add
+
+- [ ] Additional Scrapers (e.g., Launchbox)
+- [ ] Synchronise a legacy gamelist with its ES-DE counterpart
+- [ ] Scrape every picture type into its own ES-DE media folder
+>>>>>>> 144c675 (Describe the ES-DE view in the README)
 - [ ] Auto-Fix invalid media links
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media

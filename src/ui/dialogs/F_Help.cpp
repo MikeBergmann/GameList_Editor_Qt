@@ -15,9 +15,13 @@ struct HelpSection
 
 // Sections in display order, rendered into one HTML document.
 constexpr HelpSection Cst_HelpSections[] = {
-   { "Choose your folder:", "Select the folder where your systems folders are stored.<br>"
+   { "Choose your folder:", "Select the folder where your systems folders are stored, or the "
+                            "ES-DE folder (the one with <code>gamelists</code> and "
+                            "<code>settings</code>). The title bar then reads ES-DE: pictures and "
+                            "videos are found by the ROM's name in ES-DE's media folder, and "
+                            "linking or renaming them is not offered.<br>"
                             "<br>"
-                            "If that folder lives on a running Recalbox or RetroPie, stop "
+                            "If that folder lives on a running Recalbox, RetroPie or ES-DE, stop "
                             "EmulationStation first: it rewrites <code>gamelist.xml</code> when it "
                             "exits, and would overwrite anything saved from here.<br>"
                             "<br>"

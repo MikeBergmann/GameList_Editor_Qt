@@ -59,6 +59,19 @@ TEST( MainWindow, ConstructsWithNothingLoaded )
    EXPECT_TRUE( shown( editor ).isEmpty() );
 }
 
+TEST( MainWindow, TheTitleSaysES_DEOnlyForAnEsdeFolder )
+{
+   Fixture fixture;
+   Frm_Editor editor;
+   editor.openRootFolder( fixture.dir.path() );
+   EXPECT_FALSE( editor.windowTitle().contains( QStringLiteral( "ES-DE" ) ) );
+
+   writeFile( fixture.path( "ES-DE/settings/es_settings.xml" ), "<bool name=\"DebugMode\" value=\"false\" />\n" );
+   writeFile( fixture.path( "ES-DE/gamelists/snes/gamelist.xml" ), Cst_Gamelist );
+   editor.openRootFolder( fixture.path( "ES-DE" ) );
+   EXPECT_TRUE( editor.windowTitle().contains( QStringLiteral( "ES-DE" ) ) );
+}
+
 TEST( MainWindow, ListsTheGamesOfTheSelectedSystem )
 {
    Fixture fixture;

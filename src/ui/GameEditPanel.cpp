@@ -532,10 +532,12 @@ void GameEditPanel::deleteGame()
    if ( !FSkipDeletePrompt ) {
       QMessageBox box( QMessageBox::Question, QStringLiteral( "GameList Editor Qt" ),
                        QStringLiteral( "Remove \"%1\" from the gamelist?\n"
-                                       "You can also send its ROM, picture and video to the trash "
+                                       "You can also send its ROM and %2 to the trash "
                                        "(deleted where there is no trash), unless another game "
                                        "uses them." )
-                          .arg( FGamelist->at( index ).name ),
+                          .arg( FGamelist->at( index ).name,
+                                FGamelist->conventionalMedia() ? QStringLiteral( "all its media" )
+                                                               : QStringLiteral( "picture and video" ) ),
                        QMessageBox::NoButton, this );
       QPushButton* entryOnly = box.addButton( QStringLiteral( "Remove entry only" ), QMessageBox::ActionRole );
       QPushButton* withFiles =
