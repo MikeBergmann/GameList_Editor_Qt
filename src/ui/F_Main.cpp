@@ -785,5 +785,5 @@ void Frm_Editor::showMoreInfos( int aIndex )
          FGamelist.ensureHashes( aIndex );
    }
 
-   Frm_MoreInfos( this ).Execute( FGamelist.at( aIndex ) );
+   Frm_MoreInfos( this ).Execute( FGamelist.at( aIndex ), FGamelist.system().gamelistPath );
 }

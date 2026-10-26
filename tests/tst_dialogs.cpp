@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <QLineEdit>
 #include <QTimer>
 
 namespace {
@@ -30,20 +31,29 @@ TEST( Dialogs, AllConstruct )
    expectConstructs<Frm_Network>();
 }
 
-TEST( Dialogs, MoreInfosShowsAGamesFields )
+TEST( Dialogs, MoreInfosShowsAGamesFilesAndFields )
 {
    Game game;
    game.playcount = QStringLiteral( "12" );
    game.lastplayed = QStringLiteral( "20130101T180000" );
    game.crc32 = QStringLiteral( "352441C2" );
+   game.physicalRomPath = QStringLiteral( "/roms/snes/Sonic.zip" );
+   game.physicalImagePath = QStringLiteral( "/media/snes/covers/Sonic.png" );
+   game.missingImage = true;
 
    Frm_MoreInfos dialog;
    QTimer::singleShot( 0, &dialog, &QDialog::reject );
-   dialog.Execute( game );
+   dialog.Execute( game, QStringLiteral( "/appdata/gamelists/snes/gamelist.xml" ) );
 
-   // Nothing to assert on the widgets from out here; the point is that feeding
-   // a real Game through Execute neither crashes nor blocks.
-   SUCCEED();
+   const auto text = [&dialog]( const char* aName ) {
+      return dialog.findChild<QLineEdit*>( QLatin1String( aName ) )->text();
+   };
+   EXPECT_EQ( text( "Edt_Gamelist" ), QStringLiteral( "/appdata/gamelists/snes/gamelist.xml" ) );
+   EXPECT_EQ( text( "Edt_Rom" ), QStringLiteral( "/roms/snes/Sonic.zip" ) );
+   EXPECT_EQ( text( "Edt_Image" ), QStringLiteral( "/media/snes/covers/Sonic.png (missing)" ) );
+   EXPECT_TRUE( text( "Edt_Video" ).isEmpty() ) << "no link, so no path and no \"(missing)\"";
+   EXPECT_EQ( text( "Edt_Playcount" ), QStringLiteral( "12" ) );
+   EXPECT_EQ( text( "Edt_Crc32" ), QStringLiteral( "352441C2" ) );
 }
 
 // With the opt-out hidden, opening Help must hand the "show tips" setting back
