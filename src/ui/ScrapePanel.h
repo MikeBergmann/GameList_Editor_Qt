@@ -12,6 +12,7 @@
 #include <memory>
 
 class Gamelist;
+class Frm_PickGame;
 class QCheckBox;
 class QComboBox;
 class QThread;
@@ -55,6 +56,9 @@ signals:
    // The selection and the Gamelist must stay put until the reply lands.
    void busyChanged( bool aBusy );
 
+private slots:
+   void searchScreenScraper( const QString& aText );
+
 private:
    void buildLayout();
    void setBusy( bool aBusy );
@@ -80,6 +84,10 @@ private:
 
    void handleGameInfo( const ScrapedInfo& aInfo );
    void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );
+   // Routes "Game not found" to a ScreenScraper name search, everything else to the dialog.
+   void handleScrapeFailed( const QString& aMessage, const QString& aDetails );
+   void handleSearchReady( const QVector<ScrapeCandidate>& aCandidates );
+   void handleSearchFailed( const QString& aMessage, const QString& aDetails );
    void handleMediaReady( int aIndex, const QImage& aImage );
    void handleMediaFinished();
 
@@ -97,6 +105,14 @@ private:
    std::shared_ptr<const LaunchBoxDb> FLbIndex;
    QString FLbPlatform;
    QThread* FIndexThread = nullptr;
+
+   // The ScreenScraper name search: the open picker (null if none), what it lists, and
+   // whether a reply is still wanted.
+   Frm_PickGame* FPicker = nullptr;
+   QVector<ScrapeCandidate> FCandidates;
+   bool FAwaitingSearch = false;
+   QString FSearchText;
+   QString FNotFoundDetails;
    ScrapedInfo FLastInfo;
    bool FHasScrapedData = false;
    QImage FSelectedPicture;

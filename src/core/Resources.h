@@ -255,6 +255,7 @@ inline constexpr int Cst_IniLanguageDefault = lnEnglish;
 
 inline constexpr const char* Cst_ScraperAddress = "https://www.screenscraper.fr/api2/";
 inline constexpr const char* Cst_Category = "jeuInfos.php";
+inline constexpr const char* Cst_SearchCategory = "jeuRecherche.php";
 inline constexpr const char* Cst_ScrapeLogin = "?devid=";
 inline constexpr const char* Cst_ScrapePwd = "&devpassword=";
 
@@ -266,11 +267,16 @@ inline constexpr const char* Cst_Crc = "&crc=";
 inline constexpr const char* Cst_SystemId = "&systemeid=";
 inline constexpr const char* Cst_RomName = "&romnom=";
 inline constexpr const char* Cst_RomSize = "&romtaille=";
+inline constexpr const char* Cst_SearchText = "&recherche=";
+
+// What Scraper reports when the server has no match; ScrapePanel offers a search on it.
+inline constexpr const char* Cst_GameNotFound = "Game not found";
 
 
 // Reply nodes. French, because the API is.
 inline constexpr const char* Cst_DataNode = "Data";
 inline constexpr const char* Cst_GameNode = "jeu";
+inline constexpr const char* Cst_GamesNode = "jeux";
 inline constexpr const char* Cst_UserNode = "ssuser";
 inline constexpr const char* Cst_ThreadNode = "maxthreads";
 inline constexpr const char* Cst_MediaNode = "medias";

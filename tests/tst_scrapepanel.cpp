@@ -16,6 +16,7 @@
 #include <QImage>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
@@ -371,6 +372,69 @@ TEST( ScrapePanel, LaunchBoxGameNotFoundOffersSimilarGamesToPick )
 
    EXPECT_EQ( offered, 1 );
    EXPECT_EQ( panel.edit( "Edt_ScrapeName" )->text(), QStringLiteral( "Sonic the Hedgehog Spinball" ) );
+}
+
+TEST( ScrapePanel, ScreenScraperSearchOffersCandidatesAndFillsTheFieldsFromTheChosenOne )
+{
+   if ( devCredentialsConfigured() )
+      GTEST_SKIP() << "built with dev credentials: this would search online";
+
+   Panel panel;
+   panel.panel.setSelection( 0 );
+
+   const auto candidate = []( const char* aName ) {
+      ScrapeCandidate result;
+      result.name = QString::fromLatin1( aName );
+      result.xml = QByteArrayLiteral( "<Data><jeu id=\"1\"><noms><nom region=\"wor\">" ) +
+                   aName + QByteArrayLiteral( "</nom></noms></jeu></Data>" );
+      return result;
+   };
+
+   int offered = -1;
+   QTimer picker;
+   QObject::connect( &picker, &QTimer::timeout, [&] {
+      QDialog* dialog = qobject_cast<QDialog*>( QApplication::activeModalWidget() );
+      if ( !dialog )
+         return;
+      QListWidget* list = dialog->findChild<QListWidget*>( QStringLiteral( "Lst_Candidates" ) );
+      offered = list->count();
+      list->setCurrentRow( 1 );
+      dialog->accept();
+   } );
+   picker.start( 20 );
+
+   // Without credentials the search fails at once and raises a blocking dialog; mute that
+   // reply, then answer as the server would.
+   panel.panel.scraper().blockSignals( true );
+   QMetaObject::invokeMethod( &panel.panel, "searchScreenScraper", Q_ARG( QString, QStringLiteral( "Sonic" ) ) );
+   panel.panel.scraper().blockSignals( false );
+   emit panel.panel.scraper().searchReady( { candidate( "Sonic Ball" ), candidate( "Sonic Ball 2" ) } );
+
+   EXPECT_EQ( offered, 2 );
+   EXPECT_EQ( panel.edit( "Edt_ScrapeName" )->text(), QStringLiteral( "Sonic Ball 2" ) );
+}
+
+TEST( ScrapePanel, ScreenScraperGameNotFoundWithoutCredentialsWarnsInsteadOfSearching )
+{
+   if ( devCredentialsConfigured() )
+      GTEST_SKIP() << "built with dev credentials: this would search online";
+
+   Panel panel;
+   panel.panel.setSelection( 0 );
+
+   QString shown;
+   QTimer closer;
+   QObject::connect( &closer, &QTimer::timeout, [&] {
+      if ( QMessageBox* box = qobject_cast<QMessageBox*>( QApplication::activeModalWidget() ) ) {
+         shown = box->text();
+         box->close();
+      }
+   } );
+   closer.start( 20 );
+   emit panel.panel.scraper().gameInfoFailed( QStringLiteral( "Game not found" ) );
+
+   EXPECT_TRUE( shown.contains( QStringLiteral( "GLE_SS_DEVID" ) ) );
+   EXPECT_TRUE( panel.panel.isEnabled() );
 }
 
 }  // namespace

@@ -64,6 +64,16 @@ Result<> loadLaunchBoxIndex( LaunchBoxDb& aDb, const QString& aMetadata, const Q
    return load( aMame, [&]( QIODevice& aIn ) { return aDb.loadMame( aIn ); } );
 }
 
+QString pickerRow( const QString& aName, const QString& aYear, const QString& aAltName = {} )
+{
+   QString text = aName;
+   if ( !aYear.isEmpty() )
+      text += QStringLiteral( " (%1)" ).arg( aYear );
+   if ( !aAltName.isEmpty() )
+      text += QStringLiteral( " \u2013 also known as %1" ).arg( aAltName );
+   return text;
+}
+
 }  // namespace
 
 ScrapePanel::ScrapePanel( QWidget* aParent, const QString& aLaunchBoxDir )
@@ -72,7 +82,9 @@ ScrapePanel::ScrapePanel( QWidget* aParent, const QString& aLaunchBoxDir )
    buildLayout();
 
    connect( &FScraper, &Scraper::gameInfoReady, this, &ScrapePanel::handleGameInfo );
-   connect( &FScraper, &Scraper::gameInfoFailed, this, &ScrapePanel::handleGameInfoFailed );
+   connect( &FScraper, &Scraper::gameInfoFailed, this, &ScrapePanel::handleScrapeFailed );
+   connect( &FScraper, &Scraper::searchReady, this, &ScrapePanel::handleSearchReady );
+   connect( &FScraper, &Scraper::searchFailed, this, &ScrapePanel::handleSearchFailed );
    connect( &FScraper, &Scraper::mediaReady, this, &ScrapePanel::handleMediaReady );
    connect( &FScraper, &Scraper::mediaFinished, this, &ScrapePanel::handleMediaFinished );
 
@@ -607,13 +619,108 @@ void ScrapePanel::pickLaunchBoxGame( const LaunchBoxQuery& aQuery )
       return;
    }
 
-   Frm_PickGame dialog( *FLbIndex, this );
-   const int index = dialog.Execute( aQuery.gameName.isEmpty() ? aQuery.romName : aQuery.gameName );
-   if ( index < 0 ) {
+   Frm_PickGame dialog( this );
+   dialog.setHint( QStringLiteral( "No LaunchBox game has exactly this name. Pick the closest "
+                                   "one, or change the search." ) );
+   QVector<LaunchBoxCandidate> shown;
+   const auto search = [&]( const QString& aText ) {
+      shown = FLbIndex->similar( aText );
+      QStringList rows;
+      for ( const LaunchBoxCandidate& candidate : std::as_const( shown ) )
+         rows << pickerRow( candidate.name, candidate.year, candidate.altName );
+      dialog.setRows( rows );
+   };
+   connect( &dialog, &Frm_PickGame::searchRequested, &dialog, search );
+
+   const QString initial = aQuery.gameName.isEmpty() ? aQuery.romName : aQuery.gameName;
+   search( initial );
+   const int row = dialog.Execute( initial );
+   if ( row < 0 ) {
       setBusy( false );
       return;
    }
-   handleGameInfo( FLbIndex->infoAt( index, aQuery ) );
+   handleGameInfo( FLbIndex->infoAt( shown.at( row ).index, aQuery ) );
+}
+
+void ScrapePanel::handleScrapeFailed( const QString& aMessage, const QString& aDetails )
+{
+   if ( aMessage != QLatin1String( Cst_GameNotFound ) || !FGamelist || FIndex < 0 ) {
+      handleGameInfoFailed( aMessage, aDetails );
+      return;
+   }
+   FNotFoundDetails = aDetails;
+   const Game& game = FGamelist->at( FIndex );
+   searchScreenScraper( game.name.isEmpty() ? game.romNameWoExt() : game.name );
+}
+
+void ScrapePanel::searchScreenScraper( const QString& aText )
+{
+   if ( aText.trimmed().isEmpty() )
+      return;
+
+   FSearchText = aText;
+   FAwaitingSearch = true;
+
+   ScrapeRequest request;
+   request.systemId = QLatin1String( Cst_SystemKindId[FGamelist->system().kind] );
+   request.ssLogin = FSSLogin;
+   request.ssPassword = FSSPassword;
+   FScraper.searchGames( request, aText, FLanguage );
+}
+
+void ScrapePanel::handleSearchReady( const QVector<ScrapeCandidate>& aCandidates )
+{
+   if ( !FAwaitingSearch )
+      return;
+   FAwaitingSearch = false;
+
+   FCandidates = aCandidates;
+   QStringList rows;
+   for ( const ScrapeCandidate& candidate : std::as_const( FCandidates ) )
+      rows << pickerRow( candidate.name, candidate.releaseDate );
+
+   if ( FPicker ) {
+      FPicker->setRows( rows );
+      return;
+   }
+   if ( rows.isEmpty() ) {
+      handleGameInfoFailed( QLatin1String( Cst_GameNotFound ), FNotFoundDetails );
+      return;
+   }
+
+   Frm_PickGame dialog( this );
+   dialog.setHint( QStringLiteral( "ScreenScraper has no game for this ROM. Pick the closest "
+                                   "one, or change the name and search again (each search "
+                                   "counts against your ScreenScraper quota)." ) );
+   dialog.setLiveSearch( false );
+   dialog.setRows( rows );
+   connect( &dialog, &Frm_PickGame::searchRequested, this, &ScrapePanel::searchScreenScraper );
+
+   FPicker = &dialog;
+   const int row = dialog.Execute( FSearchText );
+   FPicker = nullptr;
+   FAwaitingSearch = false;
+
+   if ( row < 0 ) {
+      setBusy( false );
+      return;
+   }
+   const Result<ScrapedInfo> info = parseScrapeResponse(
+      FCandidates.at( row ).xml, mediaTypes(), Chk_Video->isChecked(), FLanguage );
+   if ( info )
+      handleGameInfo( info.value() );
+   else
+      handleGameInfoFailed( info.error(), {} );
+}
+
+void ScrapePanel::handleSearchFailed( const QString& aMessage, const QString& aDetails )
+{
+   if ( !FPicker ) {
+      FAwaitingSearch = false;
+      handleGameInfoFailed( aMessage, aDetails );
+      return;
+   }
+   QMessageBox::warning( FPicker, QStringLiteral( "GameList Editor Qt" ), aMessage );
 }
 
 void ScrapePanel::handleGameInfo( const ScrapedInfo& aInfo )
