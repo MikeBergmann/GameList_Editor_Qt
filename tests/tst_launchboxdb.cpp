@@ -271,6 +271,44 @@ TEST( LaunchBoxDb, NotFoundIsAnError )
    EXPECT_EQ( missing.error(), QStringLiteral( "Game not found" ) );
 }
 
+TEST( LaunchBoxDb, SimilarRanksTyposMissingSubtitlesAndAlternateNames )
+{
+   const LaunchBoxDb db = nesDb();
+   const auto first = [&]( const char* aText ) {
+      const auto found = db.similar( QLatin1String( aText ) );
+      return found.isEmpty() ? QString() : found.first().name;
+   };
+
+   EXPECT_EQ( first( "Legnd of Zelda" ), QStringLiteral( "The Legend of Zelda" ) );
+   EXPECT_EQ( first( "Legend of Zelda, The" ), QStringLiteral( "The Legend of Zelda" ) );
+   EXPECT_EQ( first( "Super Mario Brothers (USA)" ), QStringLiteral( "Super Mario Bros." ) );
+   EXPECT_EQ( first( "Tom and Jerry" ), QStringLiteral( "Tom & Jerry: Frantic Antics" ) )
+      << "the ROM name lacks the subtitle";
+
+   const auto alt = db.similar( QStringLiteral( "Mario Bros Specal" ) );
+   ASSERT_FALSE( alt.isEmpty() );
+   EXPECT_EQ( alt.first().name, QStringLiteral( "Super Mario Bros." ) );
+   EXPECT_EQ( alt.first().altName, QStringLiteral( "Mario Bros Special" ) );
+   EXPECT_EQ( alt.first().year, QStringLiteral( "2000" ) ) << "falls back to the release date";
+
+   const auto zelda = db.similar( QStringLiteral( "Legnd of Zelda" ) );
+   ASSERT_FALSE( zelda.isEmpty() );
+   EXPECT_TRUE( zelda.first().altName.isEmpty() );
+   EXPECT_EQ( zelda.first().year, QStringLiteral( "1987" ) );
+}
+
+TEST( LaunchBoxDb, SimilarIgnoresUnrelatedNamesAndHonoursTheLimit )
+{
+   const LaunchBoxDb db = nesDb();
+   EXPECT_TRUE( db.similar( QStringLiteral( "Qwertyuiop" ) ).isEmpty() );
+   EXPECT_TRUE( db.similar( QStringLiteral( "(USA)" ) ).isEmpty() );
+   EXPECT_EQ( db.similar( QStringLiteral( "Duplicate" ), 1 ).size(), 1 );
+   EXPECT_EQ( db.similar( QStringLiteral( "Duplicate" ) ).size(), 2 ) << "both share the name";
+
+   const auto picked = db.similar( QStringLiteral( "Duplicate" ) ).last();
+   EXPECT_EQ( db.infoAt( picked.index, query( {} ) ).description, QStringLiteral( "second" ) );
+}
+
 TEST( LaunchBoxDb, SharedNameKeyTakesTheFirstAndSaysSo )
 {
    const LaunchBoxDb db = nesDb();

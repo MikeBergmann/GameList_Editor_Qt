@@ -11,9 +11,11 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDialog>
 #include <QElapsedTimer>
 #include <QImage>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
@@ -343,6 +345,32 @@ TEST( ScrapePanel, LaunchBoxGameNotFoundWarnsAndStaysUsable )
    waitUntilEnabled( panel.panel );
 
    EXPECT_TRUE( panel.edit( "Edt_ScrapeName" )->text().isEmpty() );
+}
+
+TEST( ScrapePanel, LaunchBoxGameNotFoundOffersSimilarGamesToPick )
+{
+   Panel panel;
+   QByteArray metadata = Cst_LbMetadata;
+   metadata.replace( "Sonic the Hedgehog", "Sonic the Hedgehog Spinball" );
+   writeLaunchBoxCache( panel, metadata );
+   panel.combo( "Cbo_Source" )->setCurrentIndex( 1 );
+   panel.panel.setSelection( 0 );
+
+   int offered = -1;
+   QTimer picker;
+   QObject::connect( &picker, &QTimer::timeout, [&] {
+      QDialog* dialog = qobject_cast<QDialog*>( QApplication::activeModalWidget() );
+      if ( !dialog )
+         return;
+      offered = dialog->findChild<QListWidget*>( QStringLiteral( "Lst_Candidates" ) )->count();
+      dialog->accept();
+   } );
+   picker.start( 20 );
+   panel.button( "Btn_Scrape" )->click();
+   waitUntilEnabled( panel.panel );
+
+   EXPECT_EQ( offered, 1 );
+   EXPECT_EQ( panel.edit( "Edt_ScrapeName" )->text(), QStringLiteral( "Sonic the Hedgehog Spinball" ) );
 }
 
 }  // namespace

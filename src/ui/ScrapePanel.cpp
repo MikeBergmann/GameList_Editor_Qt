@@ -1,6 +1,7 @@
 #include "ScrapePanel.h"
 
 #include "Gamelist.h"
+#include "F_PickGame.h"
 #include "Resources.h"
 
 #include <QCheckBox>
@@ -590,13 +591,29 @@ void ScrapePanel::lookupLaunchBox()
 
    const Result<LaunchBoxMatch> match = FLbIndex->find( query );
    if ( !match ) {
-      handleGameInfoFailed( match.error(), {} );
+      pickLaunchBoxGame( query );
       return;
    }
    if ( match.value().ambiguous )
       Lbl_Note->setText(
          QStringLiteral( "Several LaunchBox games share this name; the first was taken." ) );
    handleGameInfo( match.value().info );
+}
+
+void ScrapePanel::pickLaunchBoxGame( const LaunchBoxQuery& aQuery )
+{
+   if ( FLbIndex->gameCount() == 0 ) {
+      handleGameInfoFailed( QStringLiteral( "Game not found" ), {} );
+      return;
+   }
+
+   Frm_PickGame dialog( *FLbIndex, this );
+   const int index = dialog.Execute( aQuery.gameName.isEmpty() ? aQuery.romName : aQuery.gameName );
+   if ( index < 0 ) {
+      setBusy( false );
+      return;
+   }
+   handleGameInfo( FLbIndex->infoAt( index, aQuery ) );
 }
 
 void ScrapePanel::handleGameInfo( const ScrapedInfo& aInfo )

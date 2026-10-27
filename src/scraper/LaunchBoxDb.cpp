@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <numeric>
 
 namespace {
 
@@ -131,6 +132,52 @@ const QVector<MediaSlot>& mediaSlots()
       { Cst_MediaWheel, { QStringLiteral( "Clear Logo" ) } },
    };
    return table;
+}
+
+const double Cst_MinSimilarity = 0.6;
+
+struct Probe
+{
+   QString key;
+   QSet<QString> words;
+};
+
+QSet<QString> wordsOf( const QString& aKey )
+{
+   const QStringList words = aKey.split( QLatin1Char( '_' ), Qt::SkipEmptyParts );
+   return QSet<QString>( words.cbegin(), words.cend() );
+}
+
+int editDistance( const QString& aA, const QString& aB )
+{
+   const qsizetype n = aB.size();
+   QVector<int> prev( n + 1 ), cur( n + 1 );
+   std::iota( prev.begin(), prev.end(), 0 );
+   for ( qsizetype i = 1; i <= aA.size(); ++i ) {
+      cur[0] = static_cast<int>( i );
+      for ( qsizetype j = 1; j <= n; ++j ) {
+         const int cost = aA.at( i - 1 ) == aB.at( j - 1 ) ? 0 : 1;
+         cur[j] = std::min( { prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost } );
+      }
+      std::swap( prev, cur );
+   }
+   return prev[n];
+}
+
+// 0..1 between two name keys: the best of word overlap (Dice), a query that is a subset of the
+// name (a missing subtitle, scaled down so an exact match still wins) and character edit distance.
+double similarity( const Probe& aProbe, const QString& aKey )
+{
+   const QSet<QString> words = wordsOf( aKey );
+   double common = 0;
+   for ( const QString& word : words )
+      common += aProbe.words.contains( word ) ? 1 : 0;
+
+   const double count = static_cast<double>( aProbe.words.size() + words.size() );
+   const double fewest = static_cast<double>( std::min( aProbe.words.size(), words.size() ) );
+   const double longest = static_cast<double>( std::max( aProbe.key.size(), aKey.size() ) );
+   const double edit = 1.0 - static_cast<double>( editDistance( aProbe.key, aKey ) ) / longest;
+   return std::max( { 2 * common / count, 0.8 * common / fewest, edit } );
 }
 
 }  // namespace
@@ -314,6 +361,62 @@ Result<LaunchBoxMatch> LaunchBoxDb::find( const LaunchBoxQuery& aQuery ) const
       }
    }
    return Error{ QStringLiteral( "Game not found" ) };
+}
+
+QVector<LaunchBoxCandidate> LaunchBoxDb::similar( const QString& aText, int aLimit ) const
+{
+   QVector<Probe> probes;
+   for ( const QString& text : { aText, articleFront( aText ) } ) {
+      Probe probe;
+      probe.key = launchBoxNameKey( text );
+      probe.words = wordsOf( probe.key );
+      if ( !probe.key.isEmpty() )
+         probes.append( probe );
+   }
+
+   QHash<int, LaunchBoxCandidate> best;
+   const auto visit = [&]( const QHash<QString, QVector<int>>& aTable, bool aAlt ) {
+      for ( auto it = aTable.constBegin(); it != aTable.constEnd(); ++it ) {
+         double score = 0;
+         for ( const Probe& probe : std::as_const( probes ) )
+            score = std::max( score, similarity( probe, it.key() ) );
+         if ( score < Cst_MinSimilarity )
+            continue;
+         for ( const int index : it.value() ) {
+            LaunchBoxCandidate& candidate = best[index];
+            if ( score <= candidate.score )
+               continue;
+            candidate.index = index;
+            candidate.score = score;
+            candidate.altName.clear();
+            if ( !aAlt )
+               continue;
+            for ( const Alt& alt : FGames.at( index ).alts ) {
+               if ( launchBoxNameKey( alt.name ) == it.key() ) {
+                  candidate.altName = alt.name;
+                  break;
+               }
+            }
+         }
+      }
+   };
+   visit( FByKey, false );
+   visit( FByAltKey, true );
+
+   QVector<LaunchBoxCandidate> result = best.values();
+   std::sort( result.begin(), result.end(),
+              []( const LaunchBoxCandidate& aLeft, const LaunchBoxCandidate& aRight ) {
+                 return aLeft.score != aRight.score ? aLeft.score > aRight.score
+                                                    : aLeft.index < aRight.index;
+              } );
+   if ( result.size() > aLimit )
+      result.resize( aLimit );
+   for ( LaunchBoxCandidate& candidate : result ) {
+      const Entry& game = FGames.at( candidate.index );
+      candidate.name = game.name;
+      candidate.year = game.releaseYear.isEmpty() ? game.releaseDate.left( 4 ) : game.releaseYear;
+   }
+   return result;
 }
 
 ScrapedInfo LaunchBoxDb::toInfo( const Entry& aGame, const LaunchBoxQuery& aQuery ) const

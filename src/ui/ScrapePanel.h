@@ -76,6 +76,7 @@ private:
    void requestLaunchBox();
    void buildLaunchBoxIndex( const QString& aPlatform );
    void lookupLaunchBox();
+   void pickLaunchBoxGame( const LaunchBoxQuery& aQuery );
 
    void handleGameInfo( const ScrapedInfo& aInfo );
    void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );

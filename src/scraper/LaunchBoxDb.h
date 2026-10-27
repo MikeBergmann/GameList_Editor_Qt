@@ -30,6 +30,15 @@ struct LaunchBoxMatch
    bool ambiguous = false;  // several games share the name key; the first was taken
 };
 
+struct LaunchBoxCandidate
+{
+   int index = -1;  // for LaunchBoxDb::infoAt
+   QString name;
+   QString year;     // empty when unknown
+   QString altName;  // set when an alternate name matched better than the name
+   double score = 0;  // 0..1
+};
+
 class LaunchBoxDb
 {
 public:
@@ -43,6 +52,15 @@ public:
 
    // An Error "Game not found" when nothing matches.
    Result<LaunchBoxMatch> find( const LaunchBoxQuery& aQuery ) const;
+
+   // Games whose name or alternate name looks like aText, best first, for when find() fails.
+   QVector<LaunchBoxCandidate> similar( const QString& aText, int aLimit = 20 ) const;
+
+   // What find() returns for a game picked from similar().
+   ScrapedInfo infoAt( int aIndex, const LaunchBoxQuery& aQuery ) const
+   {
+      return toInfo( FGames.at( aIndex ), aQuery );
+   }
 
 private:
    struct Alt
