@@ -139,7 +139,12 @@ Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QStr
    info.publisher = game.firstChildElement( QLatin1String( Cst_EditNode ) ).text();
    info.developer = game.firstChildElement( QLatin1String( Cst_DevNode ) ).text();
    info.players = game.firstChildElement( QLatin1String( Cst_PlayersNode ) ).text();
-   info.rating = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
+   // <note> is 0-20; gamelist.xml's <rating> is 0-1.
+   const QString noteText = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
+   bool noteOk = false;
+   const double note = noteText.toDouble( &noteOk );
+   if ( noteOk && note > 0 )
+      info.rating = QString::number( qMin( note / 20.0, 1.0 ), 'f', 2 );
 
    // Media: only the requested types; video is handled separately from the pictures.
    const QDomElement medias = game.firstChildElement( QLatin1String( Cst_MediaNode ) );

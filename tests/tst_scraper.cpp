@@ -56,6 +56,17 @@ const QByteArray kResponse = QByteArrayLiteral( R"(<?xml version="1.0" encoding=
 </Data>
 )" );
 
+TEST( ParseScrapeResponse, NoUsableNoteLeavesTheRatingEmpty )
+{
+   for ( const char* note : { "<note></note>", "<note>n/a</note>", "<note>0</note>", "" } ) {
+      const QByteArray reply =
+         QByteArrayLiteral( "<Data><jeu id=\"1\">" ) + note + QByteArrayLiteral( "</jeu></Data>" );
+      const Result<ScrapedInfo> parsed = parseScrapeResponse( reply, {}, false, lnEnglish );
+      ASSERT_TRUE( parsed ) << note;
+      EXPECT_TRUE( parsed.value().rating.isEmpty() ) << note;
+   }
+}
+
 TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
 {
    const QSet<QString> mediaTypes = { QStringLiteral( "box-2D" ), QStringLiteral( "ss" ) };
@@ -75,7 +86,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
    EXPECT_EQ( info.publisher, QStringLiteral( "Sega" ) );
    EXPECT_EQ( info.developer, QStringLiteral( "Sonic Team" ) );
    EXPECT_EQ( info.players, QStringLiteral( "2" ) );
-   EXPECT_EQ( info.rating, QStringLiteral( "18" ) );
+   EXPECT_EQ( info.rating, QStringLiteral( "0.90" ) ) << "note 18 of 20, as ES's 0-1";
 
    // "wheel" was not in mediaTypes, so only box-2D and ss made it through.
    ASSERT_EQ( info.pictures.size(), 2 );
