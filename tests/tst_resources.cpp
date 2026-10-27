@@ -28,6 +28,26 @@ TEST( Resources, EverySystemHasADisplayNameAndAScraperId )
    }
 }
 
+// A table one row short leaves the tail null, a shifted row maps a system to the wrong platform.
+TEST( Resources, LaunchBoxPlatformNamesLineUpWithTheKinds )
+{
+   for ( int i = 0; i < skCount; ++i ) {
+      SCOPED_TRACE( i );
+      EXPECT_NE( Cst_SystemKindLbName[i], nullptr );
+   }
+
+   EXPECT_STREQ( Cst_SystemKindLbName[skNES], "Nintendo Entertainment System" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skMSX2], "Microsoft MSX2" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skGW2], "Nintendo Game & Watch" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skTI99], "Texas Instruments TI 99/4A" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skPSPM], "Sony PSP Minis" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skWindows], "Windows" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skAndroid], "Android" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skCS], "" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skOther], "" );
+   EXPECT_STREQ( Cst_SystemKindLbName[skMegaDrive], Cst_SystemKindLbName[skGenesis] );
+}
+
 // The logo is loaded with no existence check, so every one has to be in the .qrc.
 TEST( Resources, EverySystemLogoResolvesInTheQrc )
 {

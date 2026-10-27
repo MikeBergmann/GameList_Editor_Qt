@@ -4,6 +4,7 @@
 #include "Resources.h"
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -23,6 +24,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSettings>
+#include <QThread>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -33,9 +35,38 @@ namespace {
 
 constexpr int Cst_ThumbnailSize = 120;
 
+constexpr int Cst_SourceScreenScraper = 0;
+constexpr int Cst_SourceLaunchBox = 1;
+
+Result<> loadLaunchBoxIndex( LaunchBoxDb& aDb, const QString& aMetadata, const QString& aFiles,
+                             const QString& aMame, const QString& aPlatform )
+{
+   const auto load = []( const QString& aPath, const auto& aRead ) -> Result<> {
+      QFile file( aPath );
+      if ( !file.open( QIODevice::ReadOnly ) )
+         return Error{ QStringLiteral( "Cannot open %1: %2" ).arg( aPath, file.errorString() ) };
+      return aRead( file );
+   };
+
+   if ( const Result<> ok = load( aMetadata, [&]( QIODevice& aIn ) {
+                                     return aDb.loadMetadata( aIn, aPlatform );
+                                  } );
+        !ok )
+      return ok;
+   // Only Arcade needs the ROM-name tables; everywhere else they add nothing.
+   if ( aPlatform != QLatin1String( "Arcade" ) )
+      return {};
+   if ( const Result<> ok =
+           load( aFiles, [&]( QIODevice& aIn ) { return aDb.loadFiles( aIn, aPlatform ); } );
+        !ok )
+      return ok;
+   return load( aMame, [&]( QIODevice& aIn ) { return aDb.loadMame( aIn ); } );
+}
+
 }  // namespace
 
-ScrapePanel::ScrapePanel( QWidget* aParent ) : QWidget( aParent )
+ScrapePanel::ScrapePanel( QWidget* aParent, const QString& aLaunchBoxDir )
+   : QWidget( aParent ), FDump( aLaunchBoxDir )
 {
    buildLayout();
 
@@ -44,7 +75,35 @@ ScrapePanel::ScrapePanel( QWidget* aParent ) : QWidget( aParent )
    connect( &FScraper, &Scraper::mediaReady, this, &ScrapePanel::handleMediaReady );
    connect( &FScraper, &Scraper::mediaFinished, this, &ScrapePanel::handleMediaFinished );
 
+   connect( &FDump, &LaunchBoxDump::downloadProgress, this,
+            [this]( qint64 aReceived, qint64 aTotal ) {
+               Img_Loading->setRange( 0, aTotal > 0 ? static_cast<int>( aTotal / 1024 ) : 0 );
+               Img_Loading->setValue( static_cast<int>( aReceived / 1024 ) );
+            } );
+   connect( &FDump, &LaunchBoxDump::unpacking, this, [this] { Img_Loading->setRange( 0, 0 ); } );
+   connect( &FDump, &LaunchBoxDump::finished, this, [this]( bool aUpdated ) {
+      if ( aUpdated ) {
+         FLbIndex.reset();
+         FLbPlatform.clear();
+      }
+      Img_Loading->setRange( 0, 0 );
+      setBusy( false );
+      Lbl_Note->setText( aUpdated ? QStringLiteral( "LaunchBox DB updated." )
+                                  : QStringLiteral( "LaunchBox DB is already up to date." ) );
+   } );
+   connect( &FDump, &LaunchBoxDump::failed, this, [this]( const QString& aMessage ) {
+      Img_Loading->setRange( 0, 0 );
+      setBusy( false );
+      QMessageBox::warning( this, QStringLiteral( "GameList Editor Qt" ), aMessage );
+   } );
+
    setSelection( -1 );
+}
+
+ScrapePanel::~ScrapePanel()
+{
+   if ( FIndexThread )
+      FIndexThread->wait();
 }
 
 void ScrapePanel::buildLayout()
@@ -117,9 +176,37 @@ void ScrapePanel::buildLayout()
    fields->addRow( QStringLiteral( "Developer" ), Edt_ScrapeDeveloper );
    fields->addRow( QStringLiteral( "Publisher" ), Edt_ScrapePublisher );
 
+   Cbo_Source = new QComboBox( this );
+   Cbo_Source->setObjectName( QStringLiteral( "Cbo_Source" ) );
+   Cbo_Source->addItems( { QStringLiteral( "ScreenScraper" ), QStringLiteral( "LaunchBox" ) } );
+   connect( Cbo_Source, &QComboBox::currentIndexChanged, this, [this]( int aIndex ) {
+      QSettings settings;
+      settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+      settings.setValue( QLatin1String( Cst_IniScrapeSource ), aIndex );
+      applySource();
+   } );
+
+   Btn_RefreshLaunchBox =
+      new QPushButton( QStringLiteral( "Refresh LaunchBox DB" ), this );
+   Btn_RefreshLaunchBox->setObjectName( QStringLiteral( "Btn_RefreshLaunchBox" ) );
+   Btn_RefreshLaunchBox->setVisible( false );
+   connect( Btn_RefreshLaunchBox, &QPushButton::clicked, this, &ScrapePanel::refreshLaunchBox );
+
+   Lbl_Note = new QLabel( this );
+   Lbl_Note->setObjectName( QStringLiteral( "Lbl_Note" ) );
+   Lbl_Note->setWordWrap( true );
+
+   QHBoxLayout* sourceRow = new QHBoxLayout;
+   sourceRow->addWidget( new QLabel( QStringLiteral( "Source" ), this ) );
+   sourceRow->addWidget( Cbo_Source );
+   sourceRow->addWidget( Btn_RefreshLaunchBox );
+   sourceRow->addStretch( 1 );
+
    QVBoxLayout* left = new QVBoxLayout;
+   left->addLayout( sourceRow );
    left->addLayout( mediaRow );
    left->addWidget( Btn_Scrape );
+   left->addWidget( Lbl_Note );
    left->addLayout( fields );
    left->addWidget( new QLabel( QStringLiteral( "Description" ), this ) );
    left->addWidget( Mmo_ScrapeDescription, 1 );
@@ -225,8 +312,25 @@ void ScrapePanel::setSelection( int aIndex )
    // A game whose ROM has vanished has nothing to hash.
    const bool canScrape = valid && !FGamelist->at( aIndex ).isOrphan;
    Btn_Scrape->setEnabled( canScrape );
-   Chk_ManualCRC->setEnabled( canScrape );
-   Edt_ManualCRC->setEnabled( canScrape && Chk_ManualCRC->isChecked() );
+   const bool launchBox = launchBoxSelected();
+   Chk_ManualCRC->setEnabled( canScrape && !launchBox );
+   Edt_ManualCRC->setEnabled( canScrape && !launchBox && Chk_ManualCRC->isChecked() );
+}
+
+bool ScrapePanel::launchBoxSelected() const
+{
+   return Cbo_Source->currentIndex() == Cst_SourceLaunchBox;
+}
+
+// LaunchBox has no video, CRC lookup or Mix/Arcade box art. The old results are from the other source.
+void ScrapePanel::applySource()
+{
+   const bool launchBox = launchBoxSelected();
+   Btn_RefreshLaunchBox->setVisible( launchBox );
+   const QList<QWidget*> sourceOnly = { Chk_Mix1, Chk_Mix2, Chk_ArcadeBox, Chk_Video };
+   for ( QWidget* widget : sourceOnly )
+      widget->setEnabled( !launchBox );
+   setSelection( FIndex );
 }
 
 void ScrapePanel::setBusy( bool aBusy )
@@ -242,12 +346,15 @@ void ScrapePanel::activate()
    settings.beginGroup( QLatin1String( Cst_IniOptions ) );
 
    if ( settings.value( QLatin1String( Cst_IniProxyUse ), false ).toBool() ) {
-      FScraper.setProxy( settings.value( QLatin1String( Cst_IniProxyServer ) ).toString(),
-                         settings.value( QLatin1String( Cst_IniProxyPort ), 0 ).toInt(),
-                         settings.value( QLatin1String( Cst_IniProxyUser ) ).toString(),
-                         settings.value( QLatin1String( Cst_IniProxyPwd ) ).toString() );
+      const QString server = settings.value( QLatin1String( Cst_IniProxyServer ) ).toString();
+      const int port = settings.value( QLatin1String( Cst_IniProxyPort ), 0 ).toInt();
+      const QString user = settings.value( QLatin1String( Cst_IniProxyUser ) ).toString();
+      const QString password = settings.value( QLatin1String( Cst_IniProxyPwd ) ).toString();
+      FScraper.setProxy( server, port, user, password );
+      FDump.setProxy( server, port, user, password );
    } else {
       FScraper.setProxy( QString(), 0, QString(), QString() );
+      FDump.setProxy( QString(), 0, QString(), QString() );
    }
 
    FSSLogin = settings.value( QLatin1String( Cst_IniSSUser ) ).toString();
@@ -255,6 +362,12 @@ void ScrapePanel::activate()
 
    FLanguage = langFromIndex(
       settings.value( QLatin1String( Cst_IniLanguage ), Cst_IniLanguageDefault ).toInt() );
+
+   Cbo_Source->setCurrentIndex(
+      settings.value( QLatin1String( Cst_IniScrapeSource ), Cst_SourceScreenScraper ).toInt() ==
+            Cst_SourceLaunchBox
+         ? Cst_SourceLaunchBox
+         : Cst_SourceScreenScraper );
 
    clearScrapeMedia();
 }
@@ -309,6 +422,7 @@ QSet<QString> ScrapePanel::mediaTypes() const
 void ScrapePanel::emptyScrapeFields()
 {
    setFields( {} );
+   Lbl_Note->clear();
    FSelectedPicture = QImage();
    showSelectedPicture();
    FLastInfo = ScrapedInfo();
@@ -389,6 +503,11 @@ void ScrapePanel::requestScrape()
 
    setBusy( true );
 
+   if ( launchBoxSelected() ) {
+      requestLaunchBox();
+      return;
+   }
+
    // The hash is cached on the Game once computed, so a rescrape does not
    // rehash a ROM that has not changed.
    FGamelist->ensureHashes( FIndex );
@@ -404,6 +523,80 @@ void ScrapePanel::requestScrape()
    request.ssPassword = FSSPassword;
 
    FScraper.requestGame( request, mediaTypes(), Chk_Video->isChecked(), FLanguage );
+}
+
+void ScrapePanel::refreshLaunchBox()
+{
+   Lbl_Note->clear();
+   setBusy( true );
+   FDump.refresh();
+}
+
+void ScrapePanel::requestLaunchBox()
+{
+   const QString platform =
+      QLatin1String( Cst_SystemKindLbName[FGamelist->system().kind] );
+   if ( platform.isEmpty() ) {
+      handleGameInfoFailed( QStringLiteral( "LaunchBox has no platform for this system." ), {} );
+      return;
+   }
+   if ( !FDump.isCached() ) {
+      handleGameInfoFailed( QStringLiteral( "The LaunchBox DB is not downloaded yet. Use "
+                                            "\"Refresh LaunchBox DB\" first." ),
+                            {} );
+      return;
+   }
+
+   if ( FLbIndex && FLbPlatform == platform )
+      lookupLaunchBox();
+   else
+      buildLaunchBoxIndex( platform );
+}
+
+// Reading Metadata.xml takes tens of seconds, so it runs on a worker; the panel stays busy.
+void ScrapePanel::buildLaunchBoxIndex( const QString& aPlatform )
+{
+   const QString metadata = FDump.filePath( QStringLiteral( "Metadata.xml" ) );
+   const QString files = FDump.filePath( QStringLiteral( "Files.xml" ) );
+   const QString mame = FDump.filePath( QStringLiteral( "Mame.xml" ) );
+   const auto db = std::make_shared<LaunchBoxDb>();
+   const auto result = std::make_shared<Result<>>();
+
+   FIndexThread = QThread::create(
+      [=] { *result = loadLaunchBoxIndex( *db, metadata, files, mame, aPlatform ); } );
+   FIndexThread->setParent( this );
+   connect( FIndexThread, &QThread::finished, this, [this, db, result, aPlatform] {
+      FIndexThread->deleteLater();
+      FIndexThread = nullptr;
+      if ( !*result ) {
+         handleGameInfoFailed( result->error(), {} );
+         return;
+      }
+      FLbIndex = db;
+      FLbPlatform = aPlatform;
+      lookupLaunchBox();
+   } );
+   FIndexThread->start();
+}
+
+void ScrapePanel::lookupLaunchBox()
+{
+   const Game& game = FGamelist->at( FIndex );
+   LaunchBoxQuery query;
+   query.romName = game.romNameWoExt();
+   query.gameName = game.name;
+   query.region = game.region;
+   query.mediaTypes = mediaTypes();
+
+   const Result<LaunchBoxMatch> match = FLbIndex->find( query );
+   if ( !match ) {
+      handleGameInfoFailed( match.error(), {} );
+      return;
+   }
+   if ( match.value().ambiguous )
+      Lbl_Note->setText(
+         QStringLiteral( "Several LaunchBox games share this name; the first was taken." ) );
+   handleGameInfo( match.value().info );
 }
 
 void ScrapePanel::handleGameInfo( const ScrapedInfo& aInfo )

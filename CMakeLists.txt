@@ -114,6 +114,7 @@ configure_file( src/scraper/DevCredentials.h.in generated/DevCredentials.h @ONLY
 
 add_library( gle_scraper STATIC
    src/scraper/LaunchBoxDb.cpp
+   src/scraper/LaunchBoxDump.cpp
    src/scraper/Scraper.cpp
 )
 target_include_directories( gle_scraper PUBLIC src/scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" )
@@ -152,6 +153,7 @@ add_executable( tests
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
    tests/tst_launchboxdb.cpp
+   tests/tst_launchboxdump.cpp
    tests/tst_mediaops.cpp
    tests/tst_pathutil.cpp
    tests/tst_resources.cpp
