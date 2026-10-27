@@ -7,8 +7,8 @@ on:
 
 jobs:
   build-and-test:
-    # macos-14 is Apple Silicon; the clang_64 Qt kit is a universal build, so it works there.
-    runs-on: macos-14
+    # macos-15 is Apple Silicon; the clang_64 Qt kit is a universal build, so it works there.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
         with:

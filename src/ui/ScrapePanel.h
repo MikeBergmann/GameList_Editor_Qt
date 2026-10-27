@@ -1,15 +1,21 @@
 #pragma once
 
 #include "Game.h"
+#include "LaunchBoxDb.h"
+#include "LaunchBoxDump.h"
 #include "Scraper.h"
 
 #include <QImage>
 #include <QWidget>
 
 #include <functional>
+#include <memory>
 
 class Gamelist;
+class Frm_PickGame;
 class QCheckBox;
+class QComboBox;
+class QThread;
 class QHBoxLayout;
 class QLabel;
 class QLineEdit;
@@ -24,7 +30,9 @@ class ScrapePanel : public QWidget
    Q_OBJECT
 
 public:
-   explicit ScrapePanel( QWidget* aParent = nullptr );
+   explicit ScrapePanel( QWidget* aParent = nullptr,
+                         const QString& aLaunchBoxDir = LaunchBoxDump::defaultCacheDir() );
+   ~ScrapePanel() override;
 
    // Borrowed, not owned. Null means no system is loaded.
    void setGamelist( Gamelist* aGamelist );
@@ -40,12 +48,16 @@ public:
 
    // Exposed so tests can emit its signals without a network round trip.
    Scraper& scraper() { return FScraper; }
+   LaunchBoxDump& launchBoxDump() { return FDump; }
 
 signals:
    void gamesChanged();
 
    // The selection and the Gamelist must stay put until the reply lands.
    void busyChanged( bool aBusy );
+
+private slots:
+   void searchScreenScraper( const QString& aText );
 
 private:
    void buildLayout();
@@ -62,8 +74,20 @@ private:
    void showSelectedPicture();
    void report( const Result<>& aResult );
 
+   bool launchBoxSelected() const;
+   void applySource();
+   void refreshLaunchBox();
+   void requestLaunchBox();
+   void buildLaunchBoxIndex( const QString& aPlatform );
+   void lookupLaunchBox();
+   void pickLaunchBoxGame( const LaunchBoxQuery& aQuery );
+
    void handleGameInfo( const ScrapedInfo& aInfo );
    void handleGameInfoFailed( const QString& aMessage, const QString& aDetails );
+   // Routes "Game not found" to a ScreenScraper name search, everything else to the dialog.
+   void handleScrapeFailed( const QString& aMessage, const QString& aDetails );
+   void handleSearchReady( const QVector<ScrapeCandidate>& aCandidates );
+   void handleSearchFailed( const QString& aMessage, const QString& aDetails );
    void handleMediaReady( int aIndex, const QImage& aImage );
    void handleMediaFinished();
 
@@ -76,6 +100,19 @@ private:
    int FIndex = -1;
 
    Scraper FScraper;
+   LaunchBoxDump FDump;
+   // One platform's index at a time; the Arcade one is the biggest.
+   std::shared_ptr<const LaunchBoxDb> FLbIndex;
+   QString FLbPlatform;
+   QThread* FIndexThread = nullptr;
+
+   // The ScreenScraper name search: the open picker (null if none), what it lists, and
+   // whether a reply is still wanted.
+   Frm_PickGame* FPicker = nullptr;
+   QVector<ScrapeCandidate> FCandidates;
+   bool FAwaitingSearch = false;
+   QString FSearchText;
+   QString FNotFoundDetails;
    ScrapedInfo FLastInfo;
    bool FHasScrapedData = false;
    QImage FSelectedPicture;
@@ -95,6 +132,10 @@ private:
    QLineEdit* Edt_ScrapePlayers = nullptr;
    QPlainTextEdit* Mmo_ScrapeDescription = nullptr;
    QLineEdit* Edt_ScrapeRomPath = nullptr;
+
+   QComboBox* Cbo_Source = nullptr;
+   QPushButton* Btn_RefreshLaunchBox = nullptr;
+   QLabel* Lbl_Note = nullptr;
 
    QCheckBox* Chk_Box2D = nullptr;
    QCheckBox* Chk_Box3D = nullptr;

@@ -56,6 +56,17 @@ const QByteArray kResponse = QByteArrayLiteral( R"(<?xml version="1.0" encoding=
 </Data>
 )" );
 
+TEST( ParseScrapeResponse, NoUsableNoteLeavesTheRatingEmpty )
+{
+   for ( const char* note : { "<note></note>", "<note>n/a</note>", "<note>0</note>", "" } ) {
+      const QByteArray reply =
+         QByteArrayLiteral( "<Data><jeu id=\"1\">" ) + note + QByteArrayLiteral( "</jeu></Data>" );
+      const Result<ScrapedInfo> parsed = parseScrapeResponse( reply, {}, false, lnEnglish );
+      ASSERT_TRUE( parsed ) << note;
+      EXPECT_TRUE( parsed.value().rating.isEmpty() ) << note;
+   }
+}
+
 TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
 {
    const QSet<QString> mediaTypes = { QStringLiteral( "box-2D" ), QStringLiteral( "ss" ) };
@@ -75,7 +86,7 @@ TEST( ParseScrapeResponse, ResolvesEnglishFieldsAndFiltersMedia )
    EXPECT_EQ( info.publisher, QStringLiteral( "Sega" ) );
    EXPECT_EQ( info.developer, QStringLiteral( "Sonic Team" ) );
    EXPECT_EQ( info.players, QStringLiteral( "2" ) );
-   EXPECT_EQ( info.rating, QStringLiteral( "18" ) );
+   EXPECT_EQ( info.rating, QStringLiteral( "0.90" ) ) << "note 18 of 20, as ES's 0-1";
 
    // "wheel" was not in mediaTypes, so only box-2D and ss made it through.
    ASSERT_EQ( info.pictures.size(), 2 );
@@ -235,6 +246,73 @@ TEST( Scraper, DecodesXorEncodedDevSecret )
 
    EXPECT_EQ( decodeDevSecret( abc ), QStringLiteral( "abc" ) );
    EXPECT_TRUE( decodeDevSecret( empty ).isEmpty() );
+}
+
+TEST( Scraper, SearchQueryEncodesTheTextAndSendsNoRomFields )
+{
+   ScrapeRequest request;
+   request.systemId = QStringLiteral( "3" );
+   request.crc32 = QStringLiteral( "BCD9EC52" );
+   request.romName = QStringLiteral( "Sonic.zip" );
+   request.ssLogin = QStringLiteral( "user" );
+   request.ssPassword = QStringLiteral( "pw" );
+
+   const QUrlQuery query{ QUrl( buildSearchQuery( request, QStringLiteral( "Sonic & Knuckles #2" ) ) ) };
+   EXPECT_EQ( query.queryItemValue( QStringLiteral( "recherche" ), QUrl::FullyDecoded ),
+              QStringLiteral( "Sonic & Knuckles #2" ) );
+   EXPECT_EQ( query.queryItemValue( QStringLiteral( "systemeid" ) ), QStringLiteral( "3" ) );
+   EXPECT_EQ( query.queryItemValue( QStringLiteral( "ssid" ) ), QStringLiteral( "user" ) );
+   for ( const char* name : { "crc", "romnom", "romtaille" } )
+      EXPECT_FALSE( query.hasQueryItem( QLatin1String( name ) ) ) << name;
+   EXPECT_TRUE( buildSearchQuery( request, {} ).contains( QStringLiteral( "jeuRecherche.php" ) ) );
+
+   request.systemId = QStringLiteral( "0" );
+   EXPECT_FALSE( QUrlQuery( QUrl( buildSearchQuery( request, QStringLiteral( "x" ) ) ) )
+                    .hasQueryItem( QStringLiteral( "systemeid" ) ) )
+      << "systemeid=0 is rejected by the server";
+}
+
+TEST( ParseSearchResponse, ListsEachGameWithItsOwnDocument )
+{
+   const QByteArray reply = QByteArrayLiteral( R"(<?xml version="1.0" encoding="UTF-8"?>
+<Data>
+   <ssuser><maxthreads>4</maxthreads></ssuser>
+   <jeux>
+      <jeu id="1"><noms><nom region="wor">Sonic Ball</nom></noms>
+         <dates><date region="wor">1992-12-08</date></dates>
+         <medias><media type="ss" format="png">https://example.invalid/a.png</media></medias></jeu>
+      <jeu id="2"><noms><nom region="ss">Sonic Ball 2</nom></noms></jeu>
+      <jeu id="3"><noms/></jeu>
+   </jeux>
+</Data>
+note after the document
+)" );
+
+   const Result<QVector<ScrapeCandidate>> found = parseSearchResponse( reply, lnEnglish );
+   ASSERT_TRUE( found ) << found.error().toStdString();
+   ASSERT_EQ( found.value().size(), 2 ) << "a game without a name is skipped";
+   EXPECT_EQ( found.value()[0].name, QStringLiteral( "Sonic Ball" ) );
+   EXPECT_EQ( found.value()[0].releaseDate, QStringLiteral( "08/12/1992" ) );
+   EXPECT_EQ( found.value()[1].name, QStringLiteral( "Sonic Ball 2" ) );
+   EXPECT_TRUE( found.value()[1].releaseDate.isEmpty() );
+
+   const Result<ScrapedInfo> picked = parseScrapeResponse(
+      found.value()[0].xml, { QStringLiteral( "ss" ) }, false, lnEnglish );
+   ASSERT_TRUE( picked ) << picked.error().toStdString();
+   EXPECT_EQ( picked.value().name, QStringLiteral( "Sonic Ball" ) );
+   EXPECT_EQ( picked.value().pictures.size(), 1 );
+   EXPECT_EQ( picked.value().maxThreads, 4 );
+}
+
+TEST( ParseSearchResponse, NoGamesIsAnEmptyListAndBadXmlIsAnError )
+{
+   const Result<QVector<ScrapeCandidate>> none =
+      parseSearchResponse( QByteArrayLiteral( "<Data><jeux/></Data>" ), lnEnglish );
+   ASSERT_TRUE( none );
+   EXPECT_TRUE( none.value().isEmpty() );
+
+   EXPECT_TRUE( parseSearchResponse( QByteArrayLiteral( "<Data/>" ), lnEnglish ) );
+   EXPECT_FALSE( parseSearchResponse( QByteArrayLiteral( "not xml" ), lnEnglish ) );
 }
 
 // An unconfigured build must fail fast, offline, with a hint.

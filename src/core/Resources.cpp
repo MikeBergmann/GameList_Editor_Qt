@@ -274,6 +274,95 @@ const char* const Cst_SystemKindId[skCount] = {
    "53", "205", "210", "52", "15", "104", "31", "114", "172", "138", "63", "0",
 };
 
+// Checked against Platforms.xml of the dump. Mega Drive and Genesis share "Sega Genesis", the
+// only name Metadata.xml has for them; MAME-like kinds all map to "Arcade".
+const char* const Cst_SystemKindLbName[skCount] = {
+   "Nintendo Entertainment System",        // skNES
+   "Super Nintendo Entertainment System",  // skSNES
+   "Sega Master System",                   // skMasterSystem
+   "Sega Genesis",                         // skMegaDrive
+   "SNK Neo Geo AES",                      // skNeoGeo
+   "Amstrad CPC",                          // skCPC
+   "Atari 2600",                           // skAT2600
+   "Atari 7800",                           // skAT7800
+   "Atari ST",                             // skATST
+   "",                                     // skCS
+   "Nintendo Famicom Disk System",         // skFCD
+   "Arcade",                               // skFBA
+   "Arcade",                               // skFBALib
+   "Nintendo Game & Watch",                // skGW
+   "Nintendo Game Boy Color",              // skGBC
+   "Sega Game Gear",                       // skGG
+   "Nintendo Game Boy",                    // skGB
+   "Nintendo Game Boy Advance",            // skGBA
+   "",                                     // skLU
+   "Atari Lynx",                           // skLYNX
+   "Arcade",                               // skMAME
+   "Microsoft MSX",                        // skMSX
+   "Microsoft MSX",                        // skMSX1
+   "Microsoft MSX2",                       // skMSX2
+   "SNK Neo Geo Pocket",                   // skNGP
+   "SNK Neo Geo Pocket Color",             // skNGPC
+   "Nintendo 64",                          // skN64
+   "Magnavox Odyssey 2",                   // skODY
+   "NEC TurboGrafx-16",                    // skPCE
+   "NEC TurboGrafx-CD",                    // skPCECD
+   "Sony Playstation",                     // skPS
+   "",                                     // skPRB
+   "ScummVM",                              // skSVM
+   "Sega 32X",                             // skS32X
+   "Sega CD",                              // skSCD
+   "Sega SG-1000",                         // skSG1000
+   "PC Engine SuperGrafx",                 // skSGFX
+   "GCE Vectrex",                          // skVCX
+   "Nintendo Virtual Boy",                 // skVB
+   "WonderSwan",                           // skWS
+   "WonderSwan Color",                     // skWSC
+   "Sinclair ZX Spectrum",                 // skZXS
+   "Sinclair ZX-81",                       // skZX81
+   "Commodore Amiga",                      // skAM1200
+   "Commodore Amiga",                      // skAM600
+   "Apple II",                             // skAPPLE
+   "ColecoVision",                         // skCV
+   "Commodore 64",                         // skC64
+   "MS-DOS",                               // skDB
+   "Sega Dreamcast",                       // skDC
+   "Nintendo GameCube",                    // skGC
+   "Sony PSP",                             // skPSP
+   "Nintendo Wii",                         // skWII
+   "Sega Genesis",                         // skGenesis
+   "3DO Interactive Multiplayer",          // sk3do
+   "Commodore Amiga",                      // skAM
+   "Commodore Amiga CD32",                 // skAMCD
+   "Arcade",                               // skARC
+   "Atari 5200",                           // skAT5200
+   "Atari Lynx",                           // skATLX
+   "Commodore CDTV",                       // skCDTV
+   "ColecoVision",                         // skCV2
+   "",                                     // skDaphne
+   "Amstrad GX4000",                       // skGX4000
+   "Mattel Intellivision",                 // skIV
+   "Sega Naomi",                           // skNaomi
+   "SNK Neo Geo CD",                       // skNGCD
+   "OpenBOR",                              // skOB
+   "",                                     // skPorts
+   "Sega Saturn",                          // skSS
+   "",                                     // skSNESCD
+   "Sharp X68000",                         // skX68000
+   "Sammy Atomiswave",                     // skAW
+   "Texas Instruments TI 99/4A",           // skTI99
+   "Super Nintendo Entertainment System",  // skMSU1
+   "Nintendo Game & Watch",                // skGW2
+   "Nintendo DS",                          // skNDS
+   "Magnavox Odyssey 2",                   // skODY2
+   "NEC TurboGrafx-16",                    // skTG
+   "NEC TurboGrafx-CD",                    // skTGCD
+   "Sony PSP Minis",                      // skPSPM
+   "Windows",                              // skWindows
+   "Android",                              // skAndroid
+   "",                                     // skOther
+};
+
 const char* const Cst_CountryName[cnCount] = {
    "", "de", "asi", "au", "br", "bg", "ca", "cl", "cn", "ame",
    "kr", "cus", "dk", "sp", "eu", "fi", "fr", "gr", "hu", "il",

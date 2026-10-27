@@ -163,6 +163,8 @@ extern const char* const Cst_SystemKindFolderNames[skCount];
 extern const char* const Cst_SystemKindImageNames[skCount];
 // screenscraper.fr system ids. Not unique either.
 extern const char* const Cst_SystemKindId[skCount];
+// LaunchBox platform names, as Metadata.xml writes them. Empty where LaunchBox has no equivalent.
+extern const char* const Cst_SystemKindLbName[skCount];
 
 // Two-letter codes as screenscraper.fr writes them. Cst_CountryName[cnUnd] is "".
 extern const char* const Cst_CountryName[cnCount];
@@ -240,6 +242,11 @@ inline constexpr const char* Cst_IniLastFolder = "LastFolder";
 // Folder name -> known system's folder name ("amiga500" = "amiga"), for
 // folders the tables do not recognise.
 inline constexpr const char* Cst_IniSystemMap = "SystemMap";
+// Validators of the cached LaunchBox dump, sent back as If-None-Match / If-Modified-Since.
+inline constexpr const char* Cst_IniLaunchBoxETag = "LaunchBoxETag";
+inline constexpr const char* Cst_IniLaunchBoxModified = "LaunchBoxModified";
+// Scrape tab source: 0 ScreenScraper (the default), 1 LaunchBox.
+inline constexpr const char* Cst_IniScrapeSource = "ScrapeSource";
 
 // Language is the one key whose default is not the zero value (lnFrench is 0).
 inline constexpr int Cst_IniLanguageDefault = lnEnglish;
@@ -248,6 +255,7 @@ inline constexpr int Cst_IniLanguageDefault = lnEnglish;
 
 inline constexpr const char* Cst_ScraperAddress = "https://www.screenscraper.fr/api2/";
 inline constexpr const char* Cst_Category = "jeuInfos.php";
+inline constexpr const char* Cst_SearchCategory = "jeuRecherche.php";
 inline constexpr const char* Cst_ScrapeLogin = "?devid=";
 inline constexpr const char* Cst_ScrapePwd = "&devpassword=";
 
@@ -259,11 +267,16 @@ inline constexpr const char* Cst_Crc = "&crc=";
 inline constexpr const char* Cst_SystemId = "&systemeid=";
 inline constexpr const char* Cst_RomName = "&romnom=";
 inline constexpr const char* Cst_RomSize = "&romtaille=";
+inline constexpr const char* Cst_SearchText = "&recherche=";
+
+// What Scraper reports when the server has no match; ScrapePanel offers a search on it.
+inline constexpr const char* Cst_GameNotFound = "Game not found";
 
 
 // Reply nodes. French, because the API is.
 inline constexpr const char* Cst_DataNode = "Data";
 inline constexpr const char* Cst_GameNode = "jeu";
+inline constexpr const char* Cst_GamesNode = "jeux";
 inline constexpr const char* Cst_UserNode = "ssuser";
 inline constexpr const char* Cst_ThreadNode = "maxthreads";
 inline constexpr const char* Cst_MediaNode = "medias";

@@ -12,7 +12,7 @@
 
 #include <memory>
 
-// Client for screenscraper.fr's jeuInfos.php. Asynchronous, on the calling thread.
+// Client for screenscraper.fr's jeuInfos.php and jeuRecherche.php. Asynchronous.
 
 // One requested lookup.
 struct ScrapeRequest
@@ -55,9 +55,25 @@ struct ScrapedInfo
    int maxThreads = 1;
 };
 
+// One game of a jeuRecherche.php reply.
+struct ScrapeCandidate
+{
+   QString name;
+   QString releaseDate;  // dd/MM/yyyy, MM/yyyy or yyyy; may be empty
+   // A whole <Data> document holding just this game, so parseScrapeResponse resolves it like
+   // a jeuInfos reply once the user has picked it.
+   QByteArray xml;
+};
+
+// ISO "yyyy-mm-dd", "yyyy-mm" or "yyyy" to dd/MM/yyyy, MM/yyyy or yyyy. Empty for anything else.
+QString formatScrapedDate( const QString& aValue );
+
 // Needs no network. An Error when the XML is invalid or holds no <jeu>.
 Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
                                         bool aWantVideo, LangName aLanguage );
+
+// Needs no network. An Error when the XML is invalid; an empty list when nothing matched.
+Result<QVector<ScrapeCandidate>> parseSearchResponse( const QByteArray& aXml, LangName aLanguage );
 
 // Strips credentials from a message. Pass the whole error text, not just your
 // URL: QNetworkReply::errorString() embeds its own copy of the request URL.
@@ -68,6 +84,9 @@ QString decodeDevSecret( const unsigned char* aData );
 
 // Every value percent-encoded.
 QString buildGameQuery( const ScrapeRequest& aRequest );
+
+// Takes the system and the login from aRequest; its ROM fields are not sent.
+QString buildSearchQuery( const ScrapeRequest& aRequest, const QString& aText );
 
 // False when the build has no developer credentials; requestGame() then fails
 // immediately.
@@ -88,6 +107,10 @@ public:
    void requestGame( const ScrapeRequest& aRequest, const QSet<QString>& aMediaTypes,
                      bool aWantVideo, LangName aLanguage );
 
+   // For a game requestGame() could not find. Up to 30 matches, best first; an empty list is
+   // a success. Answers with searchReady or searchFailed.
+   void searchGames( const ScrapeRequest& aRequest, const QString& aText, LangName aLanguage );
+
    // At most aMaxThreads at a time; the server states that limit. mediaReady fires
    // per picture, mediaFinished once at the end.
    void requestMedia( const QVector<MediaInfo>& aMedia, int aMaxThreads = 1 );
@@ -99,6 +122,9 @@ signals:
    void gameInfoReady( const ScrapedInfo& aInfo );
    // aDetails is the sanitized server body, if any.
    void gameInfoFailed( const QString& aMessage, const QString& aDetails = QString() );
+
+   void searchReady( const QVector<ScrapeCandidate>& aCandidates );
+   void searchFailed( const QString& aMessage, const QString& aDetails = QString() );
 
    void mediaReady( int aIndex, const QImage& aImage );
    void mediaFailed( int aIndex, const QString& aMessage );

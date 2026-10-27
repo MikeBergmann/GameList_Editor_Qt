@@ -113,6 +113,8 @@ gle_xor_encode( GLE_SS_DEVPWD GLE_SS_DEVPWD_XOR )
 configure_file( src/scraper/DevCredentials.h.in generated/DevCredentials.h @ONLY )
 
 add_library( gle_scraper STATIC
+   src/scraper/LaunchBoxDb.cpp
+   src/scraper/LaunchBoxDump.cpp
    src/scraper/Scraper.cpp
 )
 target_include_directories( gle_scraper PUBLIC src/scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" )
@@ -130,6 +132,7 @@ add_library( gle_ui STATIC
    src/ui/dialogs/F_Help.cpp
    src/ui/dialogs/F_LinkMedia.cpp
    src/ui/dialogs/F_MoreInfos.cpp
+   src/ui/dialogs/F_PickGame.cpp
 )
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
 target_link_libraries( gle_ui PUBLIC Qt6::Widgets Qt6::Multimedia Qt6::MultimediaWidgets gle_core gle_scraper )
@@ -150,6 +153,8 @@ add_executable( tests
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
+   tests/tst_launchboxdb.cpp
+   tests/tst_launchboxdump.cpp
    tests/tst_mediaops.cpp
    tests/tst_pathutil.cpp
    tests/tst_resources.cpp

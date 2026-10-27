@@ -24,10 +24,6 @@ QString decodeDevSecret( const unsigned char* aData )
    }
 }
 
-namespace {
-
-// The dates node holds ISO "yyyy-mm-dd", shortened to "yyyy-mm" or "yyyy" when only part of it
-// is known.
 QString formatScrapedDate( const QString& aValue )
 {
    switch ( aValue.size() ) {
@@ -39,6 +35,8 @@ QString formatScrapedDate( const QString& aValue )
       default: return {};
    }
 }
+
+namespace {
 
 // noms/regions/synopsis/dates: a flat dict of <child aAttribute="key">text</child>.
 QHash<QString, QString> childDict( const QDomElement& aParent, const char* aAttribute )
@@ -70,24 +68,35 @@ QStringList descriptionFallback( const QString& aLangStr )
 
 }  // namespace
 
+namespace {
+
+// ScreenScraper sometimes appends a plain-text note after </Data> (e.g.
+// "CRC non trouve : ..." when the lookup fell back to the ROM name), which a
+// strict parser rejects as extra content. The document itself is complete.
+Result<> parseData( const QByteArray& aXml, QDomDocument& aDoc )
+{
+   QString parseError;
+   const qsizetype end = aXml.lastIndexOf( "</Data>" );
+   const QByteArray xml = end < 0 ? aXml : aXml.left( end + 7 );
+   if ( !aDoc.setContent( xml, &parseError ) )
+      return Error{ parseError };
+   return {};
+}
+
+}  // namespace
+
 Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
                                         bool aWantVideo, LangName aLanguage )
 {
    QDomDocument doc;
-   QString parseError;
-   // ScreenScraper sometimes appends a plain-text note after </Data> (e.g.
-   // "CRC non trouve : ..." when the lookup fell back to the ROM name), which a
-   // strict parser rejects as extra content. The document itself is complete.
-   const qsizetype end = aXml.lastIndexOf( "</Data>" );
-   const QByteArray xml = end < 0 ? aXml : aXml.left( end + 7 );
-   if ( !doc.setContent( xml, &parseError ) )
-      return Error{ parseError };
+   if ( const Result<> parsed = parseData( aXml, doc ); !parsed )
+      return Error{ parsed.error() };
 
    const QDomElement root = doc.documentElement();
    const QDomElement game = root.firstChildElement( QLatin1String( Cst_GameNode ) );
    // An API error document has no <jeu>.
    if ( game.isNull() )
-      return Error{ QStringLiteral( "Game not found" ) };
+      return Error{ QLatin1String( Cst_GameNotFound ) };
 
    ScrapedInfo info;
    const QString langStr = QString( QLatin1String( Cst_LangNameStr[aLanguage] ) ).left( 2 );
@@ -141,7 +150,12 @@ Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QStr
    info.publisher = game.firstChildElement( QLatin1String( Cst_EditNode ) ).text();
    info.developer = game.firstChildElement( QLatin1String( Cst_DevNode ) ).text();
    info.players = game.firstChildElement( QLatin1String( Cst_PlayersNode ) ).text();
-   info.rating = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
+   // <note> is 0-20; gamelist.xml's <rating> is 0-1.
+   const QString noteText = game.firstChildElement( QLatin1String( Cst_NoteNode ) ).text();
+   bool noteOk = false;
+   const double note = noteText.toDouble( &noteOk );
+   if ( noteOk && note > 0 )
+      info.rating = QString::number( qMin( note / 20.0, 1.0 ), 'f', 2 );
 
    // Media: only the requested types; video is handled separately from the pictures.
    const QDomElement medias = game.firstChildElement( QLatin1String( Cst_MediaNode ) );
@@ -163,6 +177,38 @@ Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QStr
    info.maxThreads = ( threadsOk && maxThreads > 0 ) ? maxThreads : 1;
 
    return info;
+}
+
+Result<QVector<ScrapeCandidate>> parseSearchResponse( const QByteArray& aXml, LangName aLanguage )
+{
+   QDomDocument doc;
+   if ( const Result<> parsed = parseData( aXml, doc ); !parsed )
+      return Error{ parsed.error() };
+
+   const QDomElement root = doc.documentElement();
+   const QDomElement user = root.firstChildElement( QLatin1String( Cst_UserNode ) );
+   const QDomElement games = root.firstChildElement( QLatin1String( Cst_GamesNode ) );
+
+   QVector<ScrapeCandidate> candidates;
+   for ( QDomElement game = games.firstChildElement( QLatin1String( Cst_GameNode ) );
+         !game.isNull(); game = game.nextSiblingElement( QLatin1String( Cst_GameNode ) ) ) {
+      QDomDocument single;
+      QDomElement data = single.createElement( QLatin1String( Cst_DataNode ) );
+      single.appendChild( data );
+      if ( !user.isNull() )
+         data.appendChild( single.importNode( user, true ) );
+      data.appendChild( single.importNode( game, true ) );
+
+      ScrapeCandidate candidate;
+      candidate.xml = single.toByteArray( -1 );
+      const Result<ScrapedInfo> info = parseScrapeResponse( candidate.xml, {}, false, aLanguage );
+      if ( !info || info.value().name.isEmpty() )
+         continue;
+      candidate.name = info.value().name;
+      candidate.releaseDate = info.value().releaseDate;
+      candidates.append( candidate );
+   }
+   return candidates;
 }
 
 QString sanitizeUrl( const QString& aUrl )
@@ -204,9 +250,11 @@ QString encoded( const QString& aValue )
 
 }  // namespace
 
-QString buildGameQuery( const ScrapeRequest& aRequest )
+namespace {
+
+QString apiQuery( const char* aCategory, const ScrapeRequest& aRequest )
 {
-   QString query = QLatin1String( Cst_ScraperAddress ) + QLatin1String( Cst_Category ) +
+   QString query = QLatin1String( Cst_ScraperAddress ) + QLatin1String( aCategory ) +
                    QLatin1String( Cst_ScrapeLogin ) + encoded( decodeDevSecret( Cst_DevIdXor ) ) +
                    QLatin1String( Cst_ScrapePwd ) + encoded( decodeDevSecret( Cst_DevPwdXor ) ) +
                    QLatin1String( Cst_DevSoftName ) + QLatin1String( Cst_Output );
@@ -214,6 +262,22 @@ QString buildGameQuery( const ScrapeRequest& aRequest )
    if ( !aRequest.ssLogin.isEmpty() && !aRequest.ssPassword.isEmpty() )
       query += QLatin1String( Cst_SSId ) + encoded( aRequest.ssLogin ) + QLatin1String( Cst_SSPwd ) +
                encoded( aRequest.ssPassword );
+   return query;
+}
+
+}  // namespace
+
+QString buildSearchQuery( const ScrapeRequest& aRequest, const QString& aText )
+{
+   QString query = apiQuery( Cst_SearchCategory, aRequest );
+   if ( !aRequest.systemId.isEmpty() && aRequest.systemId != QLatin1String( "0" ) )
+      query += QLatin1String( Cst_SystemId ) + encoded( aRequest.systemId );
+   return query + QLatin1String( Cst_SearchText ) + encoded( aText );
+}
+
+QString buildGameQuery( const ScrapeRequest& aRequest )
+{
+   QString query = apiQuery( Cst_Category, aRequest );
 
    query += QLatin1String( Cst_Crc ) + encoded( aRequest.crc32 );
    // systemeid=0 is rejected (HTTP 400). Without it the server skips the CRC and matches romnom.
@@ -286,7 +350,7 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                if ( reply->error() != QNetworkReply::NoError ) {
                   // screenscraper.fr answers 404 when it has no match for the game.
                   if ( reply->attribute( QNetworkRequest::HttpStatusCodeAttribute ).toInt() == 404 ) {
-                     emit gameInfoFailed( QStringLiteral( "Game not found" ),
+                     emit gameInfoFailed( QLatin1String( Cst_GameNotFound ),
                                           responseDetails( query, data ) );
                      return;
                   }
@@ -305,6 +369,41 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
 
                emit gameInfoFailed( info.error(), responseDetails( query, data ) );
             } );
+}
+
+void Scraper::searchGames( const ScrapeRequest& aRequest, const QString& aText,
+                           LangName aLanguage )
+{
+   if ( !devCredentialsConfigured() ) {
+      emit searchFailed( QStringLiteral(
+         "This build has no screenscraper.fr developer credentials. Rebuild with "
+         "-DGLE_SS_DEVID=... -DGLE_SS_DEVPWD=... (see README)." ) );
+      return;
+   }
+
+   const QString query = buildSearchQuery( aRequest, aText );
+   QNetworkReply* reply = FManager.get( QNetworkRequest( QUrl( query ) ) );
+
+   connect( reply, &QNetworkReply::finished, this, [this, reply, aLanguage, query] {
+      reply->deleteLater();
+
+      const QByteArray data = reply->readAll();
+      if ( reply->error() != QNetworkReply::NoError ) {
+         // Presumably the same 404 as jeuInfos.php when nothing matches; the docs don't say.
+         if ( reply->attribute( QNetworkRequest::HttpStatusCodeAttribute ).toInt() == 404 )
+            emit searchReady( {} );
+         else
+            emit searchFailed( sanitizeUrl( query + QStringLiteral( "\n" ) + describeError( reply ) ),
+                               responseDetails( query, data ) );
+         return;
+      }
+
+      const Result<QVector<ScrapeCandidate>> found = parseSearchResponse( data, aLanguage );
+      if ( found )
+         emit searchReady( found.value() );
+      else
+         emit searchFailed( found.error(), responseDetails( query, data ) );
+   } );
 }
 
 void Scraper::startNextMedia( const std::shared_ptr<MediaBatch>& aState )
