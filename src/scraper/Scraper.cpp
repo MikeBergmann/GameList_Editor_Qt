@@ -24,10 +24,6 @@ QString decodeDevSecret( const unsigned char* aData )
    }
 }
 
-namespace {
-
-// The dates node holds ISO "yyyy-mm-dd", shortened to "yyyy-mm" or "yyyy" when only part of it
-// is known.
 QString formatScrapedDate( const QString& aValue )
 {
    switch ( aValue.size() ) {
@@ -39,6 +35,8 @@ QString formatScrapedDate( const QString& aValue )
       default: return {};
    }
 }
+
+namespace {
 
 // noms/regions/synopsis/dates: a flat dict of <child aAttribute="key">text</child>.
 QHash<QString, QString> childDict( const QDomElement& aParent, const char* aAttribute )
