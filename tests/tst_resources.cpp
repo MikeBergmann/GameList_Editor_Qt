@@ -11,10 +11,10 @@
 
 namespace {
 
-// 82 systems, not 76: 76 is the count of unique logo *files*, and six kinds share one.
+// 84 systems, but fewer logo *files*: several kinds share one.
 TEST( Resources, EnumCountsMatchTheTables )
 {
-   EXPECT_EQ( skCount, 82 );
+   EXPECT_EQ( skCount, 84 );
    EXPECT_EQ( cnCount, 40 );
    EXPECT_EQ( lnCount, 5 );
 }

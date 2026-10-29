@@ -82,6 +82,8 @@ const char* const Cst_SystemKindStr[skCount] = {
    "PC Engine",                   // skTG
    "PC Engine CD",                // skTGCD
    "PSP Minis",                   // skPSPM
+   "Windows",                     // skWindows
+   "Android",                     // skAndroid
    "Other",                       // skOther
 };
 
@@ -167,6 +169,8 @@ const char* const Cst_SystemKindFolderNames[skCount] = {
    "tg16",                        // skTG
    "tg16cd",                      // skTGCD
    "pspminis",                    // skPSPM
+   "windows",                     // skWindows
+   "android",                     // skAndroid
    "",                            // skOther
 };
 
@@ -252,6 +256,8 @@ const char* const Cst_SystemKindImageNames[skCount] = {
    "pcengine.png",                // skTG
    "pcenginecd.png",              // skTGCD
    "pspminis.png",                // skPSPM
+   "other.png",                   // skWindows
+   "other.png",                   // skAndroid
    "other.png",                   // skOther
 };
 
@@ -265,7 +271,7 @@ const char* const Cst_SystemKindId[skCount] = {
    "105", "102", "11", "45", "46", "76", "77", "64", "64", "86", "48", "66",
    "135", "23", "13", "61", "16", "1", "29", "64", "130", "75", "40", "28",
    "129", "48", "49", "87", "115", "56", "70", "214", "135", "22", "210", "79",
-   "53", "205", "210", "52", "15", "104", "31", "114", "172", "0",
+   "53", "205", "210", "52", "15", "104", "31", "114", "172", "138", "63", "0",
 };
 
 const char* const Cst_CountryName[cnCount] = {

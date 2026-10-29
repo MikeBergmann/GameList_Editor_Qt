@@ -91,6 +91,8 @@ enum SystemKind
    skTG,
    skTGCD,
    skPSPM,
+   skWindows,
+   skAndroid,
    skOther,
    skCount
 };
