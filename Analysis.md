@@ -57,6 +57,7 @@ The logic is a 1:1 port, except where I think the original was wrong or didn't f
 | Path building | Hardcoded backslashes | `QDir`, forward slashes | Linux |
 | Saving the file | Re-indented only after adding a node | Re-indents the whole document, via `QSaveFile` | Re-Design |
 | Removing media | May delete the file because it compared only the links  | Deleted only if no other game uses it based on real path | Possible Data loss |
+| Media in a sync | n/a (no sync) | Copied byte for byte; re-encoded to PNG only when the target (ES-DE) cannot read the format | "Always PNG" would turn every jpg and webp cover into a bigger file and make a second sync see every cover as changed |
 
 ## Later
 
