@@ -23,6 +23,7 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSettings>
+#include <QSplitter>
 #include <QTemporaryDir>
 #include <QTimer>
 
@@ -362,6 +363,29 @@ TEST( MainWindow, CloseIsIgnoredWhileAScrapeIsBusy )
 
    emit scrape->busyChanged( false );
    EXPECT_TRUE( editor.close() );
+}
+
+// The window geometry and the list | editor split come back on the next start.
+TEST( MainWindow, WindowLayoutIsRestoredOnTheNextStart )
+{
+   QList<int> columns;
+   QSize size;
+   {
+      Frm_Editor first;
+      first.resize( 1300, 650 );
+      first.show();
+      QSplitter* split = first.findChild<QSplitter*>();
+      ASSERT_NE( split, nullptr );
+      split->setSizes( { split->width() / 4, split->width() * 3 / 4 } );
+      columns = split->sizes();
+      size = first.size();
+      ASSERT_TRUE( first.close() );
+   }
+
+   Frm_Editor second;
+   second.show();
+   EXPECT_EQ( second.size(), size );
+   EXPECT_EQ( second.findChild<QSplitter*>()->sizes(), columns );
 }
 
 // The logo belongs to the loaded system, so it goes when that system does.

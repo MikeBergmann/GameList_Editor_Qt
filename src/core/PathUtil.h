@@ -5,6 +5,8 @@
 #include <QByteArray>
 #include <QString>
 
+#include <functional>
+
 // Gamelists often come from Windows, so a link's case may not match the disk.
 // This is the one choke point that falls back to a case-insensitive match.
 QString resolvePath( const QString& aPath );
@@ -39,6 +41,11 @@ Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent )
 // Renames aStaged to aTarget; a replaced aTarget is kept as *.gle-bak, whose name is returned
 // (empty if none). On an Error, aTarget is as it was and aStaged is gone.
 Result<QString> swapIn( const QString& aStaged, const QString& aTarget );
+
+// Has aWrite fill aTarget.gle-new (false: it failed), then swapIn. Same contract as swapIn;
+// aFailure is the Error text when aWrite fails.
+Result<QString> stageAndSwap( const QString& aTarget, const QString& aFailure,
+                              const std::function<bool( const QString& )>& aWrite );
 
 // For files with several top-level elements (a gamelist beside <alternativeEmulator>,
 // es_settings.xml): the wrapper goes after the declaration so its encoding still applies.

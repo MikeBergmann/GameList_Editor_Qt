@@ -20,6 +20,7 @@ class QLabel;
 class QLineEdit;
 class QListView;
 class QMenu;
+class QSplitter;
 class QTabWidget;
 
 // The main window. Owns no game data: the Gamelist is the single loaded system.
@@ -101,6 +102,7 @@ private:
    GameEditPanel* FEditPanel = nullptr;
    ScrapePanel* FScrapePanel = nullptr;
    QTabWidget* Pgc_Editor = nullptr;
+   QSplitter* Spl_Main = nullptr;
    bool FRestoringSelection = false;
    bool FScrapeBusy = false;
 

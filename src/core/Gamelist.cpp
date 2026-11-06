@@ -107,10 +107,6 @@ bool fileMissing( const QString& aPath )
    return aPath.isEmpty() || !QFileInfo::exists( aPath );
 }
 
-// New media is written under the staged name, then swapped in; the old file waits
-// under the backup name until the gamelist is saved.
-constexpr const char* Cst_StagedSuffix = ".gle-new";
-
 }  // namespace
 
 QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix )
@@ -618,12 +614,11 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
       return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };
 
    // The suffix would pick the format, but the staged name has a foreign one: always PNG.
-   const QString staged = target + QLatin1String( Cst_StagedSuffix );
-   QFile::remove( staged );
-   if ( !aPicture.save( staged, "PNG" ) ) {
-      QFile::remove( staged );
-      return Error{ QStringLiteral( "Cannot write %1." ).arg( target ) };
-   }
+   const Result<QString> backup = stageAndSwap(
+      target, QStringLiteral( "Cannot write %1." ).arg( target ),
+      [&]( const QString& aStaged ) { return aPicture.save( aStaged, "PNG" ); } );
+   if ( !backup )
+      return backup;
 
    MediaWrite write;
    write.index = aIndex;
@@ -632,9 +627,6 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
    write.before = game;
    if ( conventionalMedia() && !game.missingImage && !sameFile( game.physicalImagePath, target, FFoldsCase ) )
       write.stale = game.physicalImagePath;
-   const Result<QString> backup = swapIn( staged, target );
-   if ( !backup )
-      return backup;
    write.backup = backup.value();
 
    setMediaLink( aIndex, true, link, target );
@@ -865,14 +857,9 @@ Result<Gamelist::MediaWrite> Gamelist::applyMediaFile( int aIndex, bool aIsImage
 
    if ( source != QFileInfo( target ).canonicalFilePath() ) {
       // Copy beside the target and swap, so a failed copy cannot cost the old file.
-      const QString staged = target + QLatin1String( Cst_StagedSuffix );
-      QFile::remove( staged );
-      if ( !QFile::copy( source, staged ) ) {
-         QFile::remove( staged );
-         return Error{ QStringLiteral( "Cannot copy %1 to %2." ).arg( source, target ) };
-      }
-
-      const Result<QString> backup = swapIn( staged, target );
+      const Result<QString> backup = stageAndSwap(
+         target, QStringLiteral( "Cannot copy %1 to %2." ).arg( source, target ),
+         [&]( const QString& aStaged ) { return QFile::copy( source, aStaged ); } );
       if ( !backup )
          return backup;
       write.backup = backup.value();
@@ -887,6 +874,7 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
 {
    MediaCopyReport report;
    QVector<MediaWrite> writes;
+   QSet<QString> written;
    const bool esde = conventionalMedia();
 
    for ( const MediaCopy& copy : aCopies ) {
@@ -897,6 +885,12 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
          rollbackMedia( writes );
          return Error{ QStringLiteral( "Canceled." ) };
       }
+
+      // Games with one ES-DE media stem share the file; a second write would eat the first's backup.
+      const QString stemKey = fileKey( mediaStem( FEntries.at( copy.index ).game ), FFoldsCase ) +
+                              ( copy.isImage ? QLatin1String( "|i" ) : QLatin1String( "|v" ) );
+      if ( esde && written.contains( stemKey ) )
+         continue;
 
       const QString suffix = QFileInfo( copy.source ).suffix();
       const QString esdeSuffix = esdeMediaSuffix( copy.isImage, suffix );
@@ -929,6 +923,7 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
          return write;
       }
       writes.append( write.value() );
+      written.insert( stemKey );
    }
 
    if ( writes.isEmpty() )

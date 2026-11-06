@@ -58,9 +58,8 @@ Frm_Editor::Frm_Editor( QWidget* aParent ) : QMainWindow( aParent )
    buildMenu();
    buildCentralWidget();
    connectSignals();
-   LoadFromIni();
-
    resize( 1024, 700 );
+   LoadFromIni();
 }
 
 void Frm_Editor::buildMenu()
@@ -83,10 +82,12 @@ void Frm_Editor::buildMenu()
    actions->addSeparator();
    QMenu* system = actions->addMenu( QStringLiteral( "System" ) );
    // Everything here works on the loaded system, so it starts disabled.
+   system->setToolTipsVisible( true );
    const auto addSystemAction = [this, system]( const QString& aText, auto aHandler ) {
       QAction* action = system->addAction( aText, this, aHandler );
       action->setEnabled( false );
       FSystemActions.append( action );
+      return action;
    };
    // A SystemAction is a free function, so it goes through runAction.
    const auto command = [this]( SystemAction aAction ) { return [this, aAction] { runAction( aAction ); }; };
@@ -96,8 +97,10 @@ void Frm_Editor::buildMenu()
    addSystemAction( QStringLiteral( "Shrink large pictures..." ), command( &shrinkLargeImages ) );
    addSystemAction( QStringLiteral( "Set system type..." ), &Frm_Editor::setSystemType );
    system->addSeparator();
-   addSystemAction( QStringLiteral( "Delete orphans from gamelist..." ), command( &deleteOrphans ) );
-   addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) );
+   addSystemAction( QStringLiteral( "Delete orphans from gamelist..." ), command( &deleteOrphans ) )
+      ->setToolTip( QStringLiteral( "Remove games whose ROM no longer exists from gamelist.xml" ) );
+   addSystemAction( QStringLiteral( "Delete duplicates from gamelist..." ), command( &deleteDuplicates ) )
+      ->setToolTip( QStringLiteral( "Remove games listed more than once from gamelist.xml" ) );
    system->addSeparator();
    addSystemAction( QStringLiteral( "Export games list to txt file..." ), [this] {
       QStringList names;
@@ -132,12 +135,21 @@ void Frm_Editor::buildMenu()
    QMenu* options = menuBar()->addMenu( QStringLiteral( "Options" ) );
    QMenu* general = options->addMenu( QStringLiteral( "General" ) );
 
+   general->setToolTipsVisible( true );
    Mnu_GodMode = addOption( general, QStringLiteral( "Enable God Mode" ), Cst_IniGodMode, false );
+   Mnu_GodMode->setToolTip( QStringLiteral( "Adds a Delete button. You choose whether the picture, video and "
+                                            "ROM go to the trash too (deleted where there is no trash)." ) );
    Mnu_DeleteWoPrompt =
       addOption( general, QStringLiteral( "Delete without prompt" ), Cst_IniDelWoPrompt, false );
+   Mnu_DeleteWoPrompt->setToolTip(
+      QStringLiteral( "Delete without asking; the files go to the trash too. Use with caution." ) );
    Mnu_AutoHash = addOption( general, QStringLiteral( "Auto Hash" ), Cst_IniAutoHash, false );
+   Mnu_AutoHash->setToolTip(
+      QStringLiteral( "Hash the file when you click More Infos, instead of asking. Slow on large ROMs." ) );
    Mnu_ShowTips = addOption( general, QStringLiteral( "Show tips at start" ), Cst_ShowTips, true );
+   Mnu_ShowTips->setToolTip( QStringLiteral( "Show the tips window when the application starts" ) );
    Mnu_Genesis = addOption( general, QStringLiteral( "Use Genesis logo" ), Cst_IniGenesisLogo, false );
+   Mnu_Genesis->setToolTip( QStringLiteral( "Use the Genesis logo and name instead of MegaDrive" ) );
    Mnu_AutoplayVideo =
       addOption( general, QStringLiteral( "Autoplay video" ), Cst_IniAutoplayVideo, false );
 
@@ -148,8 +160,7 @@ void Frm_Editor::buildMenu()
 
    QMenu* help = menuBar()->addMenu( QStringLiteral( "Help" ) );
    help->addAction( QStringLiteral( "Help" ), QKeySequence::HelpContents, this, [this] {
-      // False: opening Help from the menu must not offer the opt-out, and so
-      // cannot change the setting. See Frm_Help::Execute.
+      // False: the full help, without the opt-out. See Frm_Help::Execute.
       Frm_Help( this ).Execute( Mnu_ShowTips->isChecked(), false );
    } );
    help->addAction( QStringLiteral( "About" ), this, [this] { Frm_About( this ).exec(); } );
@@ -160,13 +171,13 @@ void Frm_Editor::buildCentralWidget()
    QWidget* central = new QWidget( this );
    QHBoxLayout* columns = new QHBoxLayout( central );
 
-   QSplitter* splitter = new QSplitter( Qt::Horizontal, central );
-   splitter->setChildrenCollapsible( false );
-   columns->addWidget( splitter );
+   Spl_Main = new QSplitter( Qt::Horizontal, central );
+   Spl_Main->setChildrenCollapsible( false );
+   columns->addWidget( Spl_Main );
 
-   splitter->addWidget( buildListColumn( splitter ) );
-   splitter->addWidget( buildEditorTabs( splitter ) );
-   splitter->setStretchFactor( 1, 1 );
+   Spl_Main->addWidget( buildListColumn( Spl_Main ) );
+   Spl_Main->addWidget( buildEditorTabs( Spl_Main ) );
+   Spl_Main->setStretchFactor( 1, 1 );
 
    setCentralWidget( central );
 }
@@ -371,6 +382,11 @@ void Frm_Editor::LoadFromIni()
    // In menu order, so God mode is set before the option it gates.
    for ( const Option& option : std::as_const( FOptions ) )
       option.action->setChecked( settings.value( QLatin1String( option.key ), option.fallback ).toBool() );
+
+   settings.endGroup();
+   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
+   restoreGeometry( settings.value( QLatin1String( Cst_IniGeometry ) ).toByteArray() );
+   Spl_Main->restoreState( settings.value( QLatin1String( Cst_IniSplitMain ) ).toByteArray() );
 }
 
 void Frm_Editor::SaveToIni()
@@ -384,6 +400,11 @@ void Frm_Editor::SaveToIni()
    // Without god mode there is no delete to skip the prompt for.
    settings.setValue( QLatin1String( Cst_IniDelWoPrompt ),
                       Mnu_GodMode->isChecked() && Mnu_DeleteWoPrompt->isChecked() );
+
+   settings.endGroup();
+   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
+   settings.setValue( QLatin1String( Cst_IniGeometry ), saveGeometry() );
+   settings.setValue( QLatin1String( Cst_IniSplitMain ), Spl_Main->saveState() );
 }
 
 void Frm_Editor::showTipsAtStart()
