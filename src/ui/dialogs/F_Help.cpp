@@ -41,6 +41,7 @@ constexpr HelpSection Cst_HelpSections[] = {
                               "target are listed and kept, never removed.<br>"
                               "<br>"
                               "Games match by their ROM path, so absolute paths are listed as problems. "
+                              "Folder ROMs (ScummVM, PS3) are listed and not copied. "
                               "ES-DE reads only jpg, png and webp covers (others become PNG) and skips "
                               "videos it cannot play. Screenshots and other media types are not synced. "
                               "Stop EmulationStation on the target first. A phone over MTP is not a "

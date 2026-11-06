@@ -189,6 +189,26 @@ TEST_F( CleanMap, SystemsPairByFolderNameThenByKindAndNeverTwice )
    EXPECT_EQ( pairs[2].target.folderName, QStringLiteral( "snes" ) );
 }
 
+TEST_F( CleanMap, AMappedFolderNeverTakesTheTargetNamedAfterAnotherMasterFolder )
+{
+   Roots roots;
+   setSystemMapping( QStringLiteral( "sfc" ), skSNES );
+   putSystem( roots.master(), "sfc", game( "A.zip", "A" ), { "A.zip" } );
+   putSystem( roots.master(), "snes", game( "S.zip", "S" ), { "S.zip" } );
+   putSystem( roots.target(), "snes", game( "S.zip", "S" ), { "S.zip" } );
+   QVector<SystemEntry> master = scanSystems( roots.master() );
+   applySystemMap( master );
+
+   const QVector<SystemPair> pairs = pairSystems( master, roots.target() );
+
+   ASSERT_EQ( pairs.size(), 2 );
+   EXPECT_EQ( pairs[0].source.folderName, QStringLiteral( "sfc" ) );
+   EXPECT_FALSE( pairs[0].targetExists ) << "sfc sorts first but must not take the target's snes";
+   EXPECT_EQ( pairs[0].target.folderName, QStringLiteral( "sfc" ) );
+   EXPECT_TRUE( pairs[1].targetExists );
+   EXPECT_EQ( pairs[1].target.folderName, QStringLiteral( "snes" ) );
+}
+
 TEST( SyncPlan, AbsolutePathsAndDuplicatesOnTheMasterAreProblemsNotGuesses )
 {
    Roots roots;
@@ -237,6 +257,26 @@ TEST( SyncPlan, TheSameRomFolderCopiesNoRoms )
    EXPECT_FALSE( system.copyRoms );
    ASSERT_EQ( system.games.size(), 1 );
    EXPECT_TRUE( system.games.first().rom.files.isEmpty() );
+}
+
+TEST( SyncPlan, AFolderRomIsNotAddedOrCopiedButAListedOneStillGetsItsFields )
+{
+   Roots roots;
+   putSystem( roots.master(), "scummvm",
+              game( "dig.scummvm", "Dig", "<genre>Adventure</genre>" ) + game( "monkey.scummvm", "Monkey" ), {} );
+   writeFile( roots.master( "scummvm/dig.scummvm/dig.000" ), "d" );
+   writeFile( roots.master( "scummvm/monkey.scummvm/monkey.000" ), "m" );
+   putSystem( roots.target(), "scummvm", game( "dig.scummvm", "Dig" ), {} );
+   ASSERT_TRUE( QDir().mkpath( roots.target( "scummvm/dig.scummvm" ) ) );
+
+   const SyncPlan plan = roots.plan();
+
+   ASSERT_EQ( plan.systems.size(), 1 );
+   const SystemPlan& system = plan.systems.first();
+   ASSERT_EQ( system.games.size(), 1 ) << "Monkey cannot be added: addGames takes files only";
+   EXPECT_EQ( system.games.first().fields, GameFieldSet( gfGenre ) );
+   EXPECT_TRUE( system.games.first().rom.files.isEmpty() );
+   EXPECT_EQ( system.problems.size(), 2 ) << "one for the new folder ROM, one for the folder not copied";
 }
 
 TEST( SyncPlan, LegacyToEsdeKeepsAMatchingCoverAndPlansOnlyWhatEsdeCanRead )
@@ -446,7 +486,8 @@ TEST( SyncApply, CancelingBeforeAFileStopsTheRunAndLeavesTheTargetAlone )
 TEST( SyncApply, ATargetChangedSinceThePlanIsReportedAndNotGuessedAt )
 {
    Roots roots;
-   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic", "<genre>Platform</genre>" ), { "Sonic.zip" } );
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic", "<genre>Platform</genre>" ) + game( "Mario.zip", "Mario" ),
+              { "Sonic.zip", "Mario.zip" } );
    putSystem( roots.target(), "snes", game( "Sonic.zip", "Sonic" ), { "Sonic.zip" } );
    const SyncPlan plan = roots.plan();
    putSystem( roots.target(), "snes", game( "Other.zip", "Other" ) + game( "Sonic.zip", "Sonic" ), { "Other.zip" } );
@@ -456,6 +497,42 @@ TEST( SyncApply, ATargetChangedSinceThePlanIsReportedAndNotGuessedAt )
    ASSERT_EQ( report.systems.size(), 1 );
    EXPECT_FALSE( report.systems.first().ok() );
    EXPECT_TRUE( loadTarget( roots.target(), "snes" ).at( 1 ).genre.isEmpty() );
+   EXPECT_FALSE( QFileInfo::exists( roots.target( "snes/Mario.zip" ) ) ) << "a stale plan copies no ROM";
+}
+
+TEST( SyncApply, AMasterChangedSinceThePlanIsReportedAndCopiesNothing )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic" ) + game( "Mario.zip", "Mario" ),
+              { "Sonic.zip", "Mario.zip" } );
+   putSystem( roots.target(), "snes", game( "Other.zip", "Other" ), { "Other.zip" } );
+   const SyncPlan plan = roots.plan();
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic" ), {} );
+
+   const SyncReport report = applySync( plan );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   EXPECT_FALSE( report.systems.first().ok() ) << "Mario's index is past the end of the new master";
+   EXPECT_FALSE( QFileInfo::exists( roots.target( "snes/Sonic.zip" ) ) ) << "checked before any ROM is copied";
+}
+
+TEST( SyncApply, ALinkCasedUnlikeTheDiskIsAddedAndThenQuiet )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "sonic.zip", "Sonic", "<genre>Platform</genre>" ), { "Sonic.zip" } );
+   putSystem( roots.target(), "snes", game( "Other.zip", "Other" ), { "Other.zip" } );
+
+   const SyncReport report = applySync( roots.plan() );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   const SystemReport& system = report.systems.first();
+   EXPECT_TRUE( system.ok() ) << system.error.toStdString();
+   EXPECT_TRUE( system.skipped.isEmpty() ) << system.skipped.join( QLatin1Char( '\n' ) ).toStdString();
+   EXPECT_EQ( system.added, 1 );
+   const Gamelist target = loadTarget( roots.target(), "snes" );
+   ASSERT_EQ( target.count(), 2 );
+   EXPECT_EQ( target.at( 1 ).genre, QStringLiteral( "Platform" ) ) << "a case-sensitive target must find the game it added";
+   EXPECT_TRUE( roots.plan().isEmpty() ) << "a second run matches the link to the file on disk";
 }
 
 }  // namespace

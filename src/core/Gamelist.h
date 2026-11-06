@@ -59,6 +59,8 @@ struct MediaCopyReport
    QStringList skipped;  // one line per file left out, with the reason
 };
 
+using MediaProgress = std::function<bool( const MediaCopy& )>;
+
 // The lowercase extension ES-DE looks for in its picture or video folders; empty when it
 // does not read aSuffix.
 QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix );
@@ -96,7 +98,8 @@ public:
    // Keeps each file's format and extension. ES-DE reads only jpg/png/webp pictures (others
    // become PNG) and the videos in Cst_EsdeVideoExtensions (others are skipped and reported).
    // One save; an Error leaves games, files and the gamelist as they were.
-   Result<MediaCopyReport> copyMedia( const QVector<MediaCopy>& aCopies );
+   // aProgress runs before each file; returning false cancels with an Error.
+   Result<MediaCopyReport> copyMedia( const QVector<MediaCopy>& aCopies, const MediaProgress& aProgress = {} );
 
    Result<> removeImage( int aIndex );
    Result<> removeVideo( int aIndex );

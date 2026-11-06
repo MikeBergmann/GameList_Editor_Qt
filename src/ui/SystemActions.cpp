@@ -358,12 +358,27 @@ void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
    if ( chosen.systems.isEmpty() )
       return;
 
-   QProgressDialog progress( QStringLiteral( "Syncing..." ), QStringLiteral( "Cancel" ), 0, 0, aParent );
+   // applySystem reports once per ROM file, per media file and per system's write stage.
+   int steps = 0;
+   for ( const SystemPlan& system : chosen.systems ) {
+      for ( const SyncGame& game : system.games )
+         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) + game.copyImage + game.copyVideo;
+      ++steps;
+   }
+
+   QProgressDialog progress( QStringLiteral( "Syncing..." ), QStringLiteral( "Cancel" ), 0, steps, aParent );
+   progress.setWindowTitle( QStringLiteral( "Syncing" ) );
    progress.setWindowModality( Qt::WindowModal );
    progress.setMinimumDuration( 0 );
+   progress.setMinimumWidth( 420 );
+   progress.setAutoClose( false );
+   progress.setAutoReset( false );
+   progress.setValue( 0 );  // a QProgressDialog shows only once it gets a value
 
-   const SyncReport report = applySync( chosen, [&progress]( const QString& aMessage ) {
-      progress.setLabelText( aMessage );
+   int done = 0;
+   const SyncReport report = applySync( chosen, [&]( const QString& aMessage ) {
+      progress.setValue( qMin( done++, steps ) );
+      progress.setLabelText( QStringLiteral( "Step %1 of %2\n%3" ).arg( qMin( done, steps ) ).arg( steps ).arg( aMessage ) );
       QCoreApplication::processEvents();
       return !progress.wasCanceled();
    } );

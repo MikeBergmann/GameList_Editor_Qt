@@ -92,6 +92,7 @@ Pitfalls:
 
 - Stop EmulationStation on the target first: it rewrites its gamelists on exit.
 - Games match by ROM path. RetroPie-style absolute `<path>` values do not match and are listed.
+- Folder ROMs (ScummVM, PS3 and the like) are not synced: they are listed, and their ROM folder is not copied. Fields and media of a folder ROM the target already lists are still updated.
 - Android over MTP is not a file path on Windows: use a card reader, a share or a local copy. ES-DE on Android often keeps app data in internal storage and ROMs on the SD card; both must be reachable from the PC.
 - Screenshots, marquees and the other ES-DE media types are not synced yet.
 

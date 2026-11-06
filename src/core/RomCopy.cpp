@@ -3,7 +3,6 @@
 #include "PathUtil.h"
 
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -88,14 +87,13 @@ RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, c
       }
 
       if ( info.isDir() ) {
-         QDirIterator it( path, QDir::Files, QDirIterator::Subdirectories );
-         while ( it.hasNext() )
-            queue << it.next();
+         plan.problems << QStringLiteral( "%1 is a folder ROM; folder ROMs are not copied." ).arg( path );
          continue;
       }
 
+      // Another drive yields an absolute path, not "../".
       const QString relative = source.relativeFilePath( path );
-      if ( relative.startsWith( QLatin1String( "../" ) ) ) {
+      if ( relative.startsWith( QLatin1String( "../" ) ) || QDir::isAbsolutePath( relative ) ) {
          plan.problems << QStringLiteral( "%1 is outside the ROM folder." ).arg( path );
          continue;
       }
@@ -137,14 +135,11 @@ Result<> copyRomFiles( const QVector<RomFile>& aFiles, const RomProgress& aProgr
       if ( QFile stamped( staged ); stamped.open( QIODevice::ReadWrite ) )
          stamped.setFileTime( QFileInfo( file.source ).lastModified(), QFileDevice::FileModificationTime );
 
-      if ( QFileInfo::exists( file.target ) && !QFile::remove( file.target ) ) {
-         QFile::remove( staged );
-         return Error{ QStringLiteral( "Cannot replace %1." ).arg( file.target ) };
-      }
-      if ( !QFile::rename( staged, file.target ) ) {
-         QFile::remove( staged );
-         return Error{ QStringLiteral( "Cannot write %1." ).arg( file.target ) };
-      }
+      const Result<QString> swapped = swapIn( staged, file.target );
+      if ( !swapped )
+         return swapped;
+      if ( !swapped.value().isEmpty() )
+         QFile::remove( swapped.value() );
    }
 
    return {};

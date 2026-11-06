@@ -69,7 +69,7 @@ TEST( RomCopy, AnM3uBringsItsDiscsAndTheirTracks )
    EXPECT_TRUE( QFileInfo::exists( roms.dst( "sub/Disc2.bin" ) ) );
 }
 
-TEST( RomCopy, AGdiBringsItsTracksAndAFolderRomItsWholeTree )
+TEST( RomCopy, AGdiBringsItsTracksAndAFolderRomIsAProblemNotACopy )
 {
    Roms roms;
    writeFile( roms.src( "g.gdi" ), "2\n1 0 4 2352 track01.bin 0\n2 450 0 2352 \"track 02.raw\" 0\n" );
@@ -80,8 +80,9 @@ TEST( RomCopy, AGdiBringsItsTracksAndAFolderRomItsWholeTree )
 
    EXPECT_EQ( Roms::names( planRomCopy( roms.src(), roms.dst(), QStringLiteral( "./g.gdi" ) ), roms.src() ),
               QStringList( { "g.gdi", "track 02.raw", "track01.bin" } ) );
-   EXPECT_EQ( Roms::names( planRomCopy( roms.src(), roms.dst(), QStringLiteral( "./dig.scummvm" ) ), roms.src() ),
-              QStringList( { "dig.scummvm/data/dig.001", "dig.scummvm/dig.000" } ) );
+   const RomCopyPlan folder = planRomCopy( roms.src(), roms.dst(), QStringLiteral( "./dig.scummvm" ) );
+   EXPECT_TRUE( folder.files.isEmpty() ) << "folder ROMs are not synced";
+   EXPECT_EQ( folder.problems.size(), 1 );
 }
 
 TEST( RomCopy, OnlyAMissingOrDifferentSizedFileIsPlannedAndAMissingTrackIsAProblem )
@@ -100,6 +101,7 @@ TEST( RomCopy, OnlyAMissingOrDifferentSizedFileIsPlannedAndAMissingTrackIsAProbl
 
    ASSERT_TRUE( copyRomFiles( plan.files ) );
    EXPECT_EQ( QFileInfo( roms.dst( "a.bin" ) ).size(), 4 ) << "the different file was replaced";
+   EXPECT_FALSE( QFileInfo::exists( roms.dst( "a.bin.gle-bak" ) ) ) << "the replaced file's backup is dropped";
 }
 
 TEST( RomCopy, ATrackOutsideTheRomFolderIsAProblemNotACopy )
@@ -127,6 +129,7 @@ TEST( RomCopy, AFailedCopyLeavesNoHalfFileAndCancelStopsBeforeTheNextOne )
 
    EXPECT_FALSE( copyRomFiles( plan.files ) );
    EXPECT_FALSE( QFileInfo::exists( roms.dst( "a.bin.gle-new" ) ) );
+   EXPECT_TRUE( QFileInfo( roms.dst( "a.bin/inside" ) ).isFile() ) << "what stood there is untouched";
 
    int asked = 0;
    const Result<> cancelled = copyRomFiles(

@@ -1448,4 +1448,29 @@ TEST( GamelistCopyMedia, AFailedSaveRollsBackEveryFileOfTheBatch )
    EXPECT_EQ( list.domText( 2, "image" ), before.imagePath );
 }
 
+TEST( GamelistCopyMedia, ProgressRunsBeforeEachFileAndCancelingRollsBackTheFilesAlreadyCopied )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "src/a.jpg" ), "new jpg" );
+   writeFile( fixture.path( "src/b.mp4" ), "new mp4" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const Game before = list.at( 2 );
+   const QVector<MediaCopy> copies{ { 2, true, fixture.path( "src/a.jpg" ) }, { 0, false, fixture.path( "src/b.mp4" ) } };
+
+   int asked = 0;
+   const Result<MediaCopyReport> canceled = list.copyMedia( copies, [&asked]( const MediaCopy& ) { return ++asked < 2; } );
+
+   EXPECT_FALSE( canceled );
+   EXPECT_EQ( asked, 2 );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.jpg" ) ) ) << "the first file is taken back";
+   EXPECT_EQ( readAll( fixture.path( "snes/media/videos/Sonic.mp4" ) ), QByteArray( "mp4" ) );
+   EXPECT_EQ( list.at( 2 ).imagePath, before.imagePath );
+
+   asked = 0;
+   const Result<MediaCopyReport> done = list.copyMedia( copies, [&asked]( const MediaCopy& ) { return ++asked > 0; } );
+   ASSERT_TRUE( done ) << done.error().toStdString();
+   EXPECT_EQ( asked, 2 );
+}
+
 }  // namespace

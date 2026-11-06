@@ -91,6 +91,34 @@ Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent )
    return {};
 }
 
+Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
+{
+   QString backup;
+
+   if ( QFileInfo( aTarget ).isDir() ) {
+      QFile::remove( aStaged );
+      return Error{ QStringLiteral( "Cannot replace %1: it is a folder." ).arg( aTarget ) };
+   }
+
+   if ( QFileInfo::exists( aTarget ) ) {
+      backup = aTarget + QStringLiteral( ".gle-bak" );
+      QFile::remove( backup );
+      if ( !QFile::rename( aTarget, backup ) ) {
+         QFile::remove( aStaged );
+         return Error{ QStringLiteral( "Cannot replace %1." ).arg( aTarget ) };
+      }
+   }
+
+   if ( !QFile::rename( aStaged, aTarget ) ) {
+      if ( !backup.isEmpty() )
+         QFile::rename( backup, aTarget );
+      QFile::remove( aStaged );
+      return Error{ QStringLiteral( "Cannot write %1." ).arg( aTarget ) };
+   }
+
+   return backup;
+}
+
 bool volumeFoldsCase( const QString& aGamelistPath )
 {
    const QFileInfo info( aGamelistPath );

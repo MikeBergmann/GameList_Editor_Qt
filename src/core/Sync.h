@@ -102,9 +102,9 @@ struct SyncReport
 };
 
 // Per system: free space, ROM files, the gamelist (made first if needed), fields, media.
-// Progress runs before each ROM file and each write stage.
+// Progress runs before each ROM file, each media file and each write stage.
 // A failing system is reported and the next one still runs. Games are found by the indices
-// the plan holds; a target changed since then is reported, not guessed at.
+// the plan holds; a master or target changed since then is reported, not guessed at.
 // ponytail: cancel and progress are per file, not per byte; a big ROM runs to its end.
 SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress = {} );
 SyncReport applySync( const SyncPlan& aPlan, const SyncProgress& aProgress = {} );

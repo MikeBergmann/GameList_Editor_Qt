@@ -27,14 +27,14 @@ struct RomCopyPlan
 // Whether both folders exist and are the same one, symlinks resolved.
 bool sameFolder( const QString& aA, const QString& aB );
 
-// aRomLink is the <path> text. The ROM, the files a .cue / .m3u / .gdi names, and every
-// file of a folder ROM are copied when missing on the target or of another size.
+// aRomLink is the <path> text. The ROM and the files a .cue / .m3u / .gdi names are copied
+// when missing on the target or of another size. A folder ROM is a problem, not a copy.
 // ponytail: size only, no hash; a same-size changed ROM is not noticed. Upgrade: MD5 when sizes match.
 // ponytail: other multi-file formats are copied as the listed file only.
 RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, const QString& aRomLink );
 
-// Each file is staged as *.gle-new and renamed into place, so a broken copy never leaves
-// a half ROM. aProgress runs before each file; returning false cancels with an Error.
+// Each file is staged as *.gle-new and swapped in, so a broken copy never costs the old
+// file. aProgress runs before each file; returning false cancels with an Error.
 using RomProgress = std::function<bool( const RomFile& )>;
 Result<> copyRomFiles( const QVector<RomFile>& aFiles, const RomProgress& aProgress = {} );
 

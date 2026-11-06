@@ -96,32 +96,6 @@ bool fileMissing( const QString& aPath )
 // New media is written under the staged name, then swapped in; the old file waits
 // under the backup name until the gamelist is saved.
 constexpr const char* Cst_StagedSuffix = ".gle-new";
-constexpr const char* Cst_BackupSuffix = ".gle-bak";
-
-// Returns the backup name of a replaced aTarget (empty if none). On an Error,
-// aTarget is as it was and aStaged is gone.
-Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
-{
-   QString backup;
-
-   if ( QFileInfo::exists( aTarget ) ) {
-      backup = aTarget + QLatin1String( Cst_BackupSuffix );
-      QFile::remove( backup );
-      if ( !QFile::rename( aTarget, backup ) ) {
-         QFile::remove( aStaged );
-         return Error{ QStringLiteral( "Cannot replace %1." ).arg( aTarget ) };
-      }
-   }
-
-   if ( !QFile::rename( aStaged, aTarget ) ) {
-      if ( !backup.isEmpty() )
-         QFile::rename( backup, aTarget );
-      QFile::remove( aStaged );
-      return Error{ QStringLiteral( "Cannot write %1." ).arg( aTarget ) };
-   }
-
-   return backup;
-}
 
 }  // namespace
 
@@ -890,7 +864,7 @@ Result<Gamelist::MediaWrite> Gamelist::applyMediaFile( int aIndex, bool aIsImage
    return write;
 }
 
-Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies )
+Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, const MediaProgress& aProgress )
 {
    MediaCopyReport report;
    QVector<MediaWrite> writes;
@@ -899,6 +873,11 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies )
    for ( const MediaCopy& copy : aCopies ) {
       if ( copy.index < 0 || copy.index >= FEntries.size() )
          continue;
+
+      if ( aProgress && !aProgress( copy ) ) {
+         rollbackMedia( writes );
+         return Error{ QStringLiteral( "Canceled." ) };
+      }
 
       const QString suffix = QFileInfo( copy.source ).suffix();
       const QString esdeSuffix = esdeMediaSuffix( copy.isImage, suffix );
