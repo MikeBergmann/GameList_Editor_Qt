@@ -6,6 +6,7 @@
 #include <QDomDocument>
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QSettings>
 #include <QStringList>
 
@@ -61,36 +62,84 @@ QString esdeMediaRoot( const QString& aAppData )
                           : expandEsdePath( value, aAppData );
 }
 
+// An ES-DE app-data folder keeps its gamelists apart from the ROMs.
+struct RootLayout
+{
+   bool esde = false;
+   QDir lists;
+   QString romRoot;
+   QString mediaRoot;
+};
+
+RootLayout rootLayout( const QString& aRootPath )
+{
+   const QDir root( aRootPath );
+   RootLayout layout;
+   layout.esde = root.exists( QStringLiteral( "settings/es_settings.xml" ) ) &&
+                 root.exists( QStringLiteral( "gamelists" ) );
+   layout.lists = QDir( layout.esde ? root.filePath( QStringLiteral( "gamelists" ) ) : aRootPath );
+   if ( layout.esde ) {
+      layout.romRoot = esdeRomRoot( aRootPath );
+      layout.mediaRoot = esdeMediaRoot( aRootPath );
+   }
+   return layout;
+}
+
+SystemEntry entryIn( const RootLayout& aLayout, const QString& aFolder, const QString& aGamelistPath )
+{
+   return { aFolder, systemKindFromFolder( aFolder ), aGamelistPath,
+            aLayout.esde ? aLayout.romRoot + QLatin1Char( '/' ) + aFolder : QString(),
+            aLayout.esde ? aLayout.mediaRoot + QLatin1Char( '/' ) + aFolder : QString() };
+}
+
 }  // namespace
 
 QVector<SystemEntry> scanSystems( const QString& aRootPath )
 {
    QVector<SystemEntry> systems;
-
-   // An ES-DE app-data folder keeps its gamelists apart from the ROMs.
-   const QDir root( aRootPath );
-   const bool esde = root.exists( QStringLiteral( "settings/es_settings.xml" ) ) &&
-                     root.exists( QStringLiteral( "gamelists" ) );
-   const QDir lists( esde ? root.filePath( QStringLiteral( "gamelists" ) ) : aRootPath );
-   const QString romRoot = esde ? esdeRomRoot( aRootPath ) : QString();
-   const QString mediaRoot = esde ? esdeMediaRoot( aRootPath ) : QString();
+   const RootLayout layout = rootLayout( aRootPath );
 
    // Folders by attribute, not by a '*.*' name filter, which needs a literal dot and
    // so would miss folder names like "snes". Hidden folders are left out.
-   const QStringList folders = lists.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
+   const QStringList folders = layout.lists.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
 
    for ( const QString& folder : folders ) {
       const QString gamelist = resolvePath(
-         lists.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
+         layout.lists.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
       if ( !QFileInfo::exists( gamelist ) )
          continue;
 
-      systems.append( { folder, systemKindFromFolder( folder ), gamelist,
-                        esde ? romRoot + QLatin1Char( '/' ) + folder : QString(),
-                        esde ? mediaRoot + QLatin1Char( '/' ) + folder : QString() } );
+      systems.append( entryIn( layout, folder, gamelist ) );
    }
 
    return systems;
+}
+
+SystemEntry systemAt( const QString& aRootPath, const QString& aFolderName )
+{
+   const RootLayout layout = rootLayout( aRootPath );
+   const QString folder = resolvePath( layout.lists.filePath( aFolderName ) );
+   return entryIn( layout, aFolderName,
+                   folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) );
+}
+
+Result<> createGamelist( const QString& aPath )
+{
+   if ( QFileInfo::exists( aPath ) )
+      return Error{ QStringLiteral( "%1 already exists." ).arg( aPath ) };
+
+   const QString folder = QFileInfo( aPath ).path();
+   if ( !QDir().mkpath( folder ) )
+      return Error{ QStringLiteral( "Cannot create %1." ).arg( folder ) };
+
+   QSaveFile file( aPath );
+   if ( !file.open( QIODevice::WriteOnly ) )
+      return Error{ QStringLiteral( "Cannot write %1: %2" ).arg( aPath, file.errorString() ) };
+
+   file.write( "<?xml version=\"1.0\"?>\n<gameList/>\n" );
+   if ( !file.commit() )
+      return Error{ QStringLiteral( "Cannot write %1: %2" ).arg( aPath, file.errorString() ) };
+   return {};
 }
 
 void applySystemMap( QVector<SystemEntry>& aSystems )

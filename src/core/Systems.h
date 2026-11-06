@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Resources.h"
+#include "Result.h"
 
 #include <QMetaType>
 #include <QString>
@@ -30,6 +31,12 @@ struct SystemEntry
 // aRootPath is a ROM root (a gamelist.xml per system folder) or an ES-DE app-data folder
 // (gamelists/<system>/gamelist.xml). Systems with no gamelist are left out.
 QVector<SystemEntry> scanSystems( const QString& aRootPath );
+
+// The entry a system would have under aRootPath, whether or not its gamelist exists yet.
+SystemEntry systemAt( const QString& aRootPath, const QString& aFolderName );
+
+// An empty <gameList/>, folders included. An Error if the file already exists.
+Result<> createGamelist( const QString& aPath );
 
 // Only folders the tables do not know (skOther) are looked up in the user's mapping.
 void applySystemMap( QVector<SystemEntry>& aSystems );

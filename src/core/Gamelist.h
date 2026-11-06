@@ -40,8 +40,8 @@ struct MediaRename
 class Gamelist
 {
 public:
-   // An Error when the file cannot be read or parsed, or holds no <game>.
-   Result<> load( const SystemEntry& aSystem );
+   // An Error when the file cannot be read or parsed, or holds no <game> (unless aAllowEmpty).
+   Result<> load( const SystemEntry& aSystem, bool aAllowEmpty = false );
 
    const SystemEntry& system() const { return FSystem; }
 

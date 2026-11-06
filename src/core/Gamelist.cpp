@@ -130,7 +130,7 @@ QString Gamelist::domText( int aIndex, const char* aName ) const
    return childText( FEntries.value( aIndex ).node, aName );
 }
 
-Result<> Gamelist::load( const SystemEntry& aSystem )
+Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
 {
    FSystem = aSystem;
    FBackedUp = false;
@@ -202,7 +202,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
       FEntries.append( { game, node } );
    }
 
-   if ( FEntries.isEmpty() )
+   if ( FEntries.isEmpty() && !aAllowEmpty )
       return Error{ QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) };
 
    countDuplicates();
