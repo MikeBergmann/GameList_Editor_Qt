@@ -135,6 +135,7 @@ add_library( gle_ui STATIC
    src/ui/dialogs/F_LinkMedia.cpp
    src/ui/dialogs/F_MoreInfos.cpp
    src/ui/dialogs/F_PickGame.cpp
+   src/ui/dialogs/F_Sync.cpp
 )
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
 target_link_libraries( gle_ui PUBLIC Qt6::Widgets Qt6::Multimedia Qt6::MultimediaWidgets gle_core gle_scraper )

@@ -289,6 +289,18 @@ TEST( SyncPlan, EsdeToLegacyFindsTheMastersMediaByRomName )
    EXPECT_EQ( system.games.first().fields, GameFieldSet( gfName | gfGenre ) );
 }
 
+TEST( SyncPlan, TheMastersOwnFolderAsTargetIsAProblemNotAPlan )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic" ), { "Sonic.zip" } );
+
+   const SyncPlan plan = planSync( scanSystems( roots.master() ), roots.master() );
+
+   EXPECT_TRUE( plan.isEmpty() );
+   ASSERT_EQ( plan.systems.size(), 1 );
+   EXPECT_EQ( plan.systems.first().problems.size(), 1 );
+}
+
 TEST( SyncPlan, AGameMatchesWhateverTheCaseWhenTheTargetVolumeFoldsIt )
 {
    if ( !filesystemIsCaseInsensitive() )

@@ -2,14 +2,17 @@
 
 #include "F_AddRoms.h"
 #include "F_LinkMedia.h"
+#include "F_Sync.h"
 #include "Gamelist.h"
 #include "MediaOps.h"
 #include "PathUtil.h"
 
 #include <algorithm>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
+#include <QGuiApplication>
 #include <QInputDialog>
 #include <QLocale>
 #include <QMessageBox>
@@ -269,4 +272,82 @@ ViewUpdate deleteDuplicates( QWidget* aParent, Gamelist& aGamelist )
    return confirmAndRemove(
       aParent, aGamelist, duplicateIndexes( aGamelist ),
       QStringLiteral( "that list a ROM already listed above them (the first stays)" ) );
+}
+
+namespace {
+
+void showSyncReport( QWidget* aParent, const SyncReport& aReport )
+{
+   QStringList summary;
+   QStringList details;
+   bool failed = false;
+   for ( const SystemReport& system : aReport.systems ) {
+      if ( system.ok() ) {
+         summary << QStringLiteral( "%1: %2 added, %3 updated, %4 media files copied." )
+                       .arg( system.name )
+                       .arg( system.added )
+                       .arg( system.updated )
+                       .arg( system.mediaCopied );
+      } else {
+         failed = true;
+         summary << QStringLiteral( "%1: stopped. %2" ).arg( system.name, system.error );
+      }
+      for ( const QString& line : system.skipped )
+         details << QStringLiteral( "%1: %2" ).arg( system.name, line );
+   }
+   if ( aReport.canceled )
+      summary << QStringLiteral( "Canceled. Run the sync again to finish." );
+
+   QMessageBox box( failed || aReport.canceled ? QMessageBox::Warning : QMessageBox::Information,
+                    QStringLiteral( "GameList Editor Qt" ), summary.join( QLatin1Char( '\n' ) ), QMessageBox::Ok,
+                    aParent );
+   if ( !details.isEmpty() )
+      box.setDetailedText( details.join( QLatin1Char( '\n' ) ) );
+   box.exec();
+}
+
+}  // namespace
+
+void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
+{
+   const QString title = QStringLiteral( "GameList Editor Qt" );
+   const QString targetRoot = QFileDialog::getExistingDirectory(
+      aParent, QStringLiteral( "Sync to folder" ), QFileInfo( aMasterRoot ).absolutePath() );
+   if ( targetRoot.isEmpty() )
+      return;
+
+   if ( QFileInfo( targetRoot ).canonicalFilePath() == QFileInfo( aMasterRoot ).canonicalFilePath() ) {
+      QMessageBox::warning( aParent, title, QStringLiteral( "That is the folder you are syncing from." ) );
+      return;
+   }
+
+   QVector<SystemEntry> master = scanSystems( aMasterRoot );
+   applySystemMap( master );
+
+   // ponytail: planning hashes media on the UI thread. Upgrade: plan in a worker with a progress bar.
+   QGuiApplication::setOverrideCursor( Qt::WaitCursor );
+   const SyncPlan plan = planSync( master, targetRoot );
+   QGuiApplication::restoreOverrideCursor();
+
+   if ( plan.systems.isEmpty() ) {
+      QMessageBox::information( aParent, title, QStringLiteral( "Nothing to sync: the target is up to date." ) );
+      return;
+   }
+
+   const SyncPlan chosen = Frm_Sync( aParent ).Execute( plan );
+   if ( chosen.systems.isEmpty() )
+      return;
+
+   QProgressDialog progress( QStringLiteral( "Syncing..." ), QStringLiteral( "Cancel" ), 0, 0, aParent );
+   progress.setWindowModality( Qt::WindowModal );
+   progress.setMinimumDuration( 0 );
+
+   const SyncReport report = applySync( chosen, [&progress]( const QString& aMessage ) {
+      progress.setLabelText( aMessage );
+      QCoreApplication::processEvents();
+      return !progress.wasCanceled();
+   } );
+   progress.close();
+
+   showSyncReport( aParent, report );
 }

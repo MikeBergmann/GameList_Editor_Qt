@@ -102,6 +102,12 @@ SystemPlan planSystem( const SystemPair& aPair )
    SystemPlan plan;
    plan.pair = aPair;
 
+   const QString sourceFile = QFileInfo( aPair.source.gamelistPath ).canonicalFilePath();
+   if ( !sourceFile.isEmpty() && sourceFile == QFileInfo( aPair.target.gamelistPath ).canonicalFilePath() ) {
+      plan.problems << QStringLiteral( "%1: the target is the master's own gamelist." ).arg( aPair.source.folderName );
+      return plan;
+   }
+
    Gamelist master;
    if ( const Result<> loaded = master.load( aPair.source, true ); !loaded ) {
       plan.problems << loaded.error();

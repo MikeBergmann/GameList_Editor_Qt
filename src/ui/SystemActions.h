@@ -40,3 +40,7 @@ void cleanUpBackups( QWidget* aParent, const Gamelist& aGamelist );
 
 // Writes aNames, one per line, to a file the user picks. Touches no game, like cleanUpBackups.
 void exportGamesList( QWidget* aParent, const Gamelist& aGamelist, const QStringList& aNames );
+
+// Reviews, then syncs the systems under aMasterRoot into a root the user picks. Reads the
+// master's files from disk, so the caller guards unsaved edits first.
+void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot );

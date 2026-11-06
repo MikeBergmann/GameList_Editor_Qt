@@ -5,12 +5,15 @@
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
 #include "F_MoreInfos.h"
+#include "F_Sync.h"
 #include "Game.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
 
 #include <QLineEdit>
+#include <QListWidget>
+#include <QPlainTextEdit>
 #include <QTimer>
 
 namespace {
@@ -76,6 +79,36 @@ TEST( Dialogs, HelpKeepsTipsOnWhenTheOptOutIsNotTaken )
 
    QTimer::singleShot( 0, &dialog, &QDialog::reject );
    EXPECT_TRUE( dialog.Execute( true, true ) );
+}
+
+TEST( Dialogs, SyncListsEverySystemAndReturnsOnlyTheTickedOnes )
+{
+   SystemPlan busy;
+   busy.pair.source.folderName = QStringLiteral( "snes" );
+   busy.pair.target.folderName = QStringLiteral( "snes" );
+   busy.games.append( SyncGame() );
+   SystemPlan quiet;
+   quiet.pair.source.folderName = QStringLiteral( "gba" );
+   quiet.pair.target.folderName = QStringLiteral( "gba" );
+   quiet.targetOnly << QStringLiteral( "Zelda" );
+   SyncPlan plan;
+   plan.systems << busy << quiet;
+
+   Frm_Sync dialog;
+   QTimer::singleShot( 0, &dialog, [&dialog] {
+      const auto* list = dialog.findChild<QListWidget*>( QStringLiteral( "Lst_Systems" ) );
+      ASSERT_NE( list, nullptr );
+      ASSERT_EQ( list->count(), 2 );
+      EXPECT_EQ( list->item( 0 )->checkState(), Qt::Checked );
+      EXPECT_EQ( list->item( 1 )->checkState(), Qt::Unchecked ) << "nothing to do: not ticked";
+      EXPECT_FALSE( list->item( 1 )->flags().testFlag( Qt::ItemIsEnabled ) );
+      EXPECT_TRUE( dialog.findChild<QPlainTextEdit*>( QStringLiteral( "Txt_Notes" ) )->toPlainText().contains( QStringLiteral( "Zelda" ) ) );
+      dialog.accept();
+   } );
+
+   const SyncPlan chosen = dialog.Execute( plan );
+   ASSERT_EQ( chosen.systems.size(), 1 );
+   EXPECT_EQ( chosen.systems.first().pair.source.folderName, QStringLiteral( "snes" ) );
 }
 
 }  // namespace
