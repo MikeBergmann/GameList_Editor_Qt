@@ -22,6 +22,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScreen>
 #include <QSettings>
 #include <QSplitter>
 #include <QTemporaryDir>
@@ -372,7 +373,8 @@ TEST( MainWindow, WindowLayoutIsRestoredOnTheNextStart )
    QSize size;
    {
       Frm_Editor first;
-      first.resize( 1300, 650 );
+      const int screenWidth = first.screen()->availableGeometry().width();
+      first.resize( qMin( 1300, screenWidth ), 650 );
       first.show();
       QSplitter* split = first.findChild<QSplitter*>();
       ASSERT_NE( split, nullptr );
@@ -384,7 +386,7 @@ TEST( MainWindow, WindowLayoutIsRestoredOnTheNextStart )
 
    Frm_Editor second;
    second.show();
-   EXPECT_EQ( second.size(), size );
+   EXPECT_EQ( second.size(), size ) << "restoreGeometry clamps a window wider than the screen";
    EXPECT_EQ( second.findChild<QSplitter*>()->sizes(), columns );
 }
 
