@@ -90,6 +90,54 @@ QVector<SystemEntry> unknownFolder( const QString& aFolder )
    return { { aFolder, skOther, QString() } };
 }
 
+TEST( SystemAt, GivesTheEntryAnEsdeRootWouldHaveForAFolderWithNoGamelistYet )
+{
+   EsdeFolder esde( "<string name=\"MediaDirectory\" value=\"\" />\n" );
+
+   const SystemEntry entry = systemAt( esde.appData, QStringLiteral( "gb" ) );
+
+   EXPECT_EQ( entry.folderName, QStringLiteral( "gb" ) );
+   EXPECT_EQ( entry.kind, systemKindFromFolder( QStringLiteral( "gb" ) ) );
+   EXPECT_EQ( entry.gamelistPath, esde.appData + QStringLiteral( "/gamelists/gb/gamelist.xml" ) );
+   EXPECT_EQ( entry.romDir, esde.dir.filePath( QStringLiteral( "ROMs/gb" ) ) );
+   EXPECT_EQ( entry.mediaDir, esde.appData + QStringLiteral( "/downloaded_media/gb" ) );
+}
+
+TEST( SystemAt, GivesTheEntryALegacyRootWouldHaveAndMatchesTheScan )
+{
+   Fixture fixture;
+
+   const SystemEntry fresh = systemAt( fixture.dir.path(), QStringLiteral( "gb" ) );
+   EXPECT_EQ( fresh.gamelistPath, fixture.dir.filePath( QStringLiteral( "gb/gamelist.xml" ) ) );
+   EXPECT_TRUE( fresh.romDir.isEmpty() && fresh.mediaDir.isEmpty() );
+
+   const SystemEntry known = systemAt( fixture.dir.path(), QStringLiteral( "snes" ) );
+   EXPECT_EQ( known.gamelistPath, fixture.snes.gamelistPath );
+}
+
+TEST( CreateGamelist, WritesAnEmptyListThatLoadsOnlyWhenAskedAndTakesGames )
+{
+   Fixture fixture;
+   const SystemEntry entry = systemAt( fixture.dir.path(), QStringLiteral( "gb" ) );
+
+   ASSERT_TRUE( createGamelist( entry.gamelistPath ) );
+   EXPECT_FALSE( createGamelist( entry.gamelistPath ) ) << "an existing file must not be overwritten";
+
+   Gamelist list;
+   EXPECT_FALSE( list.load( entry ) ) << "the editor keeps refusing an empty list";
+   ASSERT_TRUE( list.load( entry, true ) );
+   EXPECT_EQ( list.count(), 0 );
+
+   writeFile( fixture.dir.filePath( QStringLiteral( "gb/Tetris.gb" ) ), "rom" );
+   const Result<int> added = list.addGames( { fixture.dir.filePath( QStringLiteral( "gb/Tetris.gb" ) ) } );
+   ASSERT_TRUE( added );
+   EXPECT_EQ( added.value(), 1 );
+
+   Gamelist again;
+   ASSERT_TRUE( again.load( entry ) );
+   EXPECT_EQ( again.count(), 1 );
+}
+
 TEST_F( SystemMap, AMappedFolderBecomesTheKnownSystemAndAnUnmappedOneStaysOther )
 {
    setSystemMapping( QStringLiteral( "amiga500" ), skAM );

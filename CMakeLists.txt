@@ -77,6 +77,8 @@ add_library( gle_core STATIC
    src/core/NameEdit.cpp
    src/core/PathUtil.cpp
    src/core/Resources.cpp
+   src/core/RomCopy.cpp
+   src/core/Sync.cpp
    src/core/Systems.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
@@ -133,6 +135,7 @@ add_library( gle_ui STATIC
    src/ui/dialogs/F_LinkMedia.cpp
    src/ui/dialogs/F_MoreInfos.cpp
    src/ui/dialogs/F_PickGame.cpp
+   src/ui/dialogs/F_Sync.cpp
 )
 target_include_directories( gle_ui PUBLIC src/ui src/ui/dialogs )
 target_link_libraries( gle_ui PUBLIC Qt6::Widgets Qt6::Multimedia Qt6::MultimediaWidgets gle_core gle_scraper )
@@ -159,8 +162,10 @@ add_executable( tests
    tests/tst_pathutil.cpp
    tests/tst_resources.cpp
    tests/tst_result.cpp
+   tests/tst_romcopy.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
+   tests/tst_sync.cpp
    tests/tst_systems.cpp
    Resources/assets.qrc
 )

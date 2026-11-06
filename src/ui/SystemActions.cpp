@@ -2,14 +2,18 @@
 
 #include "F_AddRoms.h"
 #include "F_LinkMedia.h"
+#include "F_Sync.h"
 #include "Gamelist.h"
 #include "MediaOps.h"
 #include "PathUtil.h"
 
 #include <algorithm>
 
+#include <QCoreApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QLocale>
 #include <QMessageBox>
@@ -269,4 +273,116 @@ ViewUpdate deleteDuplicates( QWidget* aParent, Gamelist& aGamelist )
    return confirmAndRemove(
       aParent, aGamelist, duplicateIndexes( aGamelist ),
       QStringLiteral( "that list a ROM already listed above them (the first stays)" ) );
+}
+
+namespace {
+
+void showSyncReport( QWidget* aParent, const SyncReport& aReport )
+{
+   QStringList summary;
+   QStringList details;
+   bool failed = false;
+   for ( const SystemReport& system : aReport.systems ) {
+      if ( system.ok() ) {
+         summary << QStringLiteral( "%1: %2 added, %3 updated, %4 media files copied." )
+                       .arg( system.name )
+                       .arg( system.added )
+                       .arg( system.updated )
+                       .arg( system.mediaCopied );
+      } else {
+         failed = true;
+         summary << QStringLiteral( "%1: stopped. %2" ).arg( system.name, system.error );
+      }
+      for ( const QString& line : system.skipped )
+         details << QStringLiteral( "%1: %2" ).arg( system.name, line );
+   }
+   if ( aReport.canceled )
+      summary << QStringLiteral( "Canceled. Run the sync again to finish." );
+
+   QMessageBox box( failed || aReport.canceled ? QMessageBox::Warning : QMessageBox::Information,
+                    QStringLiteral( "GameList Editor Qt" ), summary.join( QLatin1Char( '\n' ) ), QMessageBox::Ok,
+                    aParent );
+   if ( !details.isEmpty() )
+      box.setDetailedText( details.join( QLatin1Char( '\n' ) ) );
+   box.exec();
+}
+
+}  // namespace
+
+void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
+{
+   const QString title = QStringLiteral( "GameList Editor Qt" );
+   const QString targetRoot = QFileDialog::getExistingDirectory(
+      aParent, QStringLiteral( "Sync to folder" ), QFileInfo( aMasterRoot ).absolutePath() );
+   if ( targetRoot.isEmpty() )
+      return;
+
+   if ( QFileInfo( targetRoot ).canonicalFilePath() == QFileInfo( aMasterRoot ).canonicalFilePath() ) {
+      QMessageBox::warning( aParent, title, QStringLiteral( "That is the folder you are syncing from." ) );
+      return;
+   }
+
+   QVector<SystemEntry> master = scanSystems( aMasterRoot );
+   applySystemMap( master );
+
+   // ponytail: planning runs on the UI thread, repainting every 50 ms. Upgrade: plan in a worker.
+   QProgressDialog analysing( QStringLiteral( "Reading the gamelists..." ), QStringLiteral( "Cancel" ), 0, 0, aParent );
+   analysing.setWindowTitle( QStringLiteral( "Analysing" ) );
+   analysing.setWindowModality( Qt::WindowModal );
+   analysing.setMinimumDuration( 0 );
+   analysing.setMinimumWidth( 420 );
+
+   QElapsedTimer clock;
+   clock.start();
+   qint64 lastPaint = -1000;
+   const SyncPlan plan = planSync( master, targetRoot, [&]( const QString& aMessage, int aDone, int aTotal ) {
+      if ( clock.elapsed() - lastPaint >= 50 ) {
+         lastPaint = clock.elapsed();
+         analysing.setMaximum( aTotal );
+         analysing.setValue( aDone );
+         analysing.setLabelText( QStringLiteral( "System %1 of %2\n%3" ).arg( aDone + 1 ).arg( aTotal ).arg( aMessage ) );
+         QCoreApplication::processEvents();
+      }
+      return !analysing.wasCanceled();
+   } );
+   analysing.close();
+   if ( plan.canceled )
+      return;
+
+   if ( plan.systems.isEmpty() ) {
+      QMessageBox::information( aParent, title, QStringLiteral( "Nothing to sync: the target is up to date." ) );
+      return;
+   }
+
+   const SyncPlan chosen = Frm_Sync( aParent ).Execute( plan );
+   if ( chosen.systems.isEmpty() )
+      return;
+
+   // applySystem reports once per ROM file, per media file and per system's write stage.
+   int steps = 0;
+   for ( const SystemPlan& system : chosen.systems ) {
+      for ( const SyncGame& game : system.games )
+         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) + game.copyImage + game.copyVideo;
+      ++steps;
+   }
+
+   QProgressDialog progress( QStringLiteral( "Syncing..." ), QStringLiteral( "Cancel" ), 0, steps, aParent );
+   progress.setWindowTitle( QStringLiteral( "Syncing" ) );
+   progress.setWindowModality( Qt::WindowModal );
+   progress.setMinimumDuration( 0 );
+   progress.setMinimumWidth( 420 );
+   progress.setAutoClose( false );
+   progress.setAutoReset( false );
+   progress.setValue( 0 );  // a QProgressDialog shows only once it gets a value
+
+   int done = 0;
+   const SyncReport report = applySync( chosen, [&]( const QString& aMessage ) {
+      progress.setValue( qMin( done++, steps ) );
+      progress.setLabelText( QStringLiteral( "Step %1 of %2\n%3" ).arg( qMin( done, steps ) ).arg( steps ).arg( aMessage ) );
+      QCoreApplication::processEvents();
+      return !progress.wasCanceled();
+   } );
+   progress.close();
+
+   showSyncReport( aParent, report );
 }

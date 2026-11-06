@@ -115,6 +115,7 @@ private:
    QLabel* Lbl_NbGamesFound = nullptr;
 
    QAction* Mnu_Reload = nullptr;
+   QAction* Mnu_Sync = nullptr;
    QList<QAction*> FSystemActions;  // off while no system is loaded
    QList<QAction*> FSelectionActions;  // off while no game is selected
    QAction* Mnu_GodMode = nullptr;

@@ -75,6 +75,12 @@ void Frm_Editor::buildMenu()
    file->addAction( QStringLiteral( "Quit" ), QKeySequence::Quit, this, &Frm_Editor::close );
 
    QMenu* actions = menuBar()->addMenu( QStringLiteral( "Actions" ) );
+   Mnu_Sync = actions->addAction( QStringLiteral( "Sync to other folder..." ), this, [this] {
+      if ( confirmLeaveEdits() )
+         syncToOtherFolder( this, FRootPath );
+   } );
+   Mnu_Sync->setEnabled( false );
+   actions->addSeparator();
    QMenu* system = actions->addMenu( QStringLiteral( "System" ) );
    // Everything here works on the loaded system, so it starts disabled.
    const auto addSystemAction = [this, system]( const QString& aText, auto aHandler ) {
@@ -500,6 +506,7 @@ void Frm_Editor::openRootFolder( const QString& aRootPath )
    Cbx_Filter->setEnabled( found );
    Edt_Search->setEnabled( found );
    Mnu_Reload->setEnabled( found );
+   Mnu_Sync->setEnabled( found );
 
    if ( !found ) {
       setSystemActionsEnabled( false );

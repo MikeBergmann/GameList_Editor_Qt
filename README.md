@@ -47,17 +47,18 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 ### Implemented
 
 - [x] Loading and systems
-- [x] Browsing, searching and filtering the game list
+- [x] Browsing, searching, and filtering the game list
 - [x] Edit a game
-- [x] Scrape using screenscraper.fr
+- [x] Scrape using screenscraper.fr and LaunchBoxDB
 - [x] Manually adding new games
-- [x] Linking existing media, and renaming linked media after their ROM (both with a review before anything changes)
+- [x] Linking existing media and renaming linked media after their ROM (both with a review before anything changes)
 - [x] Shrinking large pictures: re-encodes linked pictures over a chosen size.
 - [x] Video playback
 - [x] Windows build
 - [x] Actions → System: delete orphans, delete duplicates (first entry of a ROM stays), export the list to a txt file (what the list currently shows)
 - [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
 - [x] ES-DE folders (see below)
+- [x] Sync to another folder, ES-DE or legacy in either direction (see below)
 
 ### ES-DE
 
@@ -75,16 +76,32 @@ The title bar then reads "GameList Editor Qt - ES-DE". Choosing a ROM folder giv
 
 The ROM folder used is `ROMDirectory` from `es_settings.xml`, else the `ROMs` folder beside the ES-DE folder. 
 
-Current limitation: A scraped picture is saved as the cover, whichever type you picked.
+Current limitation: A scraped picture is saved as the cover, no matter which type you pick.
+
+### Sync
+
+Actions → Sync to other folder... copies the open folder (the master) into another folder, one way. Either side can be ES-DE or a legacy layout. Systems pair by folder name, else by type (`megadrive` and `genesis` are two types and are not paired). A progress bar shows the analysis (cancel any time). A review lists each system's counts, the problems, and how many games only the target has; a Details button per system lists every game with what would change, before anything is written.
+
+- **Copied:** the ROMs (when the target's ROM folder is another folder; sizes are compared), `name`, `genre`, `rating`, `players`, `developer`, `publisher`, `releasedate`, `desc`, `region`, and the cover and video (compared by size, then MD5).
+- **Stays per device:** favorite, hidden, kid game, play count, last played, and every child the editor does not know.
+- **Never removed:** games only the target has are listed and kept.
+- **Media** is copied byte for byte. ES-DE reads only `jpg`, `png` and `webp` covers, so other pictures become PNG on the way in; a video ES-DE cannot play is skipped and listed. Converted covers are copied only when missing.
+
+Pitfalls:
+
+- Stop EmulationStation on the target first: it rewrites its gamelists on exit.
+- Games match by ROM path. RetroPie-style absolute `<path>` values do not match and are listed.
+- Folder ROMs (ScummVM and the like) are not synced: they are listed, and their ROM folder is not copied. Fields and media of a folder ROM that the target already lists are still updated.
+- Android over MTP is not a file path on Windows: use a card reader, a share, or a local copy. ES-DE on Android often keeps app data in internal storage and ROMs on the SD card; both must be reachable from the PC.
+- Screenshots, marquees, and other ES-DE media types aren't synced yet.
 
 ### Features to add
 
-- [ ] Additional Scrapers (e.g., Launchbox)
-- [ ] Synchronise a legacy gamelist with its ES-DE counterpart
 - [ ] Scrape every picture type into its own ES-DE media folder
 - [ ] Auto-Fix invalid media links
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
+- [ ] Add and Sync folder ROMs (ScummVM, etc.)
 - [ ] Android version
 
 ## screenscraper.fr credentials

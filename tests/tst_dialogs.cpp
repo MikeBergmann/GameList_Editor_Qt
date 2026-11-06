@@ -5,13 +5,18 @@
 #include "F_ConfigureNetwork.h"
 #include "F_Help.h"
 #include "F_MoreInfos.h"
+#include "F_Sync.h"
 #include "Game.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
 
 #include <QLineEdit>
+
+#include <QPlainTextEdit>
+#include <QPushButton>
 #include <QTimer>
+#include <QTreeWidget>
 
 namespace {
 
@@ -76,6 +81,72 @@ TEST( Dialogs, HelpKeepsTipsOnWhenTheOptOutIsNotTaken )
 
    QTimer::singleShot( 0, &dialog, &QDialog::reject );
    EXPECT_TRUE( dialog.Execute( true, true ) );
+}
+
+TEST( Dialogs, SyncDetailsListEachGameWithWhatChanges )
+{
+   SystemPlan system;
+   system.pair.source.folderName = QStringLiteral( "snes" );
+   system.pair.target.folderName = QStringLiteral( "snes2" );
+   system.pair.target.gamelistPath = QStringLiteral( "/t/snes2/gamelist.xml" );
+   system.createTarget = true;
+   SyncGame sonic;
+   sonic.name = QStringLiteral( "Sonic" );
+   sonic.fields = gfName | gfGenre;
+   sonic.copyImage = true;
+   sonic.imageSource = QStringLiteral( "/m/Sonic.png" );
+   SyncGame mario;
+   mario.name = QStringLiteral( "Mario" );
+   mario.targetIndex = 4;
+   mario.fields = gfRating;
+   system.games << sonic << mario;
+   system.unchanged = 7;
+   system.targetOnly << QStringLiteral( "Zelda" );
+   system.problems << QStringLiteral( "Bad: the path is absolute." );
+
+   const QString text = syncDetails( system );
+
+   EXPECT_TRUE( text.contains( QStringLiteral( "snes \u2192 snes2" ) ) ) << text.toStdString();
+   EXPECT_TRUE( text.contains( QStringLiteral( "(will be created)" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "New games (1)" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "Sonic  [fields: name, genre; cover: Sonic.png]" ) ) ) << text.toStdString();
+   EXPECT_TRUE( text.contains( QStringLiteral( "Updated games (1)" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "Mario  [fields: rating]" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "Unchanged: 7" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "Zelda" ) ) );
+   EXPECT_TRUE( text.contains( QStringLiteral( "Bad: the path is absolute." ) ) );
+}
+
+TEST( Dialogs, SyncListsEverySystemAndReturnsOnlyTheTickedOnes )
+{
+   SystemPlan busy;
+   busy.pair.source.folderName = QStringLiteral( "snes" );
+   busy.pair.target.folderName = QStringLiteral( "snes" );
+   busy.games.append( SyncGame() );
+   SystemPlan quiet;
+   quiet.pair.source.folderName = QStringLiteral( "gba" );
+   quiet.pair.target.folderName = QStringLiteral( "gba" );
+   quiet.targetOnly << QStringLiteral( "Zelda" );
+   SyncPlan plan;
+   plan.systems << busy << quiet;
+
+   Frm_Sync dialog;
+   QTimer::singleShot( 0, &dialog, [&dialog] {
+      const auto* list = dialog.findChild<QTreeWidget*>( QStringLiteral( "Lst_Systems" ) );
+      ASSERT_NE( list, nullptr );
+      ASSERT_EQ( list->topLevelItemCount(), 2 );
+      EXPECT_EQ( list->topLevelItem( 0 )->checkState( 0 ), Qt::Checked );
+      EXPECT_EQ( list->topLevelItem( 1 )->checkState( 0 ), Qt::Unchecked ) << "nothing to do: not ticked";
+      EXPECT_FALSE( list->topLevelItem( 1 )->flags().testFlag( Qt::ItemIsEnabled ) );
+      const auto buttons = dialog.findChildren<QPushButton*>( QStringLiteral( "Btn_Details" ) );
+      EXPECT_EQ( buttons.size(), 2 ) << "a Details button per system, also for one with nothing to do";
+      EXPECT_TRUE( dialog.findChild<QPlainTextEdit*>( QStringLiteral( "Txt_Notes" ) )->toPlainText().contains( QStringLiteral( "1 game(s) only on the target" ) ) );
+      dialog.accept();
+   } );
+
+   const SyncPlan chosen = dialog.Execute( plan );
+   ASSERT_EQ( chosen.systems.size(), 1 );
+   EXPECT_EQ( chosen.systems.first().pair.source.folderName, QStringLiteral( "snes" ) );
 }
 
 }  // namespace

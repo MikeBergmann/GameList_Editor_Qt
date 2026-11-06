@@ -30,6 +30,23 @@ constexpr HelpSection Cst_HelpSections[] = {
                             "the ones you fill in are written to every selected game. The name and "
                             "the pictures can only be changed one game at a time." },
 
+   { "Sync to other folder:", "Actions, Sync to other folder copies the open folder (the master) "
+                              "into another one, ES-DE or not, in either direction. Systems pair by "
+                              "folder name, else by type. You review what changes first.<br>"
+                              "<br>"
+                              "Copied: the ROMs (when the target's ROM folder is another folder), the "
+                              "name, genre, rating, players, developer, publisher, release date, "
+                              "description and region, and the cover and video. Favorites, hidden, "
+                              "kid game, play count and last played stay per device. Games only on the "
+                              "target are listed and kept, never removed.<br>"
+                              "<br>"
+                              "Games match by their ROM path, so absolute paths are listed as problems. "
+                              "Folder ROMs (ScummVM, PS3) are listed and not copied. "
+                              "ES-DE reads only jpg, png and webp covers (others become PNG) and skips "
+                              "videos it cannot play. Screenshots and other media types are not synced. "
+                              "Stop EmulationStation on the target first. A phone over MTP is not a "
+                              "folder on Windows: use a card reader or a share." },
+
    { "Enable God Mode:", "Enabling this option will let you delete games directly from the "
                          "application. A delete button will be added to the GUI, and you will be "
                          "prompted to confirm when you click it.<br>"

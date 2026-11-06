@@ -37,11 +37,39 @@ struct MediaRename
    QString problem;
 };
 
+// New values for one game; only the fields in which are written.
+struct FieldUpdate
+{
+   int index = -1;
+   GameFields values;
+   GameFieldSet which;
+};
+
+// A media file to copy to a game, byte for byte.
+struct MediaCopy
+{
+   int index = -1;  // the game
+   bool isImage = true;
+   QString source;  // absolute path
+};
+
+struct MediaCopyReport
+{
+   int copied = 0;
+   QStringList skipped;  // one line per file left out, with the reason
+};
+
+using MediaProgress = std::function<bool( const MediaCopy& )>;
+
+// The lowercase extension ES-DE looks for in its picture or video folders; empty when it
+// does not read aSuffix.
+QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix );
+
 class Gamelist
 {
 public:
-   // An Error when the file cannot be read or parsed, or holds no <game>.
-   Result<> load( const SystemEntry& aSystem );
+   // An Error when the file cannot be read or parsed, or holds no <game> (unless aAllowEmpty).
+   Result<> load( const SystemEntry& aSystem, bool aAllowEmpty = false );
 
    const SystemEntry& system() const { return FSystem; }
 
@@ -57,12 +85,21 @@ public:
    // Saves. An Error leaves games, document and file as they were.
    Result<> setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
+   // Different values per game, in one save. Same Error rule as above.
+   Result<> setFields( const QVector<FieldUpdate>& aUpdates );
+
    // Renames each target with applyNameEdit, in one save. Same Error rule as setFields.
    Result<> editNames( const QVector<int>& aTargets, const NameEdit& aEdit );
 
    Result<> setImage( int aIndex, const QString& aSourcePath );
    Result<> setImage( int aIndex, const QImage& aPicture );
    Result<> setVideo( int aIndex, const QString& aSourcePath );
+
+   // Keeps each file's format and extension. ES-DE reads only jpg/png/webp pictures (others
+   // become PNG) and the videos in Cst_EsdeVideoExtensions (others are skipped and reported).
+   // One save; an Error leaves games, files and the gamelist as they were.
+   // aProgress runs before each file; returning false cancels with an Error.
+   Result<MediaCopyReport> copyMedia( const QVector<MediaCopy>& aCopies, const MediaProgress& aProgress = {} );
 
    Result<> removeImage( int aIndex );
    Result<> removeVideo( int aIndex );
@@ -125,6 +162,9 @@ private:
    // Runs aApply on the targets, then saves; if that fails, puts the targets back.
    Result<> applyAndSave( const QVector<int>& aTargets, const std::function<void()>& aApply );
 
+   // Does not save, and leaves the duplicate counts to the caller.
+   void applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSet aWhich );
+
    // Does not save.
    void applyFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
@@ -154,15 +194,21 @@ private:
    // Does not save. On an Error nothing has changed.
    Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
 
-   // ES-DE: where aGame's image or video goes by the ROM's name.
-   QString conventionalPath( const Game& aGame, bool aIsImage ) const;
+   // Copies aSourcePath as it is, under the game's media name plus aSuffix (with the dot).
+   // Does not save. On an Error nothing has changed.
+   Result<MediaWrite> applyMediaFile( int aIndex, bool aIsImage, const QString& aSourcePath,
+                                      const QString& aSuffix );
+
+   // ES-DE: where aGame's image or video goes by the ROM's name. An empty aSuffix is png/mp4.
+   QString conventionalPath( const Game& aGame, bool aIsImage, const QString& aSuffix = {} ) const;
 
    // ES-DE: fills the media paths of aGame from the indexes, else conventionalPath.
    void findConventionalMedia( Game& aGame ) const;
    void indexMedia();
 
    // Never a file another game has. ES-DE: the absolute path by the ROM's name.
-   QString freeMediaLink( int aIndex, bool aIsImage ) const;
+   // An empty aSuffix is png/mp4.
+   QString freeMediaLink( int aIndex, bool aIsImage, const QString& aSuffix = {} ) const;
 
    // Saves; ES-DE media changes nothing in the gamelist, so there it does not.
    Result<> saveLinks();

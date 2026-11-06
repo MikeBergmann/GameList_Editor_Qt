@@ -96,41 +96,21 @@ bool fileMissing( const QString& aPath )
 // New media is written under the staged name, then swapped in; the old file waits
 // under the backup name until the gamelist is saved.
 constexpr const char* Cst_StagedSuffix = ".gle-new";
-constexpr const char* Cst_BackupSuffix = ".gle-bak";
-
-// Returns the backup name of a replaced aTarget (empty if none). On an Error,
-// aTarget is as it was and aStaged is gone.
-Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
-{
-   QString backup;
-
-   if ( QFileInfo::exists( aTarget ) ) {
-      backup = aTarget + QLatin1String( Cst_BackupSuffix );
-      QFile::remove( backup );
-      if ( !QFile::rename( aTarget, backup ) ) {
-         QFile::remove( aStaged );
-         return Error{ QStringLiteral( "Cannot replace %1." ).arg( aTarget ) };
-      }
-   }
-
-   if ( !QFile::rename( aStaged, aTarget ) ) {
-      if ( !backup.isEmpty() )
-         QFile::rename( backup, aTarget );
-      QFile::remove( aStaged );
-      return Error{ QStringLiteral( "Cannot write %1." ).arg( aTarget ) };
-   }
-
-   return backup;
-}
 
 }  // namespace
+
+QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix )
+{
+   const QString lower = aSuffix.toLower();
+   return ( aIsImage ? Cst_EsdeImageExtensions : Cst_EsdeVideoExtensions ).contains( lower ) ? lower : QString();
+}
 
 QString Gamelist::domText( int aIndex, const char* aName ) const
 {
    return childText( FEntries.value( aIndex ).node, aName );
 }
 
-Result<> Gamelist::load( const SystemEntry& aSystem )
+Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
 {
    FSystem = aSystem;
    FBackedUp = false;
@@ -202,7 +182,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem )
       FEntries.append( { game, node } );
    }
 
-   if ( FEntries.isEmpty() )
+   if ( FEntries.isEmpty() && !aAllowEmpty )
       return Error{ QStringLiteral( "%1 holds no game." ).arg( aSystem.gamelistPath ) };
 
    countDuplicates();
@@ -246,10 +226,12 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
    return game;
 }
 
-QString Gamelist::conventionalPath( const Game& aGame, bool aIsImage ) const
+QString Gamelist::conventionalPath( const Game& aGame, bool aIsImage, const QString& aSuffix ) const
 {
+   const QString suffix = !aSuffix.isEmpty() ? aSuffix
+                          : QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
    return FMediaDir + QLatin1Char( '/' ) + QLatin1String( aIsImage ? Cst_EsdeImageType : Cst_EsdeVideoType ) +
-          QLatin1Char( '/' ) + mediaStem( aGame ) + QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
+          QLatin1Char( '/' ) + mediaStem( aGame ) + suffix;
 }
 
 void Gamelist::findConventionalMedia( Game& aGame ) const
@@ -480,68 +462,90 @@ Result<> Gamelist::applyAndSave( const QVector<int>& aTargets, const std::functi
    return {};
 }
 
+Result<> Gamelist::setFields( const QVector<FieldUpdate>& aUpdates )
+{
+   QVector<int> targets;
+   for ( const FieldUpdate& update : aUpdates )
+      if ( update.which )
+         targets.append( update.index );
+
+   return applyAndSave( targets, [&] {
+      GameFieldSet all;
+      for ( const FieldUpdate& update : aUpdates ) {
+         applyFieldsTo( update.index, update.values, update.which );
+         all |= update.which;
+      }
+      if ( all & gfName )
+         countDuplicates();
+   } );
+}
+
 void Gamelist::applyFields( const QVector<int>& aTargets, const GameFields& aValues,
                             GameFieldSet aWhich )
 {
-
-   for ( int index : aTargets ) {
-      if ( index < 0 || index >= FEntries.size() )
-         continue;
-
-      Game& game = FEntries[index].game;
-      QDomElement node = FEntries[index].node;
-
-      const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
-                              QString& aStored ) {
-         if ( !( aWhich & aField ) )
-            return;
-         setChildText( node, aName, aValue );
-         aStored = aValue;
-      };
-
-      write( gfName, Cst_Name, aValues.name, game.name );
-      write( gfGenre, Cst_Genre, aValues.genre, game.genre );
-      write( gfRating, Cst_Rating, aValues.rating, game.rating );
-      write( gfPlayers, Cst_Players, aValues.players, game.players );
-      write( gfDeveloper, Cst_Developer, aValues.developer, game.developer );
-      write( gfPublisher, Cst_Publisher, aValues.publisher, game.publisher );
-      write( gfDescription, Cst_Description, aValues.description, game.description );
-      write( gfRegion, Cst_Region, aValues.region, game.region );
-
-      if ( aWhich & gfReleaseDate ) {
-         // A date in none of the three accepted forms is stored blank and comes
-         // back blank.
-         const QString stored = displayDateToGamelist( aValues.releaseDate );
-         setChildText( node, Cst_ReleaseDate, stored );
-         game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
-      }
-
-      const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
-         if ( !( aWhich & aField ) )
-            return;
-         setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
-         aStored = aValue;
-      };
-
-      writeFlag( gfKidGame, Cst_KidGame, aValues.kidGame, game.kidGame );
-      writeFlag( gfHidden, Cst_Hidden, aValues.hidden, game.hidden );
-      writeFlag( gfFavorite, Cst_Favorite, aValues.favorite, game.favorite );
-   }
+   for ( int index : aTargets )
+      applyFieldsTo( index, aValues, aWhich );
 
    if ( aWhich & gfName )
       countDuplicates();
 }
 
+void Gamelist::applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSet aWhich )
+{
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
+      return;
+
+   Game& game = FEntries[aIndex].game;
+   QDomElement node = FEntries[aIndex].node;
+
+   const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
+                           QString& aStored ) {
+      if ( !( aWhich & aField ) )
+         return;
+      setChildText( node, aName, aValue );
+      aStored = aValue;
+   };
+
+   write( gfName, Cst_Name, aValues.name, game.name );
+   write( gfGenre, Cst_Genre, aValues.genre, game.genre );
+   write( gfRating, Cst_Rating, aValues.rating, game.rating );
+   write( gfPlayers, Cst_Players, aValues.players, game.players );
+   write( gfDeveloper, Cst_Developer, aValues.developer, game.developer );
+   write( gfPublisher, Cst_Publisher, aValues.publisher, game.publisher );
+   write( gfDescription, Cst_Description, aValues.description, game.description );
+   write( gfRegion, Cst_Region, aValues.region, game.region );
+
+   if ( aWhich & gfReleaseDate ) {
+      // A date in none of the three accepted forms is stored blank and comes
+      // back blank.
+      const QString stored = displayDateToGamelist( aValues.releaseDate );
+      setChildText( node, Cst_ReleaseDate, stored );
+      game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
+   }
+
+   const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
+      if ( !( aWhich & aField ) )
+         return;
+      setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
+      aStored = aValue;
+   };
+
+   writeFlag( gfKidGame, Cst_KidGame, aValues.kidGame, game.kidGame );
+   writeFlag( gfHidden, Cst_Hidden, aValues.hidden, game.hidden );
+   writeFlag( gfFavorite, Cst_Favorite, aValues.favorite, game.favorite );
+}
+
 // Sonic.zip and Sonic.7z share a stem: keep the ROM's extension, then count up.
-QString Gamelist::freeMediaLink( int aIndex, bool aIsImage ) const
+QString Gamelist::freeMediaLink( int aIndex, bool aIsImage, const QString& aSuffix ) const
 {
    const Game& game = FEntries.at( aIndex ).game;
    const QString folder = aIsImage ? FImageFolder : FVideoFolder;
-   const QLatin1String suffix( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
+   const QString suffix = !aSuffix.isEmpty() ? aSuffix
+                          : QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
 
    // ES-DE has one file per stem, so a taken name is not a reason to pick another.
    if ( conventionalMedia() )
-      return conventionalPath( game, aIsImage );
+      return conventionalPath( game, aIsImage, suffix );
 
    for ( int attempt = 0;; ++attempt ) {
       const QString stem = attempt == 0   ? game.romNameWoExt()
@@ -807,28 +811,41 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
    if ( const Result<> valid = checkIndex( aIndex ); !valid )
       return valid;
 
+   const Result<MediaWrite> write =
+      applyMediaFile( aIndex, false, aSourcePath, QLatin1String( Cst_VideoSuffixMp4 ) );
+   if ( !write )
+      return write;
+
+   return commitMedia( { write.value() } );
+}
+
+Result<Gamelist::MediaWrite> Gamelist::applyMediaFile( int aIndex, bool aIsImage, const QString& aSourcePath,
+                                                       const QString& aSuffix )
+{
    Game& game = FEntries[aIndex].game;
-   const QString link = freeMediaLink( aIndex, false );
+   const QString link = freeMediaLink( aIndex, aIsImage, aSuffix );
    const QString target = writeTarget( FRomDir, link );
 
    if ( !QDir().mkpath( QFileInfo( target ).path() ) )
       return Error{ QStringLiteral( "Cannot create %1." ).arg( QFileInfo( target ).path() ) };
 
-   // Choosing the game's own video would otherwise remove the file and then copy
-   // from it, i.e. a deletion; the copy is skipped when source and target are one file.
+   // Choosing the game's own file would otherwise remove it and then copy from it, i.e. a
+   // deletion; the copy is skipped when source and target are one file.
    const QString source = QFileInfo( aSourcePath ).canonicalFilePath();
    if ( source.isEmpty() )
       return Error{ QStringLiteral( "%1 cannot be read." ).arg( aSourcePath ) };
 
    MediaWrite write;
    write.index = aIndex;
-   write.isImage = false;
+   write.isImage = aIsImage;
    write.before = game;
-   if ( conventionalMedia() && !game.missingVideo && !sameFile( game.physicalVideoPath, target, FFoldsCase ) )
-      write.stale = game.physicalVideoPath;
+   const bool missing = aIsImage ? game.missingImage : game.missingVideo;
+   const QString& current = aIsImage ? game.physicalImagePath : game.physicalVideoPath;
+   if ( conventionalMedia() && !missing && !sameFile( current, target, FFoldsCase ) )
+      write.stale = current;
 
    if ( source != QFileInfo( target ).canonicalFilePath() ) {
-      // Copy beside the target and swap, so a failed copy cannot cost the old video.
+      // Copy beside the target and swap, so a failed copy cannot cost the old file.
       const QString staged = target + QLatin1String( Cst_StagedSuffix );
       QFile::remove( staged );
       if ( !QFile::copy( source, staged ) ) {
@@ -843,9 +860,66 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
       write.target = target;
    }
 
-   setMediaLink( aIndex, false, link, target );
+   setMediaLink( aIndex, aIsImage, link, target );
+   return write;
+}
 
-   return commitMedia( { write } );
+Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, const MediaProgress& aProgress )
+{
+   MediaCopyReport report;
+   QVector<MediaWrite> writes;
+   const bool esde = conventionalMedia();
+
+   for ( const MediaCopy& copy : aCopies ) {
+      if ( copy.index < 0 || copy.index >= FEntries.size() )
+         continue;
+
+      if ( aProgress && !aProgress( copy ) ) {
+         rollbackMedia( writes );
+         return Error{ QStringLiteral( "Canceled." ) };
+      }
+
+      const QString suffix = QFileInfo( copy.source ).suffix();
+      const QString esdeSuffix = esdeMediaSuffix( copy.isImage, suffix );
+      const QString name = QFileInfo( copy.source ).fileName();
+
+      // ES-DE tries lowercase extensions from a short list; anything else is converted
+      // (pictures) or reported (videos).
+      const bool keep = esde ? !esdeSuffix.isEmpty() : !suffix.isEmpty();
+
+      Result<MediaWrite> write = Error{ QString() };
+      if ( keep ) {
+         write = applyMediaFile( copy.index, copy.isImage, copy.source,
+                                 QLatin1Char( '.' ) + ( esde ? esdeSuffix : suffix ) );
+      } else if ( copy.isImage ) {
+         QImage picture;
+         if ( !picture.load( copy.source ) ) {
+            report.skipped << QStringLiteral( "%1: not a picture this build can read." ).arg( name );
+            continue;
+         }
+         write = applyImage( copy.index, picture );
+      } else if ( esde ) {
+         report.skipped << QStringLiteral( "%1: ES-DE cannot play this video format." ).arg( name );
+         continue;
+      } else {
+         write = applyMediaFile( copy.index, false, copy.source, QLatin1String( Cst_VideoSuffixMp4 ) );
+      }
+
+      if ( !write ) {
+         rollbackMedia( writes );
+         return write;
+      }
+      writes.append( write.value() );
+   }
+
+   if ( writes.isEmpty() )
+      return report;
+
+   if ( const Result<> committed = commitMedia( writes ); !committed )
+      return committed;
+
+   report.copied = static_cast<int>( writes.size() );
+   return report;
 }
 
 bool Gamelist::sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const

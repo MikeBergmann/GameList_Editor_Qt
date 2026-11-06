@@ -36,6 +36,10 @@ void setTrashEnabled( bool aEnabled );
 // Atomic: an Error leaves any existing file at aPath as it was.
 Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent );
 
+// Renames aStaged to aTarget; a replaced aTarget is kept as *.gle-bak, whose name is returned
+// (empty if none). On an Error, aTarget is as it was and aStaged is gone.
+Result<QString> swapIn( const QString& aStaged, const QString& aTarget );
+
 // For files with several top-level elements (a gamelist beside <alternativeEmulator>,
 // es_settings.xml): the wrapper goes after the declaration so its encoding still applies.
 QByteArray wrapInRoot( const QByteArray& aXml, const char* aRoot );
