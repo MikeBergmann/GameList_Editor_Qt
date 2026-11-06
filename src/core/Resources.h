@@ -251,6 +251,10 @@ inline constexpr const char* Cst_IniProxyServer = "ProxyServer";
 inline constexpr const char* Cst_IniProxyPort = "ProxyPort";
 inline constexpr const char* Cst_IniProxyUse = "ProxyUse";
 inline constexpr const char* Cst_IniLastFolder = "LastFolder";
+
+inline constexpr const char* Cst_IniWindow = "Window";
+inline constexpr const char* Cst_IniGeometry = "Geometry";
+inline constexpr const char* Cst_IniSplitMain = "SplitMain";
 // Folder name -> known system's folder name ("amiga500" = "amiga"), for
 // folders the tables do not recognise.
 inline constexpr const char* Cst_IniSystemMap = "SystemMap";

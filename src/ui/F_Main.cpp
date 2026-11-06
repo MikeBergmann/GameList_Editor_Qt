@@ -58,9 +58,8 @@ Frm_Editor::Frm_Editor( QWidget* aParent ) : QMainWindow( aParent )
    buildMenu();
    buildCentralWidget();
    connectSignals();
-   LoadFromIni();
-
    resize( 1024, 700 );
+   LoadFromIni();
 }
 
 void Frm_Editor::buildMenu()
@@ -172,13 +171,13 @@ void Frm_Editor::buildCentralWidget()
    QWidget* central = new QWidget( this );
    QHBoxLayout* columns = new QHBoxLayout( central );
 
-   QSplitter* splitter = new QSplitter( Qt::Horizontal, central );
-   splitter->setChildrenCollapsible( false );
-   columns->addWidget( splitter );
+   Spl_Main = new QSplitter( Qt::Horizontal, central );
+   Spl_Main->setChildrenCollapsible( false );
+   columns->addWidget( Spl_Main );
 
-   splitter->addWidget( buildListColumn( splitter ) );
-   splitter->addWidget( buildEditorTabs( splitter ) );
-   splitter->setStretchFactor( 1, 1 );
+   Spl_Main->addWidget( buildListColumn( Spl_Main ) );
+   Spl_Main->addWidget( buildEditorTabs( Spl_Main ) );
+   Spl_Main->setStretchFactor( 1, 1 );
 
    setCentralWidget( central );
 }
@@ -383,6 +382,11 @@ void Frm_Editor::LoadFromIni()
    // In menu order, so God mode is set before the option it gates.
    for ( const Option& option : std::as_const( FOptions ) )
       option.action->setChecked( settings.value( QLatin1String( option.key ), option.fallback ).toBool() );
+
+   settings.endGroup();
+   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
+   restoreGeometry( settings.value( QLatin1String( Cst_IniGeometry ) ).toByteArray() );
+   Spl_Main->restoreState( settings.value( QLatin1String( Cst_IniSplitMain ) ).toByteArray() );
 }
 
 void Frm_Editor::SaveToIni()
@@ -396,6 +400,11 @@ void Frm_Editor::SaveToIni()
    // Without god mode there is no delete to skip the prompt for.
    settings.setValue( QLatin1String( Cst_IniDelWoPrompt ),
                       Mnu_GodMode->isChecked() && Mnu_DeleteWoPrompt->isChecked() );
+
+   settings.endGroup();
+   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
+   settings.setValue( QLatin1String( Cst_IniGeometry ), saveGeometry() );
+   settings.setValue( QLatin1String( Cst_IniSplitMain ), Spl_Main->saveState() );
 }
 
 void Frm_Editor::showTipsAtStart()
