@@ -1,368 +1,114 @@
 #include "Resources.h"
 
-const char* const Cst_SystemKindStr[skCount] = {
-   "Nintendo",                    // skNES
-   "Super Nintendo",              // skSNES
-   "Master System",               // skMasterSystem
-   "MegaDrive",                   // skMegaDrive
-   "Neo Geo",                     // skNeoGeo
-   "Amstrad CPC",                 // skCPC
-   "Atari 2600",                  // skAT2600
-   "Atari 7800",                  // skAT7800
-   "Atari ST",                    // skATST
-   "CaveStory",                   // skCS
-   "Family Computer Disk",        // skFCD
-   "Final Burn Alpha",            // skFBA
-   "Final Burn Alpha Libretro",   // skFBALib
-   "Game & Watch",                // skGW
-   "Gameboy Color",               // skGBC
-   "Game Gear",                   // skGG
-   "Gameboy",                     // skGB
-   "Gameboy Advance",             // skGBA
-   "Lutro",                       // skLU
-   "Lynx",                        // skLYNX
-   "Mame",                        // skMAME
-   "MSX 1-2-2+",                  // skMSX
-   "MSX 1",                       // skMSX1
-   "MSX 2+",                      // skMSX2
-   "Neo Geo Pocket B&W",          // skNGP
-   "Neo Geo Pocket Color",        // skNGPC
-   "Nintendo 64",                 // skN64
-   "Odyssey 2",                   // skODY
-   "PC Engine",                   // skPCE
-   "PC Engine CD",                // skPCECD
-   "Playstation",                 // skPS
-   "PR Boom",                     // skPRB
-   "Scumm VM",                    // skSVM
-   "Sega 32X",                    // skS32X
-   "Sega CD",                     // skSCD
-   "Sega SG 1000",                // skSG1000
-   "Supergrafx",                  // skSGFX
-   "Vectrex",                     // skVCX
-   "Virtual Boy",                 // skVB
-   "Wonderswan B&W",              // skWS
-   "Wonderswan Color",            // skWSC
-   "ZX Spectrum",                 // skZXS
-   "ZX81",                        // skZX81
-   "Amiga 1200",                  // skAM1200
-   "Amiga 600",                   // skAM600
-   "Apple II",                    // skAPPLE
-   "Colecovision",                // skCV
-   "Commodore 64",                // skC64
-   "DosBox",                      // skDB
-   "Dreamcast",                   // skDC
-   "Gamecube",                    // skGC
-   "Playstation Portable",        // skPSP
-   "Wii",                         // skWII
-   "Genesis",                     // skGenesis
-   "3DO",                         // sk3do
-   "Amiga",                       // skAM
-   "Amiga CD",                    // skAMCD
-   "Arcade",                      // skARC
-   "Atari 5200",                  // skAT5200
-   "Atari Lynx",                  // skATLX
-   "CDTV",                        // skCDTV
-   "Colecovision",                // skCV2
-   "Daphne",                      // skDaphne
-   "Amstrad GX4000",              // skGX4000
-   "Intellivision",               // skIV
-   "Naomi",                       // skNaomi
-   "NeoGeo CD",                   // skNGCD
-   "OpenBor",                     // skOB
-   "Ports",                       // skPorts
-   "Sega Saturn",                 // skSS
-   "Super Nintendo CD",           // skSNESCD
-   "Sharp X68000",                // skX68000
-   "Atomiswave",                  // skAW
-   "TI-99",                       // skTI99
-   "Super Nintendo MSU1",         // skMSU1
-   "Game & Watch",                // skGW2
-   "Nintendo DS",                 // skNDS
-   "Odyssey 2",                   // skODY2
-   "PC Engine",                   // skTG
-   "PC Engine CD",                // skTGCD
-   "PSP Minis",                   // skPSPM
-   "Windows",                     // skWindows
-   "Android",                     // skAndroid
-   "Other",                       // skOther
-};
+#include <iterator>
 
-const char* const Cst_SystemKindFolderNames[skCount] = {
-   "nes",                         // skNES
-   "snes",                        // skSNES
-   "mastersystem",                // skMasterSystem
-   "megadrive",                   // skMegaDrive
-   "neogeo",                      // skNeoGeo
-   "amstradcpc",                  // skCPC
-   "atari2600",                   // skAT2600
-   "atari7800",                   // skAT7800
-   "atarist",                     // skATST
-   "cavestory",                   // skCS
-   "fds",                         // skFCD
-   "fba",                         // skFBA
-   "fba_libretro",                // skFBALib
-   "gw",                          // skGW
-   "gbc",                         // skGBC
-   "gamegear",                    // skGG
-   "gb",                          // skGB
-   "gba",                         // skGBA
-   "lutro",                       // skLU
-   "lynx",                        // skLYNX
-   "mame",                        // skMAME
-   "msx",                         // skMSX
-   "msx1",                        // skMSX1
-   "msx2",                        // skMSX2
-   "ngp",                         // skNGP
-   "ngpc",                        // skNGPC
-   "n64",                         // skN64
-   "o2em",                        // skODY
-   "pcengine",                    // skPCE
-   "pcenginecd",                  // skPCECD
-   "psx",                         // skPS
-   "prboom",                      // skPRB
-   "scummvm",                     // skSVM
-   "sega32x",                     // skS32X
-   "segacd",                      // skSCD
-   "sg1000",                      // skSG1000
-   "supergrafx",                  // skSGFX
-   "vectrex",                     // skVCX
-   "virtualboy",                  // skVB
-   "wswan",                       // skWS
-   "wswanc",                      // skWSC
-   "zxspectrum",                  // skZXS
-   "zx81",                        // skZX81
-   "amiga1200",                   // skAM1200
-   "amiga600",                    // skAM600
-   "apple2",                      // skAPPLE
-   "colecovision",                // skCV
-   "c64",                         // skC64
-   "dos",                         // skDB
-   "dreamcast",                   // skDC
-   "gc",                          // skGC
-   "psp",                         // skPSP
-   "wii",                         // skWII
-   "genesis",                     // skGenesis
-   "3do",                         // sk3do
-   "amiga",                       // skAM
-   "amigacd32",                   // skAMCD
-   "arcade",                      // skARC
-   "atari5200",                   // skAT5200
-   "atarilynx",                   // skATLX
-   "cdtv",                        // skCDTV
-   "coleco",                      // skCV2
-   "daphne",                      // skDaphne
-   "gx4000",                      // skGX4000
-   "intellivision",               // skIV
-   "naomi",                       // skNaomi
-   "neogeocd",                    // skNGCD
-   "openbor",                     // skOB
-   "ports",                       // skPorts
-   "saturn",                      // skSS
-   "snescd",                      // skSNESCD
-   "x68000",                      // skX68000
-   "atomiswave",                  // skAW
-   "ti99",                        // skTI99
-   "snesmsu1",                    // skMSU1
-   "gameandwatch",                // skGW2
-   "nds",                         // skNDS
-   "odyssey2",                    // skODY2
-   "tg16",                        // skTG
-   "tg16cd",                      // skTGCD
-   "pspminis",                    // skPSPM
-   "windows",                     // skWindows
-   "android",                     // skAndroid
-   "",                            // skOther
-};
-
-const char* const Cst_SystemKindImageNames[skCount] = {
-   "nes.png",                     // skNES
-   "snes.png",                    // skSNES
-   "mastersystem.png",            // skMasterSystem
-   "megadrive.png",               // skMegaDrive
-   "neogeo.png",                  // skNeoGeo
-   "amstradcpc.png",              // skCPC
-   "atari2600.png",               // skAT2600
-   "atari7800.png",               // skAT7800
-   "atarist.png",                 // skATST
-   "cavestory.png",               // skCS
-   "fds.png",                     // skFCD
-   "fba.png",                     // skFBA
-   "fba_libretro.png",            // skFBALib
-   "gw.png",                      // skGW
-   "gbc.png",                     // skGBC
-   "gamegear.png",                // skGG
-   "gb.png",                      // skGB
-   "gba.png",                     // skGBA
-   "lutro.png",                   // skLU
-   "lynx.png",                    // skLYNX
-   "mame.png",                    // skMAME
-   "msx.png",                     // skMSX
-   "msx1.png",                    // skMSX1
-   "msx2.png",                    // skMSX2
-   "ngp.png",                     // skNGP
-   "ngpc.png",                    // skNGPC
-   "n64.png",                     // skN64
-   "o2em.png",                    // skODY
-   "pcengine.png",                // skPCE
-   "pcenginecd.png",              // skPCECD
-   "psx.png",                     // skPS
-   "prboom.png",                  // skPRB
-   "scummvm.png",                 // skSVM
-   "sega32x.png",                 // skS32X
-   "segacd.png",                  // skSCD
-   "sg1000.png",                  // skSG1000
-   "supergrafx.png",              // skSGFX
-   "vectrex.png",                 // skVCX
-   "virtualboy.png",              // skVB
-   "wswan.png",                   // skWS
-   "wswanc.png",                  // skWSC
-   "zxspectrum.png",              // skZXS
-   "zx81.png",                    // skZX81
-   "amiga1200.png",               // skAM1200
-   "amiga600.png",                // skAM600
-   "apple2.png",                  // skAPPLE
-   "colecovision.png",            // skCV
-   "c64.png",                     // skC64
-   "dos.png",                     // skDB
-   "dreamcast.png",               // skDC
-   "gc.png",                      // skGC
-   "psp.png",                     // skPSP
-   "wii.png",                     // skWII
-   "genesis.png",                 // skGenesis
-   "3do.png",                     // sk3do
-   "amiga.png",                   // skAM
-   "amigacd32.png",               // skAMCD
-   "arcade.png",                  // skARC
-   "atari5200.png",               // skAT5200
-   "lynx.png",                    // skATLX
-   "cdtv.png",                    // skCDTV
-   "colecovision.png",            // skCV2
-   "daphne.png",                  // skDaphne
-   "gx4000.png",                  // skGX4000
-   "intellivision.png",           // skIV
-   "naomi.png",                   // skNaomi
-   "neogeocd.png",                // skNGCD
-   "openbor.png",                 // skOB
-   "ports.png",                   // skPorts
-   "saturn.png",                  // skSS
-   "snescd.png",                  // skSNESCD
-   "x68000.png",                  // skX68000
-   "atomiswave.png",              // skAW
-   "ti99.png",                    // skTI99
-   "snesmsu1.png",                // skMSU1
-   "gw.png",                      // skGW2
-   "nds.png",                     // skNDS
-   "o2em.png",                    // skODY2
-   "pcengine.png",                // skTG
-   "pcenginecd.png",              // skTGCD
-   "pspminis.png",                // skPSPM
-   "other.png",                   // skWindows
-   "other.png",                   // skAndroid
-   "other.png",                   // skOther
-};
-
-// Screenscraper.fr system IDs, retrieved with this URL:
-// https://www.screenscraper.fr/api2/systemesListe.php?devid=xxx&devpassword=yyy&softname=zzz&output=XML&ssid=test&sspassword=test
 // clang-format off
-const char* const Cst_SystemKindId[skCount] = {
-   "3", "4", "2", "1", "75", "65", "26", "41", "42", "138", "106", "75",
-   "75", "52", "10", "21", "9", "12", "75", "28", "75", "113", "113", "113",
-   "25", "82", "14", "104", "31", "114", "57", "135", "123", "19", "20", "109",
-   "105", "102", "11", "45", "46", "76", "77", "64", "64", "86", "48", "66",
-   "135", "23", "13", "61", "16", "1", "29", "64", "130", "75", "40", "28",
-   "129", "48", "49", "87", "115", "56", "70", "214", "135", "22", "210", "79",
-   "53", "205", "210", "52", "15", "104", "31", "114", "172", "138", "63", "0",
+constexpr SystemInfo Cst_Systems[] = {
+   { skNES,          "Nintendo",                  "nes",           "nes.png",           "3",   "Nintendo Entertainment System"       },
+   { skSNES,         "Super Nintendo",            "snes",          "snes.png",          "4",   "Super Nintendo Entertainment System" },
+   { skMasterSystem, "Master System",             "mastersystem",  "mastersystem.png",  "2",   "Sega Master System"                  },
+   { skMegaDrive,    "MegaDrive",                 "megadrive",     "megadrive.png",     "1",   "Sega Genesis"                        },
+   { skNeoGeo,       "Neo Geo",                   "neogeo",        "neogeo.png",        "75",  "SNK Neo Geo AES"                     },
+   { skCPC,          "Amstrad CPC",               "amstradcpc",    "amstradcpc.png",    "65",  "Amstrad CPC"                         },
+   { skAT2600,       "Atari 2600",                "atari2600",     "atari2600.png",     "26",  "Atari 2600"                          },
+   { skAT7800,       "Atari 7800",                "atari7800",     "atari7800.png",     "41",  "Atari 7800"                          },
+   { skATST,         "Atari ST",                  "atarist",       "atarist.png",       "42",  "Atari ST"                            },
+   { skCS,           "CaveStory",                 "cavestory",     "cavestory.png",     "138", ""                                    },
+   { skFCD,          "Family Computer Disk",      "fds",           "fds.png",           "106", "Nintendo Famicom Disk System"        },
+   { skFBA,          "Final Burn Alpha",          "fba",           "fba.png",           "75",  "Arcade"                              },
+   { skFBALib,       "Final Burn Alpha Libretro", "fba_libretro",  "fba_libretro.png",  "75",  "Arcade"                              },
+   { skGW,           "Game & Watch",              "gw",            "gw.png",            "52",  "Nintendo Game & Watch"               },
+   { skGBC,          "Gameboy Color",             "gbc",           "gbc.png",           "10",  "Nintendo Game Boy Color"             },
+   { skGG,           "Game Gear",                 "gamegear",      "gamegear.png",      "21",  "Sega Game Gear"                      },
+   { skGB,           "Gameboy",                   "gb",            "gb.png",            "9",   "Nintendo Game Boy"                   },
+   { skGBA,          "Gameboy Advance",           "gba",           "gba.png",           "12",  "Nintendo Game Boy Advance"           },
+   { skLU,           "Lutro",                     "lutro",         "lutro.png",         "75",  ""                                    },
+   { skLYNX,         "Lynx",                      "lynx",          "lynx.png",          "28",  "Atari Lynx"                          },
+   { skMAME,         "Mame",                      "mame",          "mame.png",          "75",  "Arcade"                              },
+   { skMSX,          "MSX 1-2-2+",                "msx",           "msx.png",           "113", "Microsoft MSX"                       },
+   { skMSX1,         "MSX 1",                     "msx1",          "msx1.png",          "113", "Microsoft MSX"                       },
+   { skMSX2,         "MSX 2+",                    "msx2",          "msx2.png",          "113", "Microsoft MSX2"                      },
+   { skNGP,          "Neo Geo Pocket B&W",        "ngp",           "ngp.png",           "25",  "SNK Neo Geo Pocket"                  },
+   { skNGPC,         "Neo Geo Pocket Color",      "ngpc",          "ngpc.png",          "82",  "SNK Neo Geo Pocket Color"            },
+   { skN64,          "Nintendo 64",               "n64",           "n64.png",           "14",  "Nintendo 64"                         },
+   { skODY,          "Odyssey 2",                 "o2em",          "o2em.png",          "104", "Magnavox Odyssey 2"                  },
+   { skPCE,          "PC Engine",                 "pcengine",      "pcengine.png",      "31",  "NEC TurboGrafx-16"                   },
+   { skPCECD,        "PC Engine CD",              "pcenginecd",    "pcenginecd.png",    "114", "NEC TurboGrafx-CD"                   },
+   { skPS,           "Playstation",               "psx",           "psx.png",           "57",  "Sony Playstation"                    },
+   { skPRB,          "PR Boom",                   "prboom",        "prboom.png",        "135", ""                                    },
+   { skSVM,          "Scumm VM",                  "scummvm",       "scummvm.png",       "123", "ScummVM"                             },
+   { skS32X,         "Sega 32X",                  "sega32x",       "sega32x.png",       "19",  "Sega 32X"                            },
+   { skSCD,          "Sega CD",                   "segacd",        "segacd.png",        "20",  "Sega CD"                             },
+   { skSG1000,       "Sega SG 1000",              "sg1000",        "sg1000.png",        "109", "Sega SG-1000"                        },
+   { skSGFX,         "Supergrafx",                "supergrafx",    "supergrafx.png",    "105", "PC Engine SuperGrafx"                },
+   { skVCX,          "Vectrex",                   "vectrex",       "vectrex.png",       "102", "GCE Vectrex"                         },
+   { skVB,           "Virtual Boy",               "virtualboy",    "virtualboy.png",    "11",  "Nintendo Virtual Boy"                },
+   { skWS,           "Wonderswan B&W",            "wswan",         "wswan.png",         "45",  "WonderSwan"                          },
+   { skWSC,          "Wonderswan Color",          "wswanc",        "wswanc.png",        "46",  "WonderSwan Color"                    },
+   { skZXS,          "ZX Spectrum",               "zxspectrum",    "zxspectrum.png",    "76",  "Sinclair ZX Spectrum"                },
+   { skZX81,         "ZX81",                      "zx81",          "zx81.png",          "77",  "Sinclair ZX-81"                      },
+   { skAM1200,       "Amiga 1200",                "amiga1200",     "amiga1200.png",     "64",  "Commodore Amiga"                     },
+   { skAM600,        "Amiga 600",                 "amiga600",      "amiga600.png",      "64",  "Commodore Amiga"                     },
+   { skAPPLE,        "Apple II",                  "apple2",        "apple2.png",        "86",  "Apple II"                            },
+   { skCV,           "Colecovision",              "colecovision",  "colecovision.png",  "48",  "ColecoVision"                        },
+   { skC64,          "Commodore 64",              "c64",           "c64.png",           "66",  "Commodore 64"                        },
+   { skDB,           "DosBox",                    "dos",           "dos.png",           "135", "MS-DOS"                              },
+   { skDC,           "Dreamcast",                 "dreamcast",     "dreamcast.png",     "23",  "Sega Dreamcast"                      },
+   { skGC,           "Gamecube",                  "gc",            "gc.png",            "13",  "Nintendo GameCube"                   },
+   { skPSP,          "Playstation Portable",      "psp",           "psp.png",           "61",  "Sony PSP"                            },
+   { skWII,          "Wii",                       "wii",           "wii.png",           "16",  "Nintendo Wii"                        },
+   { skGenesis,      "Genesis",                   "genesis",       "genesis.png",       "1",   "Sega Genesis"                        },
+   { sk3do,          "3DO",                       "3do",           "3do.png",           "29",  "3DO Interactive Multiplayer"         },
+   { skAM,           "Amiga",                     "amiga",         "amiga.png",         "64",  "Commodore Amiga"                     },
+   { skAMCD,         "Amiga CD",                  "amigacd32",     "amigacd32.png",     "130", "Commodore Amiga CD32"                },
+   { skARC,          "Arcade",                    "arcade",        "arcade.png",        "75",  "Arcade"                              },
+   { skAT5200,       "Atari 5200",                "atari5200",     "atari5200.png",     "40",  "Atari 5200"                          },
+   { skATLX,         "Atari Lynx",                "atarilynx",     "lynx.png",          "28",  "Atari Lynx"                          },
+   { skCDTV,         "CDTV",                      "cdtv",          "cdtv.png",          "129", "Commodore CDTV"                      },
+   { skCV2,          "Colecovision",              "coleco",        "colecovision.png",  "48",  "ColecoVision"                        },
+   { skDaphne,       "Daphne",                    "daphne",        "daphne.png",        "49",  ""                                    },
+   { skGX4000,       "Amstrad GX4000",            "gx4000",        "gx4000.png",        "87",  "Amstrad GX4000"                      },
+   { skIV,           "Intellivision",             "intellivision", "intellivision.png", "115", "Mattel Intellivision"                },
+   { skNaomi,        "Naomi",                     "naomi",         "naomi.png",         "56",  "Sega Naomi"                          },
+   { skNGCD,         "NeoGeo CD",                 "neogeocd",      "neogeocd.png",      "70",  "SNK Neo Geo CD"                      },
+   { skOB,           "OpenBor",                   "openbor",       "openbor.png",       "214", "OpenBOR"                             },
+   { skPorts,        "Ports",                     "ports",         "ports.png",         "135", ""                                    },
+   { skSS,           "Sega Saturn",               "saturn",        "saturn.png",        "22",  "Sega Saturn"                         },
+   { skSNESCD,       "Super Nintendo CD",         "snescd",        "snescd.png",        "210", ""                                    },
+   { skX68000,       "Sharp X68000",              "x68000",        "x68000.png",        "79",  "Sharp X68000"                        },
+   { skAW,           "Atomiswave",                "atomiswave",    "atomiswave.png",    "53",  "Sammy Atomiswave"                    },
+   { skTI99,         "TI-99",                     "ti99",          "ti99.png",          "205", "Texas Instruments TI 99/4A"          },
+   { skMSU1,         "Super Nintendo MSU1",       "snesmsu1",      "snesmsu1.png",      "210", "Super Nintendo Entertainment System" },
+   { skGW2,          "Game & Watch",              "gameandwatch",  "gw.png",            "52",  "Nintendo Game & Watch"               },
+   { skNDS,          "Nintendo DS",               "nds",           "nds.png",           "15",  "Nintendo DS"                         },
+   { skODY2,         "Odyssey 2",                 "odyssey2",      "o2em.png",          "104", "Magnavox Odyssey 2"                  },
+   { skTG,           "PC Engine",                 "tg16",          "pcengine.png",      "31",  "NEC TurboGrafx-16"                   },
+   { skTGCD,         "PC Engine CD",              "tg16cd",        "pcenginecd.png",    "114", "NEC TurboGrafx-CD"                   },
+   { skPSPM,         "PSP Minis",                 "pspminis",      "pspminis.png",      "172", "Sony PSP Minis"                      },
+   { skWindows,      "Windows",                   "windows",       "other.png",         "138", "Windows"                             },
+   { skAndroid,      "Android",                   "android",       "other.png",         "63",  "Android"                             },
+   { skOther,        "Other",                     "",              "other.png",         "0",   ""                                    },
 };
+// clang-format on
 
-// Checked against Platforms.xml of the dump. Mega Drive and Genesis share "Sega Genesis", the
-// only name Metadata.xml has for them; MAME-like kinds all map to "Arcade".
-const char* const Cst_SystemKindLbName[skCount] = {
-   "Nintendo Entertainment System",        // skNES
-   "Super Nintendo Entertainment System",  // skSNES
-   "Sega Master System",                   // skMasterSystem
-   "Sega Genesis",                         // skMegaDrive
-   "SNK Neo Geo AES",                      // skNeoGeo
-   "Amstrad CPC",                          // skCPC
-   "Atari 2600",                           // skAT2600
-   "Atari 7800",                           // skAT7800
-   "Atari ST",                             // skATST
-   "",                                     // skCS
-   "Nintendo Famicom Disk System",         // skFCD
-   "Arcade",                               // skFBA
-   "Arcade",                               // skFBALib
-   "Nintendo Game & Watch",                // skGW
-   "Nintendo Game Boy Color",              // skGBC
-   "Sega Game Gear",                       // skGG
-   "Nintendo Game Boy",                    // skGB
-   "Nintendo Game Boy Advance",            // skGBA
-   "",                                     // skLU
-   "Atari Lynx",                           // skLYNX
-   "Arcade",                               // skMAME
-   "Microsoft MSX",                        // skMSX
-   "Microsoft MSX",                        // skMSX1
-   "Microsoft MSX2",                       // skMSX2
-   "SNK Neo Geo Pocket",                   // skNGP
-   "SNK Neo Geo Pocket Color",             // skNGPC
-   "Nintendo 64",                          // skN64
-   "Magnavox Odyssey 2",                   // skODY
-   "NEC TurboGrafx-16",                    // skPCE
-   "NEC TurboGrafx-CD",                    // skPCECD
-   "Sony Playstation",                     // skPS
-   "",                                     // skPRB
-   "ScummVM",                              // skSVM
-   "Sega 32X",                             // skS32X
-   "Sega CD",                              // skSCD
-   "Sega SG-1000",                         // skSG1000
-   "PC Engine SuperGrafx",                 // skSGFX
-   "GCE Vectrex",                          // skVCX
-   "Nintendo Virtual Boy",                 // skVB
-   "WonderSwan",                           // skWS
-   "WonderSwan Color",                     // skWSC
-   "Sinclair ZX Spectrum",                 // skZXS
-   "Sinclair ZX-81",                       // skZX81
-   "Commodore Amiga",                      // skAM1200
-   "Commodore Amiga",                      // skAM600
-   "Apple II",                             // skAPPLE
-   "ColecoVision",                         // skCV
-   "Commodore 64",                         // skC64
-   "MS-DOS",                               // skDB
-   "Sega Dreamcast",                       // skDC
-   "Nintendo GameCube",                    // skGC
-   "Sony PSP",                             // skPSP
-   "Nintendo Wii",                         // skWII
-   "Sega Genesis",                         // skGenesis
-   "3DO Interactive Multiplayer",          // sk3do
-   "Commodore Amiga",                      // skAM
-   "Commodore Amiga CD32",                 // skAMCD
-   "Arcade",                               // skARC
-   "Atari 5200",                           // skAT5200
-   "Atari Lynx",                           // skATLX
-   "Commodore CDTV",                       // skCDTV
-   "ColecoVision",                         // skCV2
-   "",                                     // skDaphne
-   "Amstrad GX4000",                       // skGX4000
-   "Mattel Intellivision",                 // skIV
-   "Sega Naomi",                           // skNaomi
-   "SNK Neo Geo CD",                       // skNGCD
-   "OpenBOR",                              // skOB
-   "",                                     // skPorts
-   "Sega Saturn",                          // skSS
-   "",                                     // skSNESCD
-   "Sharp X68000",                         // skX68000
-   "Sammy Atomiswave",                     // skAW
-   "Texas Instruments TI 99/4A",           // skTI99
-   "Super Nintendo Entertainment System",  // skMSU1
-   "Nintendo Game & Watch",                // skGW2
-   "Nintendo DS",                          // skNDS
-   "Magnavox Odyssey 2",                   // skODY2
-   "NEC TurboGrafx-16",                    // skTG
-   "NEC TurboGrafx-CD",                    // skTGCD
-   "Sony PSP Minis",                      // skPSPM
-   "Windows",                              // skWindows
-   "Android",                              // skAndroid
-   "",                                     // skOther
-};
+constexpr bool systemsInOrder()
+{
+   for ( int i = 0; i < skCount; ++i ) {
+      if ( Cst_Systems[i].kind != i )
+         return false;
+   }
+   return true;
+}
 
+static_assert( std::size( Cst_Systems ) == skCount, "one row per SystemKind" );
+static_assert( systemsInOrder(), "rows must follow the SystemKind enum order" );
+
+const SystemInfo& systemInfo( SystemKind aKind )
+{
+   return Cst_Systems[aKind];
+}
+
+// clang-format off
 const char* const Cst_CountryName[cnCount] = {
    "", "de", "asi", "au", "br", "bg", "ca", "cl", "cn", "ame",
    "kr", "cus", "dk", "sp", "eu", "fi", "fr", "gr", "hu", "il",
@@ -420,7 +166,7 @@ const char* const Cst_LangNameStr[lnCount] = { "fr", "de", "en", "es", "pt_BR" }
 SystemKind systemKindFromFolder( const QString& aFolderName )
 {
    for ( int kind = 0; kind < skCount; ++kind ) {
-      if ( aFolderName == QLatin1String( Cst_SystemKindFolderNames[kind] ) )
+      if ( aFolderName == QLatin1String( Cst_Systems[kind].folder ) )
          return static_cast<SystemKind>( kind );
    }
 

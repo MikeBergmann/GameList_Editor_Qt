@@ -1140,6 +1140,51 @@ TEST( Gamelist, NewMediaNeverTakesAFileAnotherGameHas )
    EXPECT_EQ( list.at( 1 ).imagePath, QStringLiteral( "./media/images/Sonic.7z.png" ) );
 }
 
+constexpr const char* Cst_DashGamelist = R"(<gameList>
+   <game><path>./A.zip</path><image>./images/A-image.png</image><video>./videos/A-video.mp4</video></game>
+   <game><path>./B.zip</path></game>
+</gameList>)";
+
+QImage dashPicture()
+{
+   QImage picture( 2, 2, QImage::Format_RGB32 );
+   picture.fill( Qt::red );
+   return picture;
+}
+
+TEST( Gamelist, NewMediaFollowsTheDashStyleOfTheFirstLinkedGame )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), Cst_DashGamelist );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   ASSERT_TRUE( list.setImage( 1, dashPicture() ) );
+   EXPECT_EQ( list.at( 1 ).imagePath, QStringLiteral( "./images/B-image.png" ) );
+
+   writeFile( fixture.path( "clip.mp4" ), "clip" );
+   ASSERT_TRUE( list.setVideo( 1, fixture.path( "clip.mp4" ) ) );
+   EXPECT_EQ( list.at( 1 ).videoPath, QStringLiteral( "./videos/B-video.mp4" ) );
+
+   ASSERT_TRUE( list.setImage( 0, dashPicture() ) );
+   EXPECT_EQ( list.at( 0 ).imagePath, QStringLiteral( "./images/A-image.png" ) )
+      << "a re-scrape replaces the dash file in place";
+}
+
+TEST( Gamelist, NewMediaStaysPlainWhenTheLinkIsTheGamesOwnNameNotADashName )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ),
+              "<gameList><game><path>./Foo-image.zip</path><image>./plain/Foo-image.png</image></game>"
+              "<game><path>./B.zip</path></game></gameList>" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   ASSERT_TRUE( list.setImage( 1, dashPicture() ) );
+   EXPECT_EQ( list.at( 1 ).imagePath, QStringLiteral( "./plain/B.png" ) )
+      << "Foo-image is the ROM's real name here, not a suffix";
+}
+
 TEST( Gamelist, ChangeAllWritesOneFilePerGameEvenWithTheSameStem )
 {
    Fixture fixture;

@@ -199,17 +199,17 @@ TEST( SystemDisplayName, ShowsTheTableNameAndTheFolderOnlyWhenItDiffers )
    EXPECT_EQ( systemDisplayName( { QStringLiteral( "mystery" ), skOther, QString() }, false ),
               QStringLiteral( "mystery" ) );
 
-   const QString plain = systemDisplayName( { QLatin1String( Cst_SystemKindFolderNames[skAM] ), skAM, QString() }, false );
-   EXPECT_EQ( plain, QLatin1String( Cst_SystemKindStr[skAM] ) );
+   const QString plain = systemDisplayName( { QLatin1String( systemInfo( skAM ).folder ), skAM, QString() }, false );
+   EXPECT_EQ( plain, QLatin1String( systemInfo( skAM ).name ) );
    EXPECT_EQ( systemDisplayName( { QStringLiteral( "amiga500" ), skAM, QString() }, false ),
               plain + QStringLiteral( " (amiga500)" ) );
 }
 
 TEST( SystemDisplayName, GenesisRenamesOnlyTheMegaDrive )
 {
-   const SystemEntry megaDrive{ QLatin1String( Cst_SystemKindFolderNames[skMegaDrive] ), skMegaDrive, QString() };
-   EXPECT_EQ( systemDisplayName( megaDrive, false ), QLatin1String( Cst_SystemKindStr[skMegaDrive] ) );
-   EXPECT_EQ( systemDisplayName( megaDrive, true ), QLatin1String( Cst_SystemKindStr[skGenesis] ) );
+   const SystemEntry megaDrive{ QLatin1String( systemInfo( skMegaDrive ).folder ), skMegaDrive, QString() };
+   EXPECT_EQ( systemDisplayName( megaDrive, false ), QLatin1String( systemInfo( skMegaDrive ).name ) );
+   EXPECT_EQ( systemDisplayName( megaDrive, true ), QLatin1String( systemInfo( skGenesis ).name ) );
 }
 
 }  // namespace
