@@ -650,7 +650,7 @@ void Frm_Editor::LoadSystemLogo( SystemKind aKind )
 
    // A missing logo file just clears the label.
    if ( !FSystemLogo.load( QLatin1String( Cst_LogoPicsFolder ) +
-                           QLatin1String( Cst_SystemKindImageNames[kind] ) ) ) {
+                           QLatin1String( systemInfo( kind ).logo ) ) ) {
       clearSystemLogo();
       return;
    }

@@ -527,7 +527,7 @@ void ScrapePanel::requestScrape()
    const Game& game = FGamelist->at( FIndex );
 
    ScrapeRequest request;
-   request.systemId = QLatin1String( Cst_SystemKindId[FGamelist->system().kind] );
+   request.systemId = QLatin1String( systemInfo( FGamelist->system().kind ).ssId );
    request.manualCrc = Chk_ManualCRC->isChecked();
    request.crc32 = request.manualCrc ? Edt_ManualCRC->text() : game.crc32;
    request.romName = game.romName();
@@ -548,7 +548,7 @@ void ScrapePanel::refreshLaunchBox()
 void ScrapePanel::requestLaunchBox()
 {
    const QString platform =
-      QLatin1String( Cst_SystemKindLbName[FGamelist->system().kind] );
+      QLatin1String( systemInfo( FGamelist->system().kind ).lbName );
    if ( platform.isEmpty() ) {
       handleGameInfoFailed( QStringLiteral( "LaunchBox has no platform for this system." ), {} );
       return;
@@ -662,7 +662,7 @@ void ScrapePanel::searchScreenScraper( const QString& aText )
    FAwaitingSearch = true;
 
    ScrapeRequest request;
-   request.systemId = QLatin1String( Cst_SystemKindId[FGamelist->system().kind] );
+   request.systemId = QLatin1String( systemInfo( FGamelist->system().kind ).ssId );
    request.ssLogin = FSSLogin;
    request.ssPassword = FSSPassword;
    FScraper.searchGames( request, aText, FLanguage );

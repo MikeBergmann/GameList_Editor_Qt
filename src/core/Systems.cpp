@@ -158,17 +158,18 @@ void setSystemMapping( const QString& aFolderName, SystemKind aKind )
    if ( aKind == skOther )
       settings.remove( aFolderName );
    else
-      settings.setValue( aFolderName, QLatin1String( Cst_SystemKindFolderNames[aKind] ) );
+      settings.setValue( aFolderName, QLatin1String( systemInfo( aKind ).folder ) );
 }
 
 QVector<SystemKindChoice> systemKindChoices()
 {
    QVector<SystemKindChoice> choices;
-   for ( int kind = 0; kind < skOther; ++kind )
+   for ( int kind = 0; kind < skOther; ++kind ) {
+      const SystemInfo& info = systemInfo( static_cast<SystemKind>( kind ) );
       choices.append( { QStringLiteral( "%1 (%2)" )
-                           .arg( QLatin1String( Cst_SystemKindStr[kind] ),
-                                 QLatin1String( Cst_SystemKindFolderNames[kind] ) ),
+                           .arg( QLatin1String( info.name ), QLatin1String( info.folder ) ),
                         static_cast<SystemKind>( kind ) } );
+   }
 
    std::sort( choices.begin(), choices.end(), []( const SystemKindChoice& a, const SystemKindChoice& b ) {
       return a.label.compare( b.label, Qt::CaseInsensitive ) < 0;
@@ -182,12 +183,13 @@ QString systemDisplayName( const SystemEntry& aSystem, bool aGenesis )
    if ( aSystem.kind == skOther )
       return aSystem.folderName;
 
-   QString name = QLatin1String( Cst_SystemKindStr[aSystem.kind] );
+   const SystemInfo& info = systemInfo( aSystem.kind );
+   QString name = QLatin1String( info.name );
    if ( aSystem.kind == skMegaDrive && aGenesis )
-      name = QLatin1String( Cst_SystemKindStr[skGenesis] );
+      name = QLatin1String( systemInfo( skGenesis ).name );
 
    // A mapped folder ("amiga500" treated as Amiga) keeps its own name visible.
-   if ( aSystem.folderName != QLatin1String( Cst_SystemKindFolderNames[aSystem.kind] ) )
+   if ( aSystem.folderName != QLatin1String( info.folder ) )
       name += QStringLiteral( " (%1)" ).arg( aSystem.folderName );
    return name;
 }

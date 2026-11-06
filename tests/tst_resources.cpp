@@ -23,9 +23,23 @@ TEST( Resources, EverySystemHasADisplayNameAndAScraperId )
 {
    for ( int i = 0; i < skCount; ++i ) {
       SCOPED_TRACE( i );
-      EXPECT_STRNE( Cst_SystemKindStr[i], "" );
-      EXPECT_STRNE( Cst_SystemKindId[i], "" );
+      EXPECT_EQ( systemInfo( static_cast<SystemKind>( i ) ).kind, i );
+      EXPECT_STRNE( systemInfo( static_cast<SystemKind>( i ) ).name, "" );
+      EXPECT_STRNE( systemInfo( static_cast<SystemKind>( i ) ).ssId, "" );
    }
+}
+
+// A shifted row would send a system to another platform's scrape.
+TEST( Resources, ScreenscraperIdsArePinnedForKnownSystems )
+{
+   EXPECT_STREQ( systemInfo( skNES ).ssId, "3" );
+   EXPECT_STREQ( systemInfo( skSNES ).ssId, "4" );
+   EXPECT_STREQ( systemInfo( skMasterSystem ).ssId, "2" );
+   EXPECT_STREQ( systemInfo( skMegaDrive ).ssId, "1" );
+   EXPECT_STREQ( systemInfo( skGB ).ssId, "9" );
+   EXPECT_STREQ( systemInfo( skGBC ).ssId, "10" );
+   EXPECT_STREQ( systemInfo( skGBA ).ssId, "12" );
+   EXPECT_STREQ( systemInfo( skGG ).ssId, "21" );
 }
 
 // A table one row short leaves the tail null, a shifted row maps a system to the wrong platform.
@@ -33,27 +47,27 @@ TEST( Resources, LaunchBoxPlatformNamesLineUpWithTheKinds )
 {
    for ( int i = 0; i < skCount; ++i ) {
       SCOPED_TRACE( i );
-      EXPECT_NE( Cst_SystemKindLbName[i], nullptr );
+      EXPECT_NE( systemInfo( static_cast<SystemKind>( i ) ).lbName, nullptr );
    }
 
-   EXPECT_STREQ( Cst_SystemKindLbName[skNES], "Nintendo Entertainment System" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skMSX2], "Microsoft MSX2" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skGW2], "Nintendo Game & Watch" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skTI99], "Texas Instruments TI 99/4A" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skPSPM], "Sony PSP Minis" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skWindows], "Windows" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skAndroid], "Android" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skCS], "" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skOther], "" );
-   EXPECT_STREQ( Cst_SystemKindLbName[skMegaDrive], Cst_SystemKindLbName[skGenesis] );
+   EXPECT_STREQ( systemInfo( skNES ).lbName, "Nintendo Entertainment System" );
+   EXPECT_STREQ( systemInfo( skMSX2 ).lbName, "Microsoft MSX2" );
+   EXPECT_STREQ( systemInfo( skGW2 ).lbName, "Nintendo Game & Watch" );
+   EXPECT_STREQ( systemInfo( skTI99 ).lbName, "Texas Instruments TI 99/4A" );
+   EXPECT_STREQ( systemInfo( skPSPM ).lbName, "Sony PSP Minis" );
+   EXPECT_STREQ( systemInfo( skWindows ).lbName, "Windows" );
+   EXPECT_STREQ( systemInfo( skAndroid ).lbName, "Android" );
+   EXPECT_STREQ( systemInfo( skCS ).lbName, "" );
+   EXPECT_STREQ( systemInfo( skOther ).lbName, "" );
+   EXPECT_STREQ( systemInfo( skMegaDrive ).lbName, systemInfo( skGenesis ).lbName );
 }
 
 // The logo is loaded with no existence check, so every one has to be in the .qrc.
 TEST( Resources, EverySystemLogoResolvesInTheQrc )
 {
    for ( int i = 0; i < skCount; ++i ) {
-      const QString logo =
-         QLatin1String( Cst_LogoPicsFolder ) + QLatin1String( Cst_SystemKindImageNames[i] );
+      const QString logo = QLatin1String( Cst_LogoPicsFolder ) +
+                           QLatin1String( systemInfo( static_cast<SystemKind>( i ) ).logo );
       EXPECT_TRUE( QFile::exists( logo ) ) << logo.toStdString();
    }
 }
@@ -65,7 +79,7 @@ TEST( Resources, FolderNamesAreUniqueAndRoundTrip )
    QSet<QString> seen;
 
    for ( int i = 0; i < skCount; ++i ) {
-      const QString folder = QString::fromLatin1( Cst_SystemKindFolderNames[i] );
+      const QString folder = QString::fromLatin1( systemInfo( static_cast<SystemKind>( i ) ).folder );
       SCOPED_TRACE( folder.toStdString() );
 
       EXPECT_FALSE( seen.contains( folder ) );
@@ -82,7 +96,7 @@ TEST( Resources, SystemKindFromFolderFallsBackToOther )
    EXPECT_EQ( systemKindFromFolder( QStringLiteral( "NES" ) ), skOther );
 
    // skOther is the catch-all and its own folder name is empty.
-   EXPECT_STREQ( Cst_SystemKindFolderNames[skOther], "" );
+   EXPECT_STREQ( systemInfo( skOther ).folder, "" );
 }
 
 TEST( Resources, CountryShortNamesRoundTrip )

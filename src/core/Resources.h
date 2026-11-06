@@ -155,16 +155,24 @@ enum CountryName
 // const char*, not QString: Qt6 decodes those as UTF-8, which the accented
 // entries of Cst_CountryNameFull need, and they cost no static construction.
 
-// Display names of the systems.
-extern const char* const Cst_SystemKindStr[skCount];
-// Names of the per-system folders under the ROM root. Empty for skOther.
-extern const char* const Cst_SystemKindFolderNames[skCount];
-// File names under Cst_LogoPicsFolder. Not unique: several kinds share a logo.
-extern const char* const Cst_SystemKindImageNames[skCount];
-// screenscraper.fr system ids. Not unique either.
-extern const char* const Cst_SystemKindId[skCount];
-// LaunchBox platform names, as Metadata.xml writes them. Empty where LaunchBox has no equivalent.
-extern const char* const Cst_SystemKindLbName[skCount];
+struct SystemInfo
+{
+   SystemKind kind;
+   // Display name.
+   const char* name;
+   // Per-system folder under the ROM root. Empty for skOther.
+   const char* folder;
+   // File name under Cst_LogoPicsFolder. Not unique: several kinds share a logo.
+   const char* logo;
+   // screenscraper.fr system id (systemesListe.php). Not unique either.
+   const char* ssId;
+   // LaunchBox platform name, as Metadata.xml writes it. Empty where LaunchBox has none.
+   // Mega Drive and Genesis share "Sega Genesis"; MAME-like kinds all map to "Arcade".
+   const char* lbName;
+};
+
+// The row of aKind; the table is checked to follow the enum order.
+const SystemInfo& systemInfo( SystemKind aKind );
 
 // Two-letter codes as screenscraper.fr writes them. Cst_CountryName[cnUnd] is "".
 extern const char* const Cst_CountryName[cnCount];
