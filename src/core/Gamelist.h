@@ -59,6 +59,10 @@ struct MediaCopyReport
    QStringList skipped;  // one line per file left out, with the reason
 };
 
+// The lowercase extension ES-DE looks for in its picture or video folders; empty when it
+// does not read aSuffix.
+QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix );
+
 class Gamelist
 {
 public:

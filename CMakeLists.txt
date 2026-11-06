@@ -78,6 +78,7 @@ add_library( gle_core STATIC
    src/core/PathUtil.cpp
    src/core/Resources.cpp
    src/core/RomCopy.cpp
+   src/core/Sync.cpp
    src/core/Systems.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
@@ -163,6 +164,7 @@ add_executable( tests
    tests/tst_romcopy.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
+   tests/tst_sync.cpp
    tests/tst_systems.cpp
    Resources/assets.qrc
 )

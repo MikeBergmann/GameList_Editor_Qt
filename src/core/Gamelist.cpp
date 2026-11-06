@@ -125,6 +125,12 @@ Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
 
 }  // namespace
 
+QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix )
+{
+   const QString lower = aSuffix.toLower();
+   return ( aIsImage ? Cst_EsdeImageExtensions : Cst_EsdeVideoExtensions ).contains( lower ) ? lower : QString();
+}
+
 QString Gamelist::domText( int aIndex, const char* aName ) const
 {
    return childText( FEntries.value( aIndex ).node, aName );
@@ -895,18 +901,17 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies )
          continue;
 
       const QString suffix = QFileInfo( copy.source ).suffix();
-      const QString lower = suffix.toLower();
+      const QString esdeSuffix = esdeMediaSuffix( copy.isImage, suffix );
       const QString name = QFileInfo( copy.source ).fileName();
 
       // ES-DE tries lowercase extensions from a short list; anything else is converted
       // (pictures) or reported (videos).
-      const bool keep = !suffix.isEmpty() &&
-                        ( !esde || ( copy.isImage ? Cst_EsdeImageExtensions : Cst_EsdeVideoExtensions ).contains( lower ) );
+      const bool keep = esde ? !esdeSuffix.isEmpty() : !suffix.isEmpty();
 
       Result<MediaWrite> write = Error{ QString() };
       if ( keep ) {
          write = applyMediaFile( copy.index, copy.isImage, copy.source,
-                                 QLatin1Char( '.' ) + ( esde ? lower : suffix ) );
+                                 QLatin1Char( '.' ) + ( esde ? esdeSuffix : suffix ) );
       } else if ( copy.isImage ) {
          QImage picture;
          if ( !picture.load( copy.source ) ) {
