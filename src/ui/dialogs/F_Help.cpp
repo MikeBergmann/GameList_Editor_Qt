@@ -7,110 +7,60 @@
 
 namespace {
 
-struct HelpSection
-{
-   const char* title;
-   const char* body;
-};
+// Shown at startup: short enough to read without scrolling.
+const char* const Cst_TipsHtml =
+   "<h3>Welcome</h3>"
+   "<ul>"
+   "<li>Choose your folder with <b>File, Choose folder...</b>: the one holding your system "
+   "folders, or the ES-DE folder.</li>"
+   "<li><b>Stop EmulationStation first.</b> It rewrites <code>gamelist.xml</code> when it exits "
+   "and would overwrite anything saved here.</li>"
+   "<li>Select a game, edit it, click <b>Save Changes</b>. Select several games to edit them "
+   "together: only the fields you fill in are written.</li>"
+   "<li>Hover over a menu option to see what it does. <b>Help, Help</b> has the details.</li>"
+   "</ul>";
 
-// Sections in display order, rendered into one HTML document.
-constexpr HelpSection Cst_HelpSections[] = {
-   { "Choose your folder:", "Select the folder where your systems folders are stored, or the "
-                            "ES-DE folder (the one with <code>gamelists</code> and "
-                            "<code>settings</code>). The title bar then reads ES-DE: pictures and "
-                            "videos are found by the ROM's name in ES-DE's media folder, and "
-                            "linking or renaming them is not offered.<br>"
-                            "<br>"
-                            "If that folder lives on a running Recalbox, RetroPie or ES-DE, stop "
-                            "EmulationStation first: it rewrites <code>gamelist.xml</code> when it "
-                            "exits, and would overwrite anything saved from here.<br>"
-                            "<br>"
-                            "Select a game to edit its fields, then click Save Changes. Select "
-                            "several games to edit them together: the fields start blank, and only "
-                            "the ones you fill in are written to every selected game. The name and "
-                            "the pictures can only be changed one game at a time." },
+const char* const Cst_HelpHtml =
+   "<p><a href=\"#folder\">Choosing a folder</a> | <a href=\"#editing\">Editing games</a> | "
+   "<a href=\"#sync\">Sync to other folder</a> | <a href=\"#options\">Menu options</a></p>"
 
-   { "Sync to other folder:", "Actions, Sync to other folder copies the open folder (the master) "
-                              "into another one, ES-DE or not, in either direction. Systems pair by "
-                              "folder name, else by type. You review what changes first.<br>"
-                              "<br>"
-                              "Copied: the ROMs (when the target's ROM folder is another folder), the "
-                              "name, genre, rating, players, developer, publisher, release date, "
-                              "description and region, and the cover and video. Favorites, hidden, "
-                              "kid game, play count and last played stay per device. Games only on the "
-                              "target are listed and kept, never removed.<br>"
-                              "<br>"
-                              "Games match by their ROM path, so absolute paths are listed as problems. "
-                              "Folder ROMs (ScummVM, PS3) are listed and not copied. "
-                              "ES-DE reads only jpg, png and webp covers (others become PNG) and skips "
-                              "videos it cannot play. Screenshots and other media types are not synced. "
-                              "Stop EmulationStation on the target first. A phone over MTP is not a "
-                              "folder on Windows: use a card reader or a share." },
+   "<h3><a name=\"folder\">Choosing a folder</a></h3>"
+   "<p>Select the folder where your system folders are stored, or the ES-DE folder (the one "
+   "with <code>gamelists</code> and <code>settings</code>). The title bar then reads ES-DE: "
+   "pictures and videos are found by the ROM's name in ES-DE's media folder, and linking or "
+   "renaming them is not offered.</p>"
+   "<p><b>If the folder lives on a running Recalbox, RetroPie or ES-DE, stop EmulationStation "
+   "first.</b> It rewrites <code>gamelist.xml</code> when it exits and would overwrite anything "
+   "saved from here.</p>"
 
-   { "Enable God Mode:", "Enabling this option will let you delete games directly from the "
-                         "application. A delete button will be added to the GUI, and you will be "
-                         "prompted to confirm when you click it.<br>"
-                         "Deleting a game removes its entry from the gamelist; you choose "
-                         "whether its picture, video and ROM file are also sent to the trash "
-                         "(or deleted where there is no trash, such as a network share)." },
+   "<h3><a name=\"editing\">Editing games</a></h3>"
+   "<ul>"
+   "<li>Select a game, edit its fields, click <b>Save Changes</b>.</li>"
+   "<li>Select several games to edit them together. The fields start blank, and only the ones "
+   "you fill in are written to every selected game.</li>"
+   "<li>The name and the pictures can only be changed one game at a time.</li>"
+   "</ul>"
 
-   { "Delete without prompt:",
-     "Enabling this option will disable the prompt to confirm when you delete "
-     "a game, and the files are sent to the trash too. Use with caution." },
+   "<h3><a name=\"sync\">Sync to other folder</a></h3>"
+   "<p><b>Actions, Sync to other folder</b> copies the open folder (the master) into another "
+   "one, ES-DE or not, in either direction. Systems pair by folder name, else by type. You "
+   "review what changes first.</p>"
+   "<ul>"
+   "<li><b>Copied:</b> the ROMs (when the target's ROM folder is another folder), name, genre, "
+   "rating, players, developer, publisher, release date, description, region, cover and "
+   "video.</li>"
+   "<li><b>Kept per device:</b> favorites, hidden, kid game, play count and last played. Games "
+   "only on the target are listed and kept, never removed.</li>"
+   "<li><b>Listed as problems:</b> absolute ROM paths (games match by ROM path), folder ROMs "
+   "(ScummVM, PS3), and videos ES-DE cannot play.</li>"
+   "<li><b>Not synced:</b> screenshots and other media types. ES-DE reads only jpg, png and "
+   "webp covers, so others become PNG.</li>"
+   "<li>Stop EmulationStation on the target first. A phone over MTP is not a folder on "
+   "Windows: use a card reader or a share.</li>"
+   "</ul>"
 
-   { "Auto Hash:", "Enabling this option will hash the files automatically when you click on "
-                   "More Infos.<br>"
-                   "Do this if you have a powerful computer, or if your systems only contain "
-                   "small roms. Hashing files can be very slow, so use it with caution.<br>"
-                   "If you do not enable this option, you will be asked whether to hash the "
-                   "file each time you click on More Infos." },
-
-   { "Show tips at start:", "Enabling this option will show this help window when the application "
-                            "starts.<br>"
-                            "You can disable it again either here, or by checking "
-                            "\"Don't show again\" below before closing this window." },
-
-   { "Use Genesis logo:", "This will let you use the Genesis logo and name instead of MegaDrive." },
-
-   { "System - Convert to lowercase:",
-     "Will convert all the text to lowercase for the whole selected system "
-     "(every game will be converted)." },
-
-   { "System - Convert to uppercase:",
-     "Will convert all the text to uppercase for the whole selected system "
-     "(every game will be converted)." },
-
-   { "System - Remove region from games names:",
-     "Will remove the region tag in the name (i.e. [xxxx]) for every game of "
-     "the selected system." },
-
-   { "System - Delete orphans from gamelist:",
-     "Will remove from <code>gamelist.xml</code> all the games that are not "
-     "physically present on your drive.<br>"
-     "Orphan means the game is listed in the gamelist, but the associated rom "
-     "no longer exists." },
-
-   { "System - Delete duplicates from gamelist:",
-     "Will remove all duplicates - the same game listed two or more times - "
-     "from <code>gamelist.xml</code>." },
-
-   { "Game - Convert to lowercase:",
-     "Will convert all the text to lowercase for the selected game." },
-
-   { "Game - Convert to uppercase:",
-     "Will convert all the text to uppercase for the selected game." },
-};
-
-QString buildHelpHtml()
-{
-   QString html;
-   for ( const HelpSection& section : Cst_HelpSections ) {
-      html += QStringLiteral( "<p><b><u>%1</u></b><br>%2</p>" )
-                 .arg( QLatin1String( section.title ), QLatin1String( section.body ) );
-   }
-
-   return html;
-}
+   "<h3><a name=\"options\">Menu options</a></h3>"
+   "<p>Hover over an option in the Options or System menu to see what it does.</p>";
 
 }  // namespace
 
@@ -119,8 +69,6 @@ Frm_Help::Frm_Help( QWidget* aParent ) : QDialog( aParent )
    setWindowTitle( QStringLiteral( "Help" ) );
 
    Red_Help = new QTextBrowser( this );
-   Red_Help->setOpenExternalLinks( true );
-   Red_Help->setHtml( buildHelpHtml() );
 
    Chk_ShowTips = new QCheckBox( QStringLiteral( "Don't show again" ), this );
 
@@ -135,12 +83,13 @@ Frm_Help::Frm_Help( QWidget* aParent ) : QDialog( aParent )
    QVBoxLayout* layout = new QVBoxLayout( this );
    layout->addWidget( Red_Help );
    layout->addLayout( bottom );
-
-   resize( 720, 560 );
 }
 
 bool Frm_Help::Execute( bool aShowTips, bool aAllowOptOut )
 {
+   Red_Help->setHtml( QLatin1String( aAllowOptOut ? Cst_TipsHtml : Cst_HelpHtml ) );
+   resize( aAllowOptOut ? QSize( 520, 300 ) : QSize( 720, 560 ) );
+
    Chk_ShowTips->setVisible( aAllowOptOut );
    Chk_ShowTips->setChecked( false );
 
