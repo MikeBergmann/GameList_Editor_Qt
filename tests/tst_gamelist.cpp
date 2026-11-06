@@ -894,6 +894,52 @@ TEST( Gamelist, AFailedSetFieldsLeavesGameAndDocumentAsTheyWere )
    EXPECT_TRUE( saved.contains( "<name>Vanished</name>" ) );
 }
 
+TEST( Gamelist, PerGameSetFieldsWritesDifferentValuesInOneSave )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
+
+   GameFields first;
+   first.name = QStringLiteral( "Sonic 1" );
+   GameFields second;
+   second.name = QStringLiteral( "Sonic 2" );
+   second.genre = QStringLiteral( "Racing" );
+
+   const Result<> written = list.setFields(
+      { { 0, first, GameFieldSet( gfName ) }, { 1, second, GameFieldSet( gfName | gfGenre ) } } );
+   ASSERT_TRUE( written ) << written.error().toStdString();
+
+   EXPECT_FALSE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 0 ).name, QStringLiteral( "Sonic 1" ) );
+   EXPECT_EQ( saved.at( 0 ).genre, QStringLiteral( "Platform" ) ) << "not in which: untouched";
+   EXPECT_EQ( saved.at( 1 ).name, QStringLiteral( "Sonic 2" ) );
+   EXPECT_EQ( saved.at( 1 ).genre, QStringLiteral( "Racing" ) );
+}
+
+TEST( Gamelist, AFailedPerGameSetFieldsLeavesEveryGameAsItWas )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   breakSave( fixture, list );
+
+   GameFields one;
+   one.name = QStringLiteral( "One" );
+   GameFields two;
+   two.genre = QStringLiteral( "Two" );
+
+   EXPECT_FALSE( list.setFields(
+      { { 0, one, GameFieldSet( gfName ) }, { 2, two, GameFieldSet( gfGenre ) } } ) );
+   EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( list.domText( 0, "name" ), QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_TRUE( list.at( 2 ).genre.isEmpty() );
+   EXPECT_TRUE( list.domText( 2, "genre" ).isEmpty() );
+   EXPECT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
+}
+
 TEST( Gamelist, EditNamesRenamesEachTargetFromItsOwnName )
 {
    Fixture fixture;

@@ -480,56 +480,77 @@ Result<> Gamelist::applyAndSave( const QVector<int>& aTargets, const std::functi
    return {};
 }
 
+Result<> Gamelist::setFields( const QVector<FieldUpdate>& aUpdates )
+{
+   QVector<int> targets;
+   for ( const FieldUpdate& update : aUpdates )
+      if ( update.which )
+         targets.append( update.index );
+
+   return applyAndSave( targets, [&] {
+      GameFieldSet all;
+      for ( const FieldUpdate& update : aUpdates ) {
+         applyFieldsTo( update.index, update.values, update.which );
+         all |= update.which;
+      }
+      if ( all & gfName )
+         countDuplicates();
+   } );
+}
+
 void Gamelist::applyFields( const QVector<int>& aTargets, const GameFields& aValues,
                             GameFieldSet aWhich )
 {
-
-   for ( int index : aTargets ) {
-      if ( index < 0 || index >= FEntries.size() )
-         continue;
-
-      Game& game = FEntries[index].game;
-      QDomElement node = FEntries[index].node;
-
-      const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
-                              QString& aStored ) {
-         if ( !( aWhich & aField ) )
-            return;
-         setChildText( node, aName, aValue );
-         aStored = aValue;
-      };
-
-      write( gfName, Cst_Name, aValues.name, game.name );
-      write( gfGenre, Cst_Genre, aValues.genre, game.genre );
-      write( gfRating, Cst_Rating, aValues.rating, game.rating );
-      write( gfPlayers, Cst_Players, aValues.players, game.players );
-      write( gfDeveloper, Cst_Developer, aValues.developer, game.developer );
-      write( gfPublisher, Cst_Publisher, aValues.publisher, game.publisher );
-      write( gfDescription, Cst_Description, aValues.description, game.description );
-      write( gfRegion, Cst_Region, aValues.region, game.region );
-
-      if ( aWhich & gfReleaseDate ) {
-         // A date in none of the three accepted forms is stored blank and comes
-         // back blank.
-         const QString stored = displayDateToGamelist( aValues.releaseDate );
-         setChildText( node, Cst_ReleaseDate, stored );
-         game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
-      }
-
-      const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
-         if ( !( aWhich & aField ) )
-            return;
-         setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
-         aStored = aValue;
-      };
-
-      writeFlag( gfKidGame, Cst_KidGame, aValues.kidGame, game.kidGame );
-      writeFlag( gfHidden, Cst_Hidden, aValues.hidden, game.hidden );
-      writeFlag( gfFavorite, Cst_Favorite, aValues.favorite, game.favorite );
-   }
+   for ( int index : aTargets )
+      applyFieldsTo( index, aValues, aWhich );
 
    if ( aWhich & gfName )
       countDuplicates();
+}
+
+void Gamelist::applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSet aWhich )
+{
+   if ( aIndex < 0 || aIndex >= FEntries.size() )
+      return;
+
+   Game& game = FEntries[aIndex].game;
+   QDomElement node = FEntries[aIndex].node;
+
+   const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
+                           QString& aStored ) {
+      if ( !( aWhich & aField ) )
+         return;
+      setChildText( node, aName, aValue );
+      aStored = aValue;
+   };
+
+   write( gfName, Cst_Name, aValues.name, game.name );
+   write( gfGenre, Cst_Genre, aValues.genre, game.genre );
+   write( gfRating, Cst_Rating, aValues.rating, game.rating );
+   write( gfPlayers, Cst_Players, aValues.players, game.players );
+   write( gfDeveloper, Cst_Developer, aValues.developer, game.developer );
+   write( gfPublisher, Cst_Publisher, aValues.publisher, game.publisher );
+   write( gfDescription, Cst_Description, aValues.description, game.description );
+   write( gfRegion, Cst_Region, aValues.region, game.region );
+
+   if ( aWhich & gfReleaseDate ) {
+      // A date in none of the three accepted forms is stored blank and comes
+      // back blank.
+      const QString stored = displayDateToGamelist( aValues.releaseDate );
+      setChildText( node, Cst_ReleaseDate, stored );
+      game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
+   }
+
+   const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
+      if ( !( aWhich & aField ) )
+         return;
+      setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
+      aStored = aValue;
+   };
+
+   writeFlag( gfKidGame, Cst_KidGame, aValues.kidGame, game.kidGame );
+   writeFlag( gfHidden, Cst_Hidden, aValues.hidden, game.hidden );
+   writeFlag( gfFavorite, Cst_Favorite, aValues.favorite, game.favorite );
 }
 
 // Sonic.zip and Sonic.7z share a stem: keep the ROM's extension, then count up.

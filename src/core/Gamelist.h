@@ -37,6 +37,14 @@ struct MediaRename
    QString problem;
 };
 
+// New values for one game; only the fields in which are written.
+struct FieldUpdate
+{
+   int index = -1;
+   GameFields values;
+   GameFieldSet which;
+};
+
 class Gamelist
 {
 public:
@@ -56,6 +64,9 @@ public:
 
    // Saves. An Error leaves games, document and file as they were.
    Result<> setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
+
+   // Different values per game, in one save. Same Error rule as above.
+   Result<> setFields( const QVector<FieldUpdate>& aUpdates );
 
    // Renames each target with applyNameEdit, in one save. Same Error rule as setFields.
    Result<> editNames( const QVector<int>& aTargets, const NameEdit& aEdit );
@@ -124,6 +135,9 @@ private:
 
    // Runs aApply on the targets, then saves; if that fails, puts the targets back.
    Result<> applyAndSave( const QVector<int>& aTargets, const std::function<void()>& aApply );
+
+   // Does not save, and leaves the duplicate counts to the caller.
+   void applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSet aWhich );
 
    // Does not save.
    void applyFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
