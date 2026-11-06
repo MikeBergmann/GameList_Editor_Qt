@@ -77,6 +77,7 @@ add_library( gle_core STATIC
    src/core/NameEdit.cpp
    src/core/PathUtil.cpp
    src/core/Resources.cpp
+   src/core/RomCopy.cpp
    src/core/Systems.cpp
 )
 target_include_directories( gle_core PUBLIC src/core )
@@ -159,6 +160,7 @@ add_executable( tests
    tests/tst_pathutil.cpp
    tests/tst_resources.cpp
    tests/tst_result.cpp
+   tests/tst_romcopy.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
    tests/tst_systems.cpp
