@@ -1361,4 +1361,91 @@ TEST( GamelistEsde, LinkingAndRenamingMediaAreRefused )
    EXPECT_FALSE( list.renameMedia( { { 0, true, QString(), QString(), QString() } } ) );
 }
 
+TEST( GamelistCopyMedia, LegacyKeepsTheFormatOfAPictureAndOfAVideo )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "src/a.jpg" ), "jpg bytes" );
+   writeFile( fixture.path( "src/b.webm" ), "webm bytes" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   const Result<MediaCopyReport> copied =
+      list.copyMedia( { { 2, true, fixture.path( "src/a.jpg" ) }, { 2, false, fixture.path( "src/b.webm" ) } } );
+
+   ASSERT_TRUE( copied ) << copied.error().toStdString();
+   EXPECT_EQ( copied.value().copied, 2 );
+   EXPECT_TRUE( copied.value().skipped.isEmpty() );
+   const Gamelist saved = reload( fixture );
+   EXPECT_EQ( saved.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.jpg" ) );
+   EXPECT_EQ( saved.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.webm" ) );
+   EXPECT_EQ( readAll( fixture.path( "snes/media/images/Vanished.jpg" ) ), QByteArray( "jpg bytes" ) );
+   EXPECT_EQ( readAll( fixture.path( "snes/media/videos/Vanished.webm" ) ), QByteArray( "webm bytes" ) );
+}
+
+TEST( GamelistCopyMedia, EsdeKeepsJpgAsIsAndConvertsWhatItCannotRead )
+{
+   EsdeLayout esde;
+   writeFile( esde.path( "src/a.JPG" ), "jpg bytes" );
+   // PNG content under a name ES-DE does not look for: QImage sniffs the content.
+   ASSERT_TRUE( tinyPicture().save( esde.path( "src/b.jpeg" ), "PNG" ) );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+   const QByteArray gamelist = readAll( esde.system.gamelistPath );
+
+   const Result<MediaCopyReport> copied = list.copyMedia(
+      { { 2, true, esde.path( "src/a.JPG" ) }, { 1, true, esde.path( "src/b.jpeg" ) } } );
+
+   ASSERT_TRUE( copied ) << copied.error().toStdString();
+   EXPECT_EQ( copied.value().copied, 2 );
+   EXPECT_EQ( readAll( esde.path( "media/snes/covers/Other.jpg" ) ), QByteArray( "jpg bytes" ) )
+      << "lowercase extension, same bytes";
+   EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/dig.scummvm.png" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/covers/dig.scummvm.jpeg" ) ) );
+   EXPECT_FALSE( list.at( 2 ).missingImage );
+   EXPECT_EQ( readAll( esde.system.gamelistPath ), gamelist ) << "ES-DE media never touches the gamelist";
+}
+
+TEST( GamelistCopyMedia, EsdeReplacesAVideoOfAnotherFormatAndReportsOneItCannotPlay )
+{
+   EsdeLayout esde;
+   writeFile( esde.path( "src/a.MKV" ), "mkv bytes" );
+   writeFile( esde.path( "src/b.flv" ), "flv bytes" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   const Result<MediaCopyReport> copied = list.copyMedia(
+      { { 0, false, esde.path( "src/a.MKV" ) }, { 2, false, esde.path( "src/b.flv" ) } } );
+
+   ASSERT_TRUE( copied ) << copied.error().toStdString();
+   EXPECT_EQ( copied.value().copied, 1 );
+   ASSERT_EQ( copied.value().skipped.size(), 1 );
+   EXPECT_TRUE( copied.value().skipped.first().contains( QStringLiteral( "b.flv" ) ) );
+   EXPECT_EQ( readAll( esde.path( "media/snes/videos/Sub/Game.mkv" ) ), QByteArray( "mkv bytes" ) );
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/videos/Sub/Game.mp4" ) ) )
+      << "the mp4 would hide the mkv";
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/videos/Other.flv" ) ) );
+}
+
+TEST( GamelistCopyMedia, AFailedSaveRollsBackEveryFileOfTheBatch )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "src/a.jpg" ), "new jpg" );
+   writeFile( fixture.path( "src/b.mp4" ), "new mp4" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const Game before = list.at( 2 );
+   breakSave( fixture, list );
+
+   const Result<MediaCopyReport> failed =
+      list.copyMedia( { { 2, true, fixture.path( "src/a.jpg" ) }, { 0, false, fixture.path( "src/b.mp4" ) } } );
+
+   EXPECT_FALSE( failed );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.jpg" ) ) );
+   EXPECT_EQ( readAll( fixture.path( "snes/media/videos/Sonic.mp4" ) ), QByteArray( "mp4" ) )
+      << "the replaced video must come back";
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4.gle-bak" ) ) );
+   EXPECT_EQ( list.at( 2 ).imagePath, before.imagePath );
+   EXPECT_EQ( list.domText( 2, "image" ), before.imagePath );
+}
+
 }  // namespace

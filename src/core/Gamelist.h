@@ -45,6 +45,20 @@ struct FieldUpdate
    GameFieldSet which;
 };
 
+// A media file to copy to a game, byte for byte.
+struct MediaCopy
+{
+   int index = -1;  // the game
+   bool isImage = true;
+   QString source;  // absolute path
+};
+
+struct MediaCopyReport
+{
+   int copied = 0;
+   QStringList skipped;  // one line per file left out, with the reason
+};
+
 class Gamelist
 {
 public:
@@ -74,6 +88,11 @@ public:
    Result<> setImage( int aIndex, const QString& aSourcePath );
    Result<> setImage( int aIndex, const QImage& aPicture );
    Result<> setVideo( int aIndex, const QString& aSourcePath );
+
+   // Keeps each file's format and extension. ES-DE reads only jpg/png/webp pictures (others
+   // become PNG) and the videos in Cst_EsdeVideoExtensions (others are skipped and reported).
+   // One save; an Error leaves games, files and the gamelist as they were.
+   Result<MediaCopyReport> copyMedia( const QVector<MediaCopy>& aCopies );
 
    Result<> removeImage( int aIndex );
    Result<> removeVideo( int aIndex );
@@ -168,15 +187,21 @@ private:
    // Does not save. On an Error nothing has changed.
    Result<MediaWrite> applyImage( int aIndex, const QImage& aPicture );
 
-   // ES-DE: where aGame's image or video goes by the ROM's name.
-   QString conventionalPath( const Game& aGame, bool aIsImage ) const;
+   // Copies aSourcePath as it is, under the game's media name plus aSuffix (with the dot).
+   // Does not save. On an Error nothing has changed.
+   Result<MediaWrite> applyMediaFile( int aIndex, bool aIsImage, const QString& aSourcePath,
+                                      const QString& aSuffix );
+
+   // ES-DE: where aGame's image or video goes by the ROM's name. An empty aSuffix is png/mp4.
+   QString conventionalPath( const Game& aGame, bool aIsImage, const QString& aSuffix = {} ) const;
 
    // ES-DE: fills the media paths of aGame from the indexes, else conventionalPath.
    void findConventionalMedia( Game& aGame ) const;
    void indexMedia();
 
    // Never a file another game has. ES-DE: the absolute path by the ROM's name.
-   QString freeMediaLink( int aIndex, bool aIsImage ) const;
+   // An empty aSuffix is png/mp4.
+   QString freeMediaLink( int aIndex, bool aIsImage, const QString& aSuffix = {} ) const;
 
    // Saves; ES-DE media changes nothing in the gamelist, so there it does not.
    Result<> saveLinks();
