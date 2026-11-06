@@ -289,6 +289,30 @@ TEST( SyncPlan, EsdeToLegacyFindsTheMastersMediaByRomName )
    EXPECT_EQ( system.games.first().fields, GameFieldSet( gfName | gfGenre ) );
 }
 
+TEST( SyncPlan, ProgressNamesTheGameBeingComparedAndCancelingLeavesNoPlan )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic" ) + game( "Mario.zip", "Mario" ), { "Sonic.zip", "Mario.zip" } );
+   putSystem( roots.target(), "snes", game( "Other.zip", "Other" ), { "Other.zip" } );
+
+   QStringList messages;
+   int total = 0;
+   const SyncPlan full = planSync( scanSystems( roots.master() ), roots.target(), [&]( const QString& aMessage, int, int aTotal ) {
+      messages << aMessage;
+      total = aTotal;
+      return true;
+   } );
+   EXPECT_FALSE( full.canceled );
+   EXPECT_EQ( total, 1 );
+   EXPECT_TRUE( messages.contains( QStringLiteral( "snes: comparing game 2 of 2, Mario" ) ) ) << messages.join( '|' ).toStdString();
+
+   const SyncPlan stopped = planSync( scanSystems( roots.master() ), roots.target(), []( const QString& aMessage, int, int ) {
+      return !aMessage.contains( QStringLiteral( "comparing" ) );
+   } );
+   EXPECT_TRUE( stopped.canceled );
+   EXPECT_TRUE( stopped.systems.isEmpty() );
+}
+
 TEST( SyncPlan, TheMastersOwnFolderAsTargetIsAProblemNotAPlan )
 {
    Roots roots;

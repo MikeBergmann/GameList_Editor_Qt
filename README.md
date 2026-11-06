@@ -80,7 +80,7 @@ Current limitation: A scraped picture is saved as the cover, whichever type you 
 
 ### Sync
 
-Actions → Sync to other folder... copies the open folder (the master) into another folder, one way. Either side can be ES-DE or a legacy layout. Systems pair by folder name, else by type (`megadrive` and `genesis` are two types and are not paired). A review lists each system's counts, the games only the target has, and the problems, before anything is written.
+Actions → Sync to other folder... copies the open folder (the master) into another folder, one way. Either side can be ES-DE or a legacy layout. Systems pair by folder name, else by type (`megadrive` and `genesis` are two types and are not paired). A progress bar shows the analysis (cancel any time). A review lists each system's counts, the problems and how many games only the target has; a Details button per system lists every game with what would change, before anything is written.
 
 - **Copied:** the ROMs (when the target's ROM folder is another folder; sizes are compared), `name`, `genre`, `rating`, `players`, `developer`, `publisher`, `releasedate`, `desc`, `region`, and the cover and video (compared by size, then MD5).
 - **Stays per device:** favorite, hidden, kid game, play count, last played, and every child the editor does not know.

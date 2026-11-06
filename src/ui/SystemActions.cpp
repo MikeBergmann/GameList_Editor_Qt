@@ -11,8 +11,9 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileDialog>
-#include <QGuiApplication>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QLocale>
 #include <QMessageBox>
@@ -324,10 +325,29 @@ void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
    QVector<SystemEntry> master = scanSystems( aMasterRoot );
    applySystemMap( master );
 
-   // ponytail: planning hashes media on the UI thread. Upgrade: plan in a worker with a progress bar.
-   QGuiApplication::setOverrideCursor( Qt::WaitCursor );
-   const SyncPlan plan = planSync( master, targetRoot );
-   QGuiApplication::restoreOverrideCursor();
+   // ponytail: planning runs on the UI thread, repainting every 50 ms. Upgrade: plan in a worker.
+   QProgressDialog analysing( QStringLiteral( "Reading the gamelists..." ), QStringLiteral( "Cancel" ), 0, 0, aParent );
+   analysing.setWindowTitle( QStringLiteral( "Analysing" ) );
+   analysing.setWindowModality( Qt::WindowModal );
+   analysing.setMinimumDuration( 0 );
+   analysing.setMinimumWidth( 420 );
+
+   QElapsedTimer clock;
+   clock.start();
+   qint64 lastPaint = -1000;
+   const SyncPlan plan = planSync( master, targetRoot, [&]( const QString& aMessage, int aDone, int aTotal ) {
+      if ( clock.elapsed() - lastPaint >= 50 ) {
+         lastPaint = clock.elapsed();
+         analysing.setMaximum( aTotal );
+         analysing.setValue( aDone );
+         analysing.setLabelText( QStringLiteral( "System %1 of %2\n%3" ).arg( aDone + 1 ).arg( aTotal ).arg( aMessage ) );
+         QCoreApplication::processEvents();
+      }
+      return !analysing.wasCanceled();
+   } );
+   analysing.close();
+   if ( plan.canceled )
+      return;
 
    if ( plan.systems.isEmpty() ) {
       QMessageBox::information( aParent, title, QStringLiteral( "Nothing to sync: the target is up to date." ) );

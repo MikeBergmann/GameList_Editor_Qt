@@ -97,17 +97,26 @@ QVector<SystemPair> pairSystems( const QVector<SystemEntry>& aMaster, const QStr
    return pairs;
 }
 
-SystemPlan planSystem( const SystemPair& aPair )
+SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
 {
    SystemPlan plan;
    plan.pair = aPair;
 
+   const auto proceed = [&]( const QString& aMessage ) {
+      if ( aProgress && !aProgress( aMessage ) )
+         plan.canceled = true;
+      return !plan.canceled;
+   };
+
+   const QString name = aPair.source.folderName;
    const QString sourceFile = QFileInfo( aPair.source.gamelistPath ).canonicalFilePath();
    if ( !sourceFile.isEmpty() && sourceFile == QFileInfo( aPair.target.gamelistPath ).canonicalFilePath() ) {
-      plan.problems << QStringLiteral( "%1: the target is the master's own gamelist." ).arg( aPair.source.folderName );
+      plan.problems << QStringLiteral( "%1: the target is the master's own gamelist." ).arg( name );
       return plan;
    }
 
+   if ( !proceed( QStringLiteral( "Reading the master's %1 gamelist" ).arg( name ) ) )
+      return plan;
    Gamelist master;
    if ( const Result<> loaded = master.load( aPair.source, true ); !loaded ) {
       plan.problems << loaded.error();
@@ -116,6 +125,8 @@ SystemPlan planSystem( const SystemPair& aPair )
 
    Gamelist target;  // stays empty when the target has no gamelist yet
    if ( aPair.targetExists ) {
+      if ( !proceed( QStringLiteral( "Reading the target's %1 gamelist" ).arg( aPair.target.folderName ) ) )
+         return plan;
       if ( const Result<> loaded = target.load( aPair.target, true ); !loaded ) {
          plan.problems << loaded.error();
          return plan;
@@ -141,6 +152,12 @@ SystemPlan planSystem( const SystemPair& aPair )
 
    for ( int i = 0; i < master.count(); ++i ) {
       const Game& source = master.at( i );
+      if ( !proceed( QStringLiteral( "%1: comparing game %2 of %3, %4" )
+                        .arg( name )
+                        .arg( i + 1 )
+                        .arg( master.count() )
+                        .arg( source.name ) ) )
+         return plan;
 
       if ( QDir::isAbsolutePath( source.romPath ) ) {
          plan.problems << QStringLiteral( "%1: the path %2 is absolute and cannot be matched." )
@@ -220,11 +237,22 @@ bool SyncPlan::isEmpty() const
    return true;
 }
 
-SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRoot )
+SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRoot, const PlanProgress& aProgress )
 {
    SyncPlan plan;
-   for ( const SystemPair& pair : pairSystems( aMaster, aTargetRoot ) ) {
-      SystemPlan system = planSystem( pair );
+   const QVector<SystemPair> pairs = pairSystems( aMaster, aTargetRoot );
+   const int total = static_cast<int>( pairs.size() );
+
+   for ( int done = 0; done < total; ++done ) {
+      const SyncProgress relay = [&]( const QString& aMessage ) {
+         return !aProgress || aProgress( aMessage, done, total );
+      };
+      SystemPlan system = planSystem( pairs.at( done ), relay );
+      if ( system.canceled ) {
+         plan.systems.clear();
+         plan.canceled = true;
+         break;
+      }
       if ( !system.isEmpty() || !system.problems.isEmpty() || !system.targetOnly.isEmpty() )
          plan.systems.append( std::move( system ) );
    }

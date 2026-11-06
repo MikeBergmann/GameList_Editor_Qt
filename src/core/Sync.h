@@ -54,6 +54,7 @@ struct SystemPlan
    QStringList targetOnly;     // names of target games the master does not have; never removed
    QStringList problems;       // what was left out and why; not an action
    qint64 romBytes = 0;
+   bool canceled = false;      // the user stopped the analysis; the plan is partial
 
    bool isEmpty() const { return games.isEmpty(); }
 };
@@ -61,14 +62,23 @@ struct SystemPlan
 struct SyncPlan
 {
    QVector<SystemPlan> systems;  // those with something to do or to report
+   bool canceled = false;        // the user stopped the analysis; systems is empty
 
    bool isEmpty() const;
 };
 
-SystemPlan planSystem( const SystemPair& aPair );
+// Called while analysing or applying, with what is being done; returning false cancels.
+using SyncProgress = std::function<bool( const QString& aMessage )>;
 
-// Loads and compares every pair; nothing is written.
-SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRoot );
+// aDone of aTotal systems are finished; the message names the one being read.
+using PlanProgress = std::function<bool( const QString& aMessage, int aDone, int aTotal )>;
+
+SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress = {} );
+
+// Loads and compares every pair; nothing is written. Progress runs before each game, so a
+// slow media hash shows which game it is on; a canceled plan is empty.
+SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRoot,
+                   const PlanProgress& aProgress = {} );
 
 // What one system's run did. A non-empty error means it stopped there; what was already
 // copied stays, and a second sync picks up the rest.
@@ -91,10 +101,8 @@ struct SyncReport
    bool canceled = false;
 };
 
-// Called before each ROM file and each write stage; returning false cancels the run.
-using SyncProgress = std::function<bool( const QString& aMessage )>;
-
 // Per system: free space, ROM files, the gamelist (made first if needed), fields, media.
+// Progress runs before each ROM file and each write stage.
 // A failing system is reported and the next one still runs. Games are found by the indices
 // the plan holds; a target changed since then is reported, not guessed at.
 // ponytail: cancel and progress are per file, not per byte; a big ROM runs to its end.
