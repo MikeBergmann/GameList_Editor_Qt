@@ -11,8 +11,6 @@
 
 namespace {
 
-constexpr const char* Cst_Staged = ".gle-new";
-
 // The file names a disc description refers to, relative to its own folder.
 QStringList referencedFiles( const QString& aPath )
 {
@@ -124,18 +122,16 @@ Result<> copyRomFiles( const QVector<RomFile>& aFiles, const RomProgress& aProgr
       if ( !QDir().mkpath( folder ) )
          return Error{ QStringLiteral( "Cannot create %1." ).arg( folder ) };
 
-      const QString staged = file.target + QLatin1String( Cst_Staged );
-      QFile::remove( staged );
-      if ( !QFile::copy( file.source, staged ) ) {
-         QFile::remove( staged );
-         return Error{ QStringLiteral( "Cannot copy %1 to %2." ).arg( file.source, file.target ) };
-      }
-
-      // A ROM unchanged on the master keeps the same time on every device.
-      if ( QFile stamped( staged ); stamped.open( QIODevice::ReadWrite ) )
-         stamped.setFileTime( QFileInfo( file.source ).lastModified(), QFileDevice::FileModificationTime );
-
-      const Result<QString> swapped = swapIn( staged, file.target );
+      const Result<QString> swapped = stageAndSwap(
+         file.target, QStringLiteral( "Cannot copy %1 to %2." ).arg( file.source, file.target ),
+         [&]( const QString& aStaged ) {
+            if ( !QFile::copy( file.source, aStaged ) )
+               return false;
+            // A ROM unchanged on the master keeps the same time on every device.
+            if ( QFile stamped( aStaged ); stamped.open( QIODevice::ReadWrite ) )
+               stamped.setFileTime( QFileInfo( file.source ).lastModified(), QFileDevice::FileModificationTime );
+            return true;
+         } );
       if ( !swapped )
          return swapped;
       if ( !swapped.value().isEmpty() )

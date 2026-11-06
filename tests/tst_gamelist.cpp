@@ -1493,6 +1493,27 @@ TEST( GamelistCopyMedia, AFailedSaveRollsBackEveryFileOfTheBatch )
    EXPECT_EQ( list.domText( 2, "image" ), before.imagePath );
 }
 
+TEST( GamelistCopyMedia, EsdeGamesSharingAStemDoNotCostTheOriginalOnRollback )
+{
+   EsdeLayout esde( "<game><path>./Sub/Game.zip</path></game><game><path>./Sub/Game.7z</path></game>"
+                    "<game><path>./Other.zip</path></game>" );
+   writeFile( esde.path( "src/a.jpg" ), "first" );
+   writeFile( esde.path( "src/b.jpg" ), "second" );
+   writeFile( esde.path( "src/c.jpg" ), "third" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+   const QString shared = esde.path( "media/snes/covers/Sub/Game.jpg" );
+
+   int asked = 0;
+   const Result<MediaCopyReport> canceled = list.copyMedia(
+      { { 0, true, esde.path( "src/a.jpg" ) }, { 1, true, esde.path( "src/b.jpg" ) }, { 2, true, esde.path( "src/c.jpg" ) } },
+      [&asked]( const MediaCopy& ) { return ++asked < 3; } );
+
+   EXPECT_FALSE( canceled );
+   EXPECT_EQ( readAll( shared ), QByteArray( "jpg" ) ) << "the file the user had before the batch";
+   EXPECT_FALSE( QFileInfo::exists( shared + QStringLiteral( ".gle-bak" ) ) );
+}
+
 TEST( GamelistCopyMedia, ProgressRunsBeforeEachFileAndCancelingRollsBackTheFilesAlreadyCopied )
 {
    Fixture fixture;

@@ -119,6 +119,19 @@ Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
    return backup;
 }
 
+Result<QString> stageAndSwap( const QString& aTarget, const QString& aFailure,
+                              const std::function<bool( const QString& )>& aWrite )
+{
+   const QString staged = aTarget + QStringLiteral( ".gle-new" );
+   QFile::remove( staged );
+   if ( !aWrite( staged ) ) {
+      QFile::remove( staged );
+      return Error{ aFailure };
+   }
+
+   return swapIn( staged, aTarget );
+}
+
 bool volumeFoldsCase( const QString& aGamelistPath )
 {
    const QFileInfo info( aGamelistPath );
