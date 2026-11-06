@@ -113,8 +113,9 @@ public:
    // Removes the entries only, no files. Later indices shift down.
    Result<> removeGames( const QVector<int>& aIndexes );
 
-   // Appends the new games at the end. Already-listed files are skipped; the value
-   // is how many were added. An Error leaves the list as it was.
+   // Appends the new games at the end. Files and folder ROMs ("dig.scummvm") are
+   // taken; already-listed ones are skipped. The value is how many were added.
+   // An Error leaves the list as it was.
    Result<int> addGames( const QStringList& aRomPaths );
 
    // All or nothing. The value is how many games got the picture.

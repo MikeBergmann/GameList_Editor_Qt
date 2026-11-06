@@ -101,7 +101,7 @@ Pitfalls:
 - [ ] Auto-Fix invalid media links
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
-- [ ] Add and Sync folder ROMs (ScummVM, etc.)
+- [ ] Sync folder ROMs (ScummVM, etc.); adding them under Add missing ROMs works
 - [ ] Android version
 
 ## screenscraper.fr credentials

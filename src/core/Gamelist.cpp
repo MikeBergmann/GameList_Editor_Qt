@@ -317,9 +317,10 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
       const QFileInfo info( path );
       const QString relative = systemDir.relativeFilePath( info.absoluteFilePath() );
 
-      if ( !info.isFile() || relative.startsWith( QLatin1String( ".." ) ) ) {
+      if ( !( info.isFile() || info.isDir() ) || relative == QLatin1String( "." ) ||
+           relative.startsWith( QLatin1String( ".." ) ) ) {
          rollback();
-         return Error{ QStringLiteral( "%1 is not a file inside %2." ).arg( path, FRomDir ) };
+         return Error{ QStringLiteral( "%1 is not a file or folder inside %2." ).arg( path, FRomDir ) };
       }
 
       // Already listed, or picked twice: nothing to add, and not an error.

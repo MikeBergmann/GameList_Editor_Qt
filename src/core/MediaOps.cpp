@@ -6,7 +6,6 @@
 
 #include <QBuffer>
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
@@ -135,17 +134,29 @@ QStringList unlistedRoms( const Gamelist& aList )
 
    const QDir systemDir( aList.romDir() );
    QStringList found;
-   QDirIterator files( aList.romDir(), QDir::Files, QDirIterator::Subdirectories );
-   while ( files.hasNext() ) {
-      const QString path = files.next();
-      const QString relative = systemDir.relativeFilePath( path );
+   QStringList pending{ aList.romDir() };
+   while ( !pending.isEmpty() ) {
+      for ( const QFileInfo& info : QDir( pending.takeLast() )
+                                       .entryInfoList( QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot ) ) {
+         const QString path = info.filePath();
+         const QString suffix = info.suffix().toLower();
+         const QString relative = systemDir.relativeFilePath( path );
 
-      if ( notRoms.contains( QFileInfo( path ).suffix().toLower() ) ||
-           mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) ||
-           listed.contains( fileKey( path, aList.foldsCase() ) ) )
-         continue;
+         if ( notRoms.contains( suffix ) ||
+              mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) )
+            continue;
 
-      found << path;
+         // ponytail: a folder named like a file ("dig.scummvm") is one ROM, any other is
+         // entered. Without ES's extension list "Vol.2" looks like one too; untick it.
+         if ( info.isDir() && ( suffix.isEmpty() || suffix.contains( QLatin1Char( ' ' ) ) ) ) {
+            if ( !info.isSymLink() )
+               pending << path;
+            continue;
+         }
+
+         if ( !listed.contains( fileKey( path, aList.foldsCase() ) ) )
+            found << path;
+      }
    }
 
    found.sort( Qt::CaseInsensitive );
