@@ -587,7 +587,7 @@ void GameEditPanel::chooseImage()
 
    const QString file =
       QFileDialog::getOpenFileName( this, QStringLiteral( "Choose a picture" ), QString(),
-                                    QStringLiteral( "Images (*.png *.jpg *.jpeg)" ) );
+                                    QStringLiteral( "Images (*.png *.jpg *.jpeg *.webp)" ) );
    if ( file.isEmpty() )
       return;
 
