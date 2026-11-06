@@ -1092,3 +1092,16 @@ void Gamelist::ensureHashes( int aIndex )
    if ( game.crc32.isEmpty() )
       game.crc32 = fileCrc32( game.physicalRomPath );
 }
+
+Result<> applyScrape( Gamelist& aList, int aIndex, const GameFields& aFields, bool aSaveFields,
+                      const QImage& aPicture, const QString& aVideoPath )
+{
+   Result<> result;
+   if ( aSaveFields )
+      result = aList.setFields( { aIndex }, aFields, changedFields( aList.at( aIndex ), aFields ) );
+   if ( result && !aPicture.isNull() )
+      result = aList.setImage( aIndex, aPicture );
+   if ( result && !aVideoPath.isEmpty() )
+      result = aList.setVideo( aIndex, aVideoPath );
+   return result;
+}

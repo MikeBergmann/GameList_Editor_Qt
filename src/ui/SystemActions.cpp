@@ -152,29 +152,17 @@ ViewUpdate shrinkLargeImages( QWidget* aParent, Gamelist& aGamelist )
    progress.setWindowModality( Qt::WindowModal );
    progress.setMinimumDuration( 0 );
 
-   int shrunk = 0;
-   qint64 saved = 0;
-   QStringList problems;
-   for ( int row = 0; row < chosen.size(); ++row ) {
-      progress.setValue( row );
-      if ( progress.wasCanceled() )
-         break;
-
-      const Result<qint64> size = shrinkImageFile( chosen.at( row ).path, maxBytes );
-      if ( !size ) {
-         problems << size.error();
-         continue;
-      }
-      ++shrunk;
-      saved += chosen.at( row ).size - size.value();
-   }
+   const ShrinkReport report = shrinkImages( chosen, maxBytes, [&progress]( int aDone ) {
+      progress.setValue( aDone );
+      return !progress.wasCanceled();
+   } );
    progress.setValue( static_cast<int>( chosen.size() ) );
 
    QString text = QStringLiteral( "%1 picture(s) shrunk, %2 saved." )
-                     .arg( shrunk )
-                     .arg( QLocale().formattedDataSize( saved, 1, QLocale::DataSizeTraditionalFormat ) );
-   if ( !problems.isEmpty() )
-      text += QStringLiteral( "\n\nNot shrunk:\n%1" ).arg( problems.join( QLatin1Char( '\n' ) ) );
+                     .arg( report.shrunk )
+                     .arg( QLocale().formattedDataSize( report.saved, 1, QLocale::DataSizeTraditionalFormat ) );
+   if ( !report.problems.isEmpty() )
+      text += QStringLiteral( "\n\nNot shrunk:\n%1" ).arg( report.problems.join( QLatin1Char( '\n' ) ) );
    QMessageBox::information( aParent, QStringLiteral( "GameList Editor Qt" ), text );
 
    // The links are unchanged, but the editor may be showing a picture that just changed.
@@ -358,13 +346,7 @@ void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
    if ( chosen.systems.isEmpty() )
       return;
 
-   // applySystem reports once per ROM file, per media file and per system's write stage.
-   int steps = 0;
-   for ( const SystemPlan& system : chosen.systems ) {
-      for ( const SyncGame& game : system.games )
-         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) + game.copyImage + game.copyVideo;
-      ++steps;
-   }
+   const int steps = syncStepCount( chosen );
 
    QProgressDialog progress( QStringLiteral( "Syncing..." ), QStringLiteral( "Cancel" ), 0, steps, aParent );
    progress.setWindowTitle( QStringLiteral( "Syncing" ) );

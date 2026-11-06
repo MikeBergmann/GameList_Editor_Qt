@@ -535,4 +535,37 @@ TEST( SyncApply, ALinkCasedUnlikeTheDiskIsAddedAndThenQuiet )
    EXPECT_TRUE( roots.plan().isEmpty() ) << "a second run matches the link to the file on disk";
 }
 
+TEST( SyncApply, StepCountIsHowOftenProgressRuns )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes",
+              game( "Sonic.zip", "Sonic" ) + game( "Mario.zip", "Mario", "<image>./media/images/Mario.png</image>" ),
+              { "Sonic.zip", "Mario.zip" } );
+   writeFile( roots.master( "snes/media/images/Mario.png" ), "AAAA" );
+   putSystem( roots.target(), "snes", game( "Sonic.zip", "Sonic" ), { "Sonic.zip" } );
+   const SyncPlan plan = roots.plan();
+
+   int calls = 0;
+   const SyncReport report = applySync( plan, [&calls]( const QString& ) { return ++calls > 0; } );
+
+   ASSERT_TRUE( report.systems.first().ok() ) << report.systems.first().error.toStdString();
+   EXPECT_EQ( calls, 3 ) << "the ROM, the write stage, the cover";
+   EXPECT_EQ( syncStepCount( plan ), calls );
+}
+
+TEST( SyncApply, ASystemWithNothingToDoCountsNoSteps )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Gone.zip", "Gone" ), {} );
+   putSystem( roots.target(), "snes", game( "Other.zip", "Other" ), { "Other.zip" } );
+   const SyncPlan plan = roots.plan();
+   ASSERT_EQ( plan.systems.size(), 1 ) << "kept for its problem";
+
+   int calls = 0;
+   applySync( plan, [&calls]( const QString& ) { return ++calls > 0; } );
+
+   EXPECT_EQ( calls, 0 );
+   EXPECT_EQ( syncStepCount( plan ), 0 );
+}
+
 }  // namespace

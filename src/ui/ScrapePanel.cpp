@@ -39,31 +39,6 @@ constexpr int Cst_ThumbnailSize = 120;
 constexpr int Cst_SourceScreenScraper = 0;
 constexpr int Cst_SourceLaunchBox = 1;
 
-Result<> loadLaunchBoxIndex( LaunchBoxDb& aDb, const QString& aMetadata, const QString& aFiles,
-                             const QString& aMame, const QString& aPlatform )
-{
-   const auto load = []( const QString& aPath, const auto& aRead ) -> Result<> {
-      QFile file( aPath );
-      if ( !file.open( QIODevice::ReadOnly ) )
-         return Error{ QStringLiteral( "Cannot open %1: %2" ).arg( aPath, file.errorString() ) };
-      return aRead( file );
-   };
-
-   if ( const Result<> ok = load( aMetadata, [&]( QIODevice& aIn ) {
-                                     return aDb.loadMetadata( aIn, aPlatform );
-                                  } );
-        !ok )
-      return ok;
-   // Only Arcade needs the ROM-name tables; everywhere else they add nothing.
-   if ( aPlatform != QLatin1String( "Arcade" ) )
-      return {};
-   if ( const Result<> ok =
-           load( aFiles, [&]( QIODevice& aIn ) { return aDb.loadFiles( aIn, aPlatform ); } );
-        !ok )
-      return ok;
-   return load( aMame, [&]( QIODevice& aIn ) { return aDb.loadMame( aIn ); } );
-}
-
 QString pickerRow( const QString& aName, const QString& aYear, const QString& aAltName = {} )
 {
    QString text = aName;
@@ -576,7 +551,7 @@ void ScrapePanel::buildLaunchBoxIndex( const QString& aPlatform )
    const auto result = std::make_shared<Result<>>();
 
    FIndexThread = QThread::create(
-      [=] { *result = loadLaunchBoxIndex( *db, metadata, files, mame, aPlatform ); } );
+      [=] { *result = db->loadDump( metadata, files, mame, aPlatform ); } );
    FIndexThread->setParent( this );
    connect( FIndexThread, &QThread::finished, this, [this, db, result, aPlatform] {
       FIndexThread->deleteLater();
@@ -853,18 +828,10 @@ void ScrapePanel::save()
 void ScrapePanel::finishSave( const QString& aVideoPath )
 {
    const int index = FIndex;
-   const GameFieldSet which = Chk_ScrapeInfos->isChecked()
-                                 ? changedFields( FGamelist->at( index ), fields() )
-                                 : GameFieldSet();
-
-   // Each step saves by itself: a failure stops the later ones, the earlier ones stay saved.
-   Result<> result = FGamelist->setFields( { index }, fields(), which );
-
-   if ( result && Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull() )
-      result = FGamelist->setImage( index, FSelectedPicture );
-
-   if ( result && !aVideoPath.isEmpty() )
-      result = FGamelist->setVideo( index, aVideoPath );
+   const bool picture = Chk_ScrapePicture->isChecked() && !FSelectedPicture.isNull();
+   const Result<> result =
+      applyScrape( *FGamelist, index, fields(), Chk_ScrapeInfos->isChecked(),
+                   picture ? FSelectedPicture : QImage(), aVideoPath );
 
    // Also when an earlier step failed and the video was never used.
    if ( !aVideoPath.isEmpty() )

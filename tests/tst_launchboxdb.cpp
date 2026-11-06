@@ -2,6 +2,7 @@
 
 #include "LaunchBoxDb.h"
 
+#include "GamelistFixture.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
@@ -418,6 +419,40 @@ TEST( LaunchBoxDb, ArcadeUsesFilesAndMame )
    const auto viaMame = db.find( sf2 );
    ASSERT_TRUE( viaMame );
    EXPECT_EQ( viaMame.value().info.name, QStringLiteral( "Street Fighter II: The World Warrior" ) );
+}
+
+TEST( LaunchBoxDb, LoadDumpReadsTheArcadeTablesOnlyForArcade )
+{
+   QTemporaryDir dir;
+   writeFile( dir.filePath( QStringLiteral( "Metadata.xml" ) ), kMetadata );
+   writeFile( dir.filePath( QStringLiteral( "Files.xml" ) ), kFiles );
+   writeFile( dir.filePath( QStringLiteral( "Mame.xml" ) ), kMame );
+   const auto path = [&dir]( const char* aName ) { return dir.filePath( QLatin1String( aName ) ); };
+
+   LaunchBoxDb arcade;
+   const Result<> loaded =
+      arcade.loadDump( path( "Metadata.xml" ), path( "Files.xml" ), path( "Mame.xml" ), Arcade );
+   ASSERT_TRUE( loaded ) << loaded.error().toStdString();
+   EXPECT_TRUE( arcade.find( query( QStringLiteral( "Hyper Street Fighter II (USA 040202)" ) ) ) );
+   EXPECT_TRUE( arcade.find( query( QStringLiteral( "sf2" ) ) ) );
+
+   LaunchBoxDb nes;
+   const Result<> plain = nes.loadDump( path( "Metadata.xml" ), path( "absent.xml" ), path( "absent.xml" ), Nes );
+   ASSERT_TRUE( plain ) << "Files.xml and Mame.xml are not opened outside Arcade";
+   EXPECT_EQ( nes.gameCount(), 5 );
+}
+
+TEST( LaunchBoxDb, LoadDumpNamesTheFileItCannotOpen )
+{
+   QTemporaryDir dir;
+   writeFile( dir.filePath( QStringLiteral( "Metadata.xml" ) ), kMetadata );
+   const QString absent = dir.filePath( QStringLiteral( "Files.xml" ) );
+
+   LaunchBoxDb db;
+   const Result<> missing = db.loadDump( dir.filePath( QStringLiteral( "Metadata.xml" ) ), absent, absent, Arcade );
+   ASSERT_FALSE( missing );
+   EXPECT_TRUE( missing.error().contains( absent ) );
+   EXPECT_FALSE( db.loadDump( absent, absent, absent, Nes ) );
 }
 
 TEST( LaunchBoxDb, BrokenXmlIsAnErrorAndLeavesNoGames )

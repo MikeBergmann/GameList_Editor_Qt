@@ -108,3 +108,6 @@ struct SyncReport
 // ponytail: cancel and progress are per file, not per byte; a big ROM runs to its end.
 SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress = {} );
 SyncReport applySync( const SyncPlan& aPlan, const SyncProgress& aProgress = {} );
+
+// How many times applySync will call its progress callback for aPlan, for a progress bar's range.
+int syncStepCount( const SyncPlan& aPlan );

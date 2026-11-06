@@ -2,6 +2,7 @@
 
 #include "Resources.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QXmlStreamReader>
@@ -326,6 +327,31 @@ Result<> LaunchBoxDb::loadMame( QIODevice& aDevice )
    if ( !done )
       FMame.clear();
    return done;
+}
+
+Result<> LaunchBoxDb::loadDump( const QString& aMetadata, const QString& aFiles,
+                                const QString& aMame, const QString& aPlatform )
+{
+   const auto load = []( const QString& aPath, const auto& aRead ) -> Result<> {
+      QFile file( aPath );
+      if ( !file.open( QIODevice::ReadOnly ) )
+         return Error{ QStringLiteral( "Cannot open %1: %2" ).arg( aPath, file.errorString() ) };
+      return aRead( file );
+   };
+
+   if ( const Result<> ok = load( aMetadata, [&]( QIODevice& aIn ) {
+                                     return loadMetadata( aIn, aPlatform );
+                                  } );
+        !ok )
+      return ok;
+   // Only Arcade needs the ROM-name tables; everywhere else they add nothing.
+   if ( aPlatform != QLatin1String( "Arcade" ) )
+      return {};
+   if ( const Result<> ok =
+           load( aFiles, [&]( QIODevice& aIn ) { return loadFiles( aIn, aPlatform ); } );
+        !ok )
+      return ok;
+   return load( aMame, [&]( QIODevice& aIn ) { return loadMame( aIn ); } );
 }
 
 Result<LaunchBoxMatch> LaunchBoxDb::find( const LaunchBoxQuery& aQuery ) const

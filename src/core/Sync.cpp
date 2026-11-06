@@ -445,3 +445,16 @@ SyncReport applySync( const SyncPlan& aPlan, const SyncProgress& aProgress )
    }
    return report;
 }
+
+int syncStepCount( const SyncPlan& aPlan )
+{
+   int steps = 0;
+   for ( const SystemPlan& system : aPlan.systems ) {
+      if ( system.isEmpty() )
+         continue;
+      for ( const SyncGame& game : system.games )
+         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) + game.copyImage + game.copyVideo;
+      ++steps;
+   }
+   return steps;
+}

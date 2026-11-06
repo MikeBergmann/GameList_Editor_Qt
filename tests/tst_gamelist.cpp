@@ -1539,4 +1539,43 @@ TEST( GamelistCopyMedia, ProgressRunsBeforeEachFileAndCancelingRollsBackTheFiles
    EXPECT_EQ( asked, 2 );
 }
 
+TEST( ApplyScrape, SavesFieldsPictureAndVideoAndSkipsWhatIsOff )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   writeFile( fixture.path( "elsewhere/clip.mp4" ), "video" );
+   GameFields values = gameFields( list.at( 2 ) );
+   values.genre = QStringLiteral( "Shooter" );
+
+   const Result<> none = applyScrape( list, 2, values, false, QImage(), QString() );
+   ASSERT_TRUE( none ) << none.error().toStdString();
+   EXPECT_TRUE( list.at( 2 ).genre.isEmpty() ) << "fields off: nothing is written";
+   EXPECT_TRUE( list.at( 2 ).imagePath.isEmpty() );
+
+   const Result<> all = applyScrape( list, 2, values, true, tinyPicture(), fixture.path( "elsewhere/clip.mp4" ) );
+   ASSERT_TRUE( all ) << all.error().toStdString();
+   EXPECT_EQ( list.at( 2 ).genre, QStringLiteral( "Shooter" ) );
+   EXPECT_EQ( list.at( 2 ).imagePath, QStringLiteral( "./media/images/Vanished.png" ) );
+   EXPECT_EQ( list.at( 2 ).videoPath, QStringLiteral( "./media/videos/Vanished.mp4" ) );
+   EXPECT_EQ( readAll( fixture.path( "elsewhere/clip.mp4" ) ), QByteArray( "video" ) ) << "the caller owns the source";
+}
+
+TEST( ApplyScrape, AFailedStepStopsTheLaterOnesAndKeepsTheEarlierOnes )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   GameFields values = gameFields( list.at( 2 ) );
+   values.genre = QStringLiteral( "Shooter" );
+
+   const Result<> result = applyScrape( list, 2, values, true, tinyPicture(), fixture.path( "absent.mp4" ) );
+
+   EXPECT_FALSE( result );
+   EXPECT_EQ( list.at( 2 ).genre, QStringLiteral( "Shooter" ) );
+   EXPECT_FALSE( list.at( 2 ).imagePath.isEmpty() );
+   EXPECT_TRUE( list.at( 2 ).videoPath.isEmpty() );
+   EXPECT_EQ( reload( fixture ).at( 2 ).genre, QStringLiteral( "Shooter" ) ) << "saved, not just in memory";
+}
+
 }  // namespace
