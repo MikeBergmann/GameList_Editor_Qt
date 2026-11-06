@@ -25,7 +25,7 @@ Frm_AddRoms::Frm_AddRoms( QWidget* aParent ) : QDialog( aParent )
    connect( buttons, &QDialogButtonBox::rejected, this, &QDialog::reject );
 
    QVBoxLayout* layout = new QVBoxLayout( this );
-   layout->addWidget( new QLabel( QStringLiteral( "Files in the system folder that are not in "
+   layout->addWidget( new QLabel( QStringLiteral( "Files and folder ROMs in the system folder that are not in "
                                                   "the gamelist. Untick what you do not want." ),
                                   this ) );
    layout->addWidget( Lst_Roms, 1 );

@@ -1233,6 +1233,31 @@ TEST( Gamelist, ARomThatDiffersOnlyInCaseIsAnotherFile )
    EXPECT_TRUE( unlistedRoms( list ).isEmpty() );
 }
 
+TEST( Gamelist, AFolderRomIsOneUnlistedRomAndCanBeAdded )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/dig.scummvm/data/dig.001" ), "d" );
+   writeFile( fixture.path( "snes/sub/monkey.scummvm/monkey.000" ), "m" );
+   writeFile( fixture.path( "snes/Disc 1/Zelda.sfc" ), "rom" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   EXPECT_EQ( unlistedRoms( list ), QStringList( { fixture.path( "snes/dig.scummvm" ),
+                                                  fixture.path( "snes/Disc 1/Zelda.sfc" ),
+                                                  fixture.path( "snes/sub/monkey.scummvm" ) } ) );
+
+   const Result<int> added = list.addGames( { fixture.path( "snes/dig.scummvm" ) } );
+   ASSERT_TRUE( added ) << added.error().toStdString();
+   EXPECT_EQ( added.value(), 1 );
+   EXPECT_EQ( list.at( list.count() - 1 ).romPath, QStringLiteral( "./dig.scummvm" ) );
+   EXPECT_EQ( list.at( list.count() - 1 ).name, QStringLiteral( "dig" ) );
+   EXPECT_FALSE( list.at( list.count() - 1 ).isOrphan );
+   EXPECT_EQ( unlistedRoms( list ).size(), 2 ) << "a listed folder ROM, and the files in it, drop out";
+
+   const Result<int> root = list.addGames( { fixture.path( "snes" ) } );
+   EXPECT_FALSE( root ) << "the system folder itself is not a ROM";
+}
+
 TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )
 {
    Fixture fixture;

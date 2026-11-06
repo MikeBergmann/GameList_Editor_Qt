@@ -17,6 +17,7 @@ QVector<int> orphanIndexes( const Gamelist& aList );
 QVector<int> duplicateIndexes( const Gamelist& aList );
 
 // Absolute paths of unlisted ROM candidates, sorted. Media is excluded.
+// A folder ROM ("dig.scummvm") is one candidate; its contents are not.
 QStringList unlistedRoms( const Gamelist& aList );
 
 // Files named after a game's ROM, for games whose link is empty or dead.
