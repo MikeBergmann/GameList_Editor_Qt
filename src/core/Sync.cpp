@@ -224,3 +224,147 @@ SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRo
    }
    return plan;
 }
+
+SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress )
+{
+   SystemReport report;
+   report.name = aPlan.pair.source.folderName;
+   if ( aPlan.games.isEmpty() )
+      return report;
+
+   const auto fail = [&report]( const QString& aMessage ) {
+      report.error = aMessage;
+      return report;
+   };
+   const auto proceed = [&]( const QString& aMessage ) {
+      if ( aProgress && !aProgress( aMessage ) ) {
+         report.canceled = true;
+         return false;
+      }
+      return true;
+   };
+
+   Gamelist master;
+   if ( const Result<> loaded = master.load( aPlan.pair.source, true ); !loaded )
+      return fail( loaded.error() );
+
+   if ( aPlan.copyRoms ) {
+      QVector<RomFile> files;
+      for ( const SyncGame& game : aPlan.games )
+         files += game.rom.files;
+
+      if ( !files.isEmpty() ) {
+         if ( const Result<> space = checkFreeSpace( romDirOf( aPlan.pair.target ), aPlan.romBytes ); !space )
+            return fail( space.error() );
+
+         const Result<> copied = copyRomFiles( files, [&]( const RomFile& aFile ) {
+            return proceed( QStringLiteral( "Copying %1" ).arg( QFileInfo( aFile.source ).fileName() ) );
+         } );
+         if ( !copied )
+            return fail( report.canceled ? QStringLiteral( "Canceled." ) : copied.error() );
+      }
+   }
+
+   if ( !proceed( QStringLiteral( "Writing %1" ).arg( report.name ) ) )
+      return fail( QStringLiteral( "Canceled." ) );
+
+   if ( aPlan.createTarget ) {
+      if ( const Result<> made = createGamelist( aPlan.pair.target.gamelistPath ); !made )
+         return fail( made.error() );
+   }
+
+   Gamelist target;
+   if ( const Result<> loaded = target.load( aPlan.pair.target, true ); !loaded )
+      return fail( loaded.error() );
+
+   const auto keyOf = [&target]( const Game& aGame ) {
+      return fileKey( QDir::cleanPath( aGame.romPath ), target.foldsCase() );
+   };
+
+   for ( const SyncGame& game : aPlan.games ) {
+      if ( game.targetIndex < 0 )
+         continue;
+      if ( game.targetIndex >= target.count() || keyOf( target.at( game.targetIndex ) ) != keyOf( master.at( game.sourceIndex ) ) )
+         return fail( QStringLiteral( "%1 changed since the plan was made. Plan again." ).arg( report.name ) );
+   }
+
+   // A ROM that did not reach the target (missing on the master) cannot become a game.
+   QStringList romPaths;
+   QSet<int> unplaced;
+   for ( int i = 0; i < aPlan.games.size(); ++i ) {
+      const SyncGame& game = aPlan.games.at( i );
+      if ( game.targetIndex >= 0 )
+         continue;
+      const QString path = QDir( target.romDir() ).filePath( QDir::cleanPath( game.romLink ) );
+      if ( QFileInfo( path ).isFile() )
+         romPaths << path;
+      else {
+         unplaced.insert( i );
+         report.skipped << QStringLiteral( "%1: the ROM is not on the target." ).arg( game.name );
+      }
+   }
+
+   if ( !romPaths.isEmpty() ) {
+      const Result<int> added = target.addGames( romPaths );
+      if ( !added )
+         return fail( added.error() );
+      report.added = added.value();
+   }
+
+   QHash<QString, int> targetKeys;
+   for ( int i = 0; i < target.count(); ++i )
+      targetKeys.insert( keyOf( target.at( i ) ), i );
+
+   QVector<FieldUpdate> updates;
+   QVector<MediaCopy> copies;
+   for ( int i = 0; i < aPlan.games.size(); ++i ) {
+      const SyncGame& game = aPlan.games.at( i );
+      if ( unplaced.contains( i ) )
+         continue;
+
+      const Game& source = master.at( game.sourceIndex );
+      const int index = game.targetIndex >= 0 ? game.targetIndex : targetKeys.value( keyOf( source ), -1 );
+      if ( index < 0 ) {
+         report.skipped << QStringLiteral( "%1: not found on the target after adding." ).arg( game.name );
+         continue;
+      }
+
+      if ( game.targetIndex >= 0 )
+         ++report.updated;
+      if ( game.fields )
+         updates.append( { index, gameFields( source ), game.fields } );
+      if ( game.copyImage )
+         copies.append( { index, true, game.imageSource } );
+      if ( game.copyVideo )
+         copies.append( { index, false, game.videoSource } );
+   }
+
+   if ( !updates.isEmpty() ) {
+      if ( const Result<> set = target.setFields( updates ); !set )
+         return fail( set.error() );
+   }
+
+   if ( !copies.isEmpty() ) {
+      const Result<MediaCopyReport> copied = target.copyMedia( copies );
+      if ( !copied )
+         return fail( copied.error() );
+      report.mediaCopied = copied.value().copied;
+      report.skipped << copied.value().skipped;
+   }
+   return report;
+}
+
+SyncReport applySync( const SyncPlan& aPlan, const SyncProgress& aProgress )
+{
+   SyncReport report;
+   for ( const SystemPlan& system : aPlan.systems ) {
+      if ( system.isEmpty() )
+         continue;
+      report.systems.append( applySystem( system, aProgress ) );
+      if ( report.systems.last().canceled ) {
+         report.canceled = true;
+         break;
+      }
+   }
+   return report;
+}

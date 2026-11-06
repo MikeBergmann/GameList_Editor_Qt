@@ -8,8 +8,10 @@
 #include <QStringList>
 #include <QVector>
 
+#include <functional>
+
 // One-way sync of a master collection into another folder, whichever layout either side
-// uses. This unit only reads: planSync says what a run would do.
+// uses. planSync only reads and says what a run would do; applySync does it.
 
 // The fields a sync copies. Favorite, hidden, kidgame, playcount, lastplayed and every child
 // the editor does not know stay per device.
@@ -67,3 +69,34 @@ SystemPlan planSystem( const SystemPair& aPair );
 
 // Loads and compares every pair; nothing is written.
 SyncPlan planSync( const QVector<SystemEntry>& aMaster, const QString& aTargetRoot );
+
+// What one system's run did. A non-empty error means it stopped there; what was already
+// copied stays, and a second sync picks up the rest.
+struct SystemReport
+{
+   QString name;
+   int added = 0;        // games put on the target's gamelist
+   int updated = 0;      // existing games that got fields, a ROM or media
+   int mediaCopied = 0;
+   QStringList skipped;  // one line per game or file left out, with the reason
+   QString error;
+   bool canceled = false;
+
+   bool ok() const { return error.isEmpty(); }
+};
+
+struct SyncReport
+{
+   QVector<SystemReport> systems;
+   bool canceled = false;
+};
+
+// Called before each ROM file and each write stage; returning false cancels the run.
+using SyncProgress = std::function<bool( const QString& aMessage )>;
+
+// Per system: free space, ROM files, the gamelist (made first if needed), fields, media.
+// A failing system is reported and the next one still runs. Games are found by the indices
+// the plan holds; a target changed since then is reported, not guessed at.
+// ponytail: cancel and progress are per file, not per byte; a big ROM runs to its end.
+SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress = {} );
+SyncReport applySync( const SyncPlan& aPlan, const SyncProgress& aProgress = {} );

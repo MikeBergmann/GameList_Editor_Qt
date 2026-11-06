@@ -1,9 +1,11 @@
 #include "GamelistFixture.h"
 #include "QtPrinters.h"
+#include "Gamelist.h"
 #include "Sync.h"
 
 #include <gtest/gtest.h>
 
+#include <QImage>
 #include <QSettings>
 
 namespace {
@@ -297,6 +299,127 @@ TEST( SyncPlan, AGameMatchesWhateverTheCaseWhenTheTargetVolumeFoldsIt )
    putSystem( roots.target(), "snes", game( "SONIC.ZIP", "Sonic" ), { "SONIC.ZIP" } );
 
    EXPECT_TRUE( roots.plan().isEmpty() ) << "no duplicate game for a case difference";
+}
+
+QByteArray fileText( const QString& aPath )
+{
+   QFile file( aPath );
+   return file.open( QIODevice::ReadOnly ) ? file.readAll() : QByteArray();
+}
+
+Gamelist loadTarget( const QString& aRoot, const char* aFolder )
+{
+   Gamelist list;
+   const Result<> loaded = list.load( systemAt( aRoot, QLatin1String( aFolder ) ), true );
+   EXPECT_TRUE( loaded ) << loaded.error().toStdString();
+   return list;
+}
+
+TEST( SyncApply, LegacyToLegacyAddsGamesFieldsRomsAndMediaThenHasNothingLeftToDo )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes",
+              game( "Sonic.zip", "Sonic", "<genre>Platform</genre><image>./Sonic.png</image>" ) +
+                 game( "Mario.zip", "Mario", "<desc>Jump</desc><video>./Mario.mp4</video>" ),
+              { "Sonic.zip", "Mario.zip" } );
+   writeFile( roots.master( "snes/Sonic.png" ), "AAAA" );
+   writeFile( roots.master( "snes/Mario.mp4" ), "video" );
+   putSystem( roots.target(), "snes", game( "Sonic.zip", "Sonic", "<favorite>true</favorite>" ), { "Sonic.zip" } );
+
+   const SyncReport report = applySync( roots.plan() );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   const SystemReport& system = report.systems.first();
+   EXPECT_TRUE( system.ok() ) << system.error.toStdString();
+   EXPECT_EQ( system.added, 1 );
+   EXPECT_EQ( system.updated, 1 );
+   EXPECT_EQ( system.mediaCopied, 2 );
+
+   const Gamelist target = loadTarget( roots.target(), "snes" );
+   ASSERT_EQ( target.count(), 2 );
+   EXPECT_EQ( target.at( 0 ).genre, QStringLiteral( "Platform" ) );
+   EXPECT_TRUE( target.at( 0 ).favorite ) << "a per-device flag is left alone";
+   EXPECT_FALSE( target.at( 0 ).missingImage );
+   EXPECT_EQ( target.at( 1 ).name, QStringLiteral( "Mario" ) );
+   EXPECT_EQ( target.at( 1 ).description, QStringLiteral( "Jump" ) );
+   EXPECT_FALSE( target.at( 1 ).missingVideo );
+   EXPECT_EQ( fileText( roots.target( "snes/Mario.zip" ) ), QByteArray( "rom" ) );
+
+   EXPECT_TRUE( roots.plan().isEmpty() ) << "a second run has nothing to do";
+}
+
+TEST( SyncApply, LegacyToEsdeConvertsWhatEsdeCannotReadAndIsThenQuiet )
+{
+   Roots roots;
+   roots.makeEsde( roots.target() );
+   putSystem( roots.master(), "snes", game( "Mario.zip", "Mario", "<image>./m.jpeg</image><video>./m.mkv</video>" ),
+              { "Mario.zip" } );
+   QImage picture( 4, 4, QImage::Format_RGB32 );
+   picture.fill( Qt::red );
+   ASSERT_TRUE( picture.save( roots.master( "snes/m.jpeg" ), "JPEG" ) );
+   writeFile( roots.master( "snes/m.mkv" ), "video" );
+
+   const SyncReport report = applySync( roots.plan() );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   EXPECT_TRUE( report.systems.first().ok() ) << report.systems.first().error.toStdString();
+   EXPECT_TRUE( QFileInfo::exists( roots.at( "ROMs/snes/Mario.zip" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( roots.target( "downloaded_media/snes/covers/Mario.png" ) ) ) << "jpeg becomes PNG";
+   EXPECT_TRUE( QFileInfo::exists( roots.target( "downloaded_media/snes/videos/Mario.mkv" ) ) );
+
+   EXPECT_TRUE( roots.plan().isEmpty() ) << "a converted cover is not planned again";
+}
+
+TEST( SyncApply, EsdeToLegacyCreatesTheTargetSystem )
+{
+   Roots roots;
+   roots.makeEsde( roots.master() );
+   writeFile( roots.master( "gamelists/snes/gamelist.xml" ), list( game( "Sonic.zip", "Sonic", "<genre>Platform</genre>" ) ) );
+   writeFile( roots.at( "ROMs/snes/Sonic.zip" ), "rom" );
+   writeFile( roots.master( "downloaded_media/snes/covers/Sonic.jpg" ), "jpg bytes" );
+   ASSERT_TRUE( QDir().mkpath( roots.target() ) );
+
+   const SyncReport report = applySync( roots.plan() );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   EXPECT_TRUE( report.systems.first().ok() ) << report.systems.first().error.toStdString();
+   const Gamelist target = loadTarget( roots.target(), "snes" );
+   ASSERT_EQ( target.count(), 1 );
+   EXPECT_EQ( target.at( 0 ).genre, QStringLiteral( "Platform" ) );
+   EXPECT_FALSE( target.at( 0 ).missingImage );
+   EXPECT_EQ( fileText( roots.target( "snes/Sonic.zip" ) ), QByteArray( "rom" ) );
+
+   EXPECT_TRUE( roots.plan().isEmpty() );
+}
+
+TEST( SyncApply, CancelingBeforeAFileStopsTheRunAndLeavesTheTargetAlone )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Mario.zip", "Mario" ), { "Mario.zip" } );
+   putSystem( roots.target(), "snes", game( "Sonic.zip", "Sonic" ), { "Sonic.zip" } );
+
+   const SyncReport report = applySync( roots.plan(), []( const QString& ) { return false; } );
+
+   EXPECT_TRUE( report.canceled );
+   ASSERT_EQ( report.systems.size(), 1 );
+   EXPECT_FALSE( report.systems.first().ok() );
+   EXPECT_FALSE( QFileInfo::exists( roots.target( "snes/Mario.zip" ) ) );
+   EXPECT_EQ( loadTarget( roots.target(), "snes" ).count(), 1 );
+}
+
+TEST( SyncApply, ATargetChangedSinceThePlanIsReportedAndNotGuessedAt )
+{
+   Roots roots;
+   putSystem( roots.master(), "snes", game( "Sonic.zip", "Sonic", "<genre>Platform</genre>" ), { "Sonic.zip" } );
+   putSystem( roots.target(), "snes", game( "Sonic.zip", "Sonic" ), { "Sonic.zip" } );
+   const SyncPlan plan = roots.plan();
+   putSystem( roots.target(), "snes", game( "Other.zip", "Other" ) + game( "Sonic.zip", "Sonic" ), { "Other.zip" } );
+
+   const SyncReport report = applySync( plan );
+
+   ASSERT_EQ( report.systems.size(), 1 );
+   EXPECT_FALSE( report.systems.first().ok() );
+   EXPECT_TRUE( loadTarget( roots.target(), "snes" ).at( 1 ).genre.isEmpty() );
 }
 
 }  // namespace
