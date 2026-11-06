@@ -237,6 +237,44 @@ TEST( MediaOps, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
    EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
 }
 
+TEST( MediaOps, ShrinkImagesTalliesTheBatchAndGoesOnPastAFailure )
+{
+   Fixture fixture;
+   QImage noise( 300, 200, QImage::Format_RGB32 );
+   quint32 state = 7;
+   for ( int y = 0; y < noise.height(); ++y )
+      for ( int x = 0; x < noise.width(); ++x ) {
+         state = state * 1664525u + 1013904223u;
+         noise.setPixel( x, y, state | 0xFF000000u );
+      }
+   const QString first = fixture.path( "a.png" );
+   const QString junk = fixture.path( "junk.png" );
+   const QString last = fixture.path( "b.png" );
+   ASSERT_TRUE( noise.save( first ) );
+   ASSERT_TRUE( noise.save( last ) );
+   writeFile( junk, QByteArray( 5000, 'x' ) );
+   const qint64 size = QFileInfo( first ).size();
+   const qint64 limit = size / 3;
+   const QVector<OversizedImage> batch{ { 0, first, size }, { 1, junk, 5000 }, { 2, last, size } };
+
+   QVector<int> seen;
+   const ShrinkReport report = shrinkImages( batch, limit, [&seen]( int aDone ) {
+      seen << aDone;
+      return true;
+   } );
+
+   EXPECT_EQ( seen, ( QVector<int>{ 0, 1, 2 } ) );
+   EXPECT_EQ( report.shrunk, 2 );
+   ASSERT_EQ( report.problems.size(), 1 );
+   EXPECT_TRUE( report.problems.first().contains( QStringLiteral( "junk.png" ) ) );
+   EXPECT_EQ( report.saved, ( size - QFileInfo( first ).size() ) + ( size - QFileInfo( last ).size() ) );
+   EXPECT_GT( report.saved, 0 );
+
+   const ShrinkReport stopped = shrinkImages( batch, limit, []( int aDone ) { return aDone < 1; } );
+   EXPECT_EQ( stopped.shrunk, 1 ) << "stops before the second picture";
+   EXPECT_TRUE( stopped.problems.isEmpty() );
+}
+
 // What a failed link or rename must leave behind: the game, and the DOM, as they were.
 void expectLinksAre( const Gamelist& aList, int aIndex, const Game& aBefore, const QString& aImageDom,
                      const QString& aVideoDom )

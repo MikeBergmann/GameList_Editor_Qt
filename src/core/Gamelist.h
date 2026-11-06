@@ -246,3 +246,9 @@ private:
    QHash<QString, int> FNameCounts;
    QHash<QString, int> FRomCounts;
 };
+
+// Saves scraped data to one game: fields (only those that differ), then the picture, then the
+// video; each is skipped when off, null or empty. Each step saves by itself, so a failure
+// stops the later ones and leaves the earlier ones saved.
+Result<> applyScrape( Gamelist& aList, int aIndex, const GameFields& aFields, bool aSaveFields,
+                      const QImage& aPicture, const QString& aVideoPath );

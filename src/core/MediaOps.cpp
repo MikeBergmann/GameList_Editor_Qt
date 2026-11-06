@@ -375,3 +375,22 @@ Result<qint64> shrinkImageFile( const QString& aPath, qint64 aMaxBytes )
 
    return qint64( encoded.size() );
 }
+
+ShrinkReport shrinkImages( const QVector<OversizedImage>& aImages, qint64 aMaxBytes,
+                           const std::function<bool( int aDone )>& aProgress )
+{
+   ShrinkReport report;
+   for ( int row = 0; row < aImages.size(); ++row ) {
+      if ( aProgress && !aProgress( row ) )
+         break;
+
+      const Result<qint64> size = shrinkImageFile( aImages.at( row ).path, aMaxBytes );
+      if ( !size ) {
+         report.problems << size.error();
+         continue;
+      }
+      ++report.shrunk;
+      report.saved += aImages.at( row ).size - size.value();
+   }
+   return report;
+}

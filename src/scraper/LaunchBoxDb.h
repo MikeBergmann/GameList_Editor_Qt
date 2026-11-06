@@ -48,6 +48,10 @@ public:
    Result<> loadFiles( QIODevice& aDevice, const QString& aPlatform );
    Result<> loadMame( QIODevice& aDevice );
 
+   // The three dump files for one platform; Files.xml and Mame.xml are read for Arcade only.
+   Result<> loadDump( const QString& aMetadata, const QString& aFiles, const QString& aMame,
+                      const QString& aPlatform );
+
    int gameCount() const { return static_cast<int>( FGames.size() ); }
 
    // An Error "Game not found" when nothing matches.
