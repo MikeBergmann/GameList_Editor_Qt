@@ -72,6 +72,20 @@ QString folderOf( const QString& aLink )
    return aLink.left( aLink.lastIndexOf( QLatin1Char( '/' ) ) + 1 );
 }
 
+// aDash when aLink is <ROM name><aDash>.<ext>: new media then follows that style.
+QString dashOf( const Game& aGame, const QString& aLink, const char* aDash )
+{
+   const QString base = QFileInfo( aLink ).completeBaseName();
+   const QString dash = QLatin1String( aDash );
+   if ( !base.endsWith( dash, Qt::CaseInsensitive ) )
+      return {};
+
+   const QString rom = base.chopped( dash.size() );
+   const bool named = rom.compare( aGame.romNameWoExt(), Qt::CaseInsensitive ) == 0 ||
+                      rom.compare( aGame.romName(), Qt::CaseInsensitive ) == 0;
+   return named ? dash : QString();
+}
+
 // A missing node reads as empty.
 QString childText( const QDomElement& aNode, const char* aName )
 {
@@ -121,6 +135,8 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
    FEntries.clear();
    FImageFolder = QLatin1String( Cst_DefaultImageFolder );
    FVideoFolder = QLatin1String( Cst_DefaultVideoFolder );
+   FImageDash.clear();
+   FVideoDash.clear();
    FNameCounts.clear();
    FRomCounts.clear();
 
@@ -172,10 +188,12 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
 
       if ( !imageFolderFound && !game.imagePath.isEmpty() ) {
          FImageFolder = folderOf( game.imagePath );
+         FImageDash = dashOf( game, game.imagePath, Cst_ImageDash );
          imageFolderFound = true;
       }
       if ( !videoFolderFound && !game.videoPath.isEmpty() ) {
          FVideoFolder = folderOf( game.videoPath );
+         FVideoDash = dashOf( game, game.videoPath, Cst_VideoDash );
          videoFolderFound = true;
       }
 
@@ -540,6 +558,7 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage, const QString& aSuff
 {
    const Game& game = FEntries.at( aIndex ).game;
    const QString folder = aIsImage ? FImageFolder : FVideoFolder;
+   const QString& dash = aIsImage ? FImageDash : FVideoDash;
    const QString suffix = !aSuffix.isEmpty() ? aSuffix
                           : QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
 
@@ -552,7 +571,7 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage, const QString& aSuff
                            : attempt == 1 ? game.romName()
                                           : game.romNameWoExt() + QLatin1Char( '_' ) +
                                                QString::number( attempt );
-      const QString link = folder + stem + suffix;
+      const QString link = folder + stem + dash + suffix;
       const QString target = writeTarget( FRomDir, link );
 
       // ponytail: a scan of every game per attempt, so a ChangeAll over N games is O(N^2)

@@ -219,6 +219,10 @@ inline constexpr const char* Cst_DateSuffix = "T000000";
 
 inline constexpr const char* Cst_ImageSuffixPng = ".png";
 inline constexpr const char* Cst_VideoSuffixMp4 = ".mp4";
+
+// Scrapers may append these to the ROM name: Sonic-image.png, Sonic-video.mp4.
+inline constexpr const char* Cst_ImageDash = "-image";
+inline constexpr const char* Cst_VideoDash = "-video";
 inline constexpr const char* Cst_TxtExtension = ".txt";
 
 // --- bundled assets -------------------------------------------------------

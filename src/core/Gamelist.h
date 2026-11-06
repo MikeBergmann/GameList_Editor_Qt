@@ -135,7 +135,8 @@ public:
    // Child text as it is in the DOM, not the Game. Empty if absent.
    QString domText( int aIndex, const char* aName ) const;
 
-   // Where new media goes; copied from the first game that has any.
+   // Where new media goes, and whether it is named Sonic-image.png (dash style); both come
+   // from the first game that has any. ponytail: mixed styles follow that game; upgrade: vote.
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 
@@ -237,6 +238,8 @@ private:
 
    QString FImageFolder;
    QString FVideoFolder;
+   QString FImageDash;
+   QString FVideoDash;
    bool FFoldsCase = false;
    bool FBackedUp = false;
 
