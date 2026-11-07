@@ -168,6 +168,12 @@ bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
    return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
 }
 
+bool sameLocation( const QString& aA, const QString& aB )
+{
+   const QString a = QFileInfo( aA ).canonicalFilePath();
+   return !a.isEmpty() && a == QFileInfo( aB ).canonicalFilePath();
+}
+
 QByteArray wrapInRoot( const QByteArray& aXml, QLatin1StringView aRoot )
 {
    qsizetype at = aXml.startsWith( "\xEF\xBB\xBF" ) ? 3 : 0;

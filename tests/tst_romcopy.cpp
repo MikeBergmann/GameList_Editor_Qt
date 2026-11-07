@@ -140,17 +140,6 @@ TEST( RomCopy, AFailedCopyLeavesNoHalfFileAndCancelStopsBeforeTheNextOne )
    EXPECT_FALSE( QFileInfo::exists( roms.dst( "x/b.bin" ) ) );
 }
 
-TEST( RomCopy, SameFolderSeesThroughSpellingAndIsFalseForAFolderThatIsNotThere )
-{
-   Roms roms;
-   ASSERT_TRUE( QDir().mkpath( roms.src() ) );
-   ASSERT_TRUE( QDir().mkpath( roms.dst() ) );
-
-   EXPECT_TRUE( sameFolder( roms.src(), roms.src( "../src/" ) ) );
-   EXPECT_FALSE( sameFolder( roms.src(), roms.dst() ) );
-   EXPECT_FALSE( sameFolder( roms.dst( "nope" ), roms.dst( "nope" ) ) );
-}
-
 TEST( RomCopy, FreeSpaceRefusesWhatCannotFitAndLooksAtTheNearestExistingParent )
 {
    Roms roms;

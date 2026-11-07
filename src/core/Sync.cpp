@@ -10,11 +10,6 @@
 
 namespace {
 
-QString romDirOf( const SystemEntry& aSystem )
-{
-   return aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
-                                   : QDir( aSystem.romDir ).absolutePath();
-}
 
 // By the file's case on disk, so a Windows link matches the file a sync copied.
 QString romKey( const Gamelist& aList, const QString& aPhysicalPath, bool aFoldsCase )
@@ -124,8 +119,7 @@ SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
    };
 
    const QString name = aPair.source.folderName;
-   const QString sourceFile = QFileInfo( aPair.source.gamelistPath ).canonicalFilePath();
-   if ( !sourceFile.isEmpty() && sourceFile == QFileInfo( aPair.target.gamelistPath ).canonicalFilePath() ) {
+   if ( sameLocation( aPair.source.gamelistPath, aPair.target.gamelistPath ) ) {
       plan.problems << QStringLiteral( "%1: the target is the master's own gamelist." ).arg( name );
       return plan;
    }
@@ -151,7 +145,7 @@ SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
    const bool foldsCase = target.foldsCase();
    const bool targetEsde = !aPair.target.mediaDir.isEmpty();
    const QString targetRomDir = romDirOf( aPair.target );
-   plan.copyRoms = !sameFolder( master.romDir(), targetRomDir );
+   plan.copyRoms = !sameLocation( master.romDir(), targetRomDir );
 
    const auto keyOf = [foldsCase]( const Gamelist& aList, const Game& aGame ) {
       return romKey( aList, aGame.physicalRomPath, foldsCase );

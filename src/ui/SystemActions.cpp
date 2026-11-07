@@ -305,7 +305,7 @@ void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
    if ( targetRoot.isEmpty() )
       return;
 
-   if ( QFileInfo( targetRoot ).canonicalFilePath() == QFileInfo( aMasterRoot ).canonicalFilePath() ) {
+   if ( sameLocation( targetRoot, aMasterRoot ) ) {
       QMessageBox::warning( aParent, title, QStringLiteral( "That is the folder you are syncing from." ) );
       return;
    }
