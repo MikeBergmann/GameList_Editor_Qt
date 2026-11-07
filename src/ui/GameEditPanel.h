@@ -87,6 +87,8 @@ private:
 
    void chooseImage();
    void chooseVideo();
+   void removePicture();
+   void removeVideo();
    void setDefaultPicture();
    void setDefaultPictureForAll();
    void deleteGame();

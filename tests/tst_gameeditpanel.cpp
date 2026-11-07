@@ -223,4 +223,26 @@ TEST( GameEditPanel, TheDeleteMediaButtonsFollowWhatTheGameHas )
    EXPECT_FALSE( panel.button( "Btn_RemoveVideo" )->isEnabled() );
 }
 
+TEST( GameEditPanel, TabFollowsTheScreenNotTheCreationOrder )
+{
+   Panel panel;
+   const QStringList expected = {
+      "Edt_Name", "Edt_RomPath", "Edt_ReleaseDate", "Edt_Genre", "Edt_Region", "Edt_NbPlayers",
+      "Edt_Rating", "Edt_Developer", "Edt_Publisher", "Cbx_KidGame", "Cbx_Hidden",
+      "Cbx_Favorite", "Btn_PlayVideo", "Chk_MuteVideo", "Btn_ChangeImage", "Btn_RemovePicture",
+      "Btn_ChangeVideo", "Btn_RemoveVideo", "Btn_SetDefaultPicture", "Btn_ChangeAll",
+      "Mmo_Description", "Btn_MoreInfos", "Btn_DeleteGame", "Btn_SaveChanges" };
+
+   QStringList chain;
+   QWidget* const first = panel.edit( "Edt_Name" );
+   QWidget* widget = first;
+   do {
+      if ( expected.contains( widget->objectName() ) )
+         chain << widget->objectName();
+      widget = widget->nextInFocusChain();
+   } while ( widget != first );
+
+   EXPECT_EQ( chain, expected );
+}
+
 }  // namespace
