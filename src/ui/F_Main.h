@@ -113,6 +113,7 @@ private:
    QCheckBox* Chk_FullRomName = nullptr;
    QListView* Lbx_Games = nullptr;
    QLabel* Img_System = nullptr;
+   QWidget* FListColumn = nullptr;
    QPixmap FSystemLogo;
    QLabel* Lbl_NbGamesFound = nullptr;
 

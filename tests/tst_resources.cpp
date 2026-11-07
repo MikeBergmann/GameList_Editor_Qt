@@ -23,9 +23,12 @@ TEST( Resources, EverySystemHasADisplayNameAndAScraperId )
 {
    for ( int i = 0; i < skCount; ++i ) {
       SCOPED_TRACE( i );
-      EXPECT_EQ( systemInfo( static_cast<SystemKind>( i ) ).kind, i );
-      EXPECT_STRNE( systemInfo( static_cast<SystemKind>( i ) ).name, "" );
-      EXPECT_STRNE( systemInfo( static_cast<SystemKind>( i ) ).ssId, "" );
+      const SystemInfo& info = systemInfo( static_cast<SystemKind>( i ) );
+      EXPECT_EQ( info.kind, i );
+      ASSERT_NE( info.name, nullptr );
+      ASSERT_NE( info.ssId, nullptr );
+      EXPECT_STRNE( info.name, "" );
+      EXPECT_STRNE( info.ssId, "" );
    }
 }
 
@@ -118,6 +121,7 @@ TEST( Resources, EveryCountryIsNamedInEveryLanguage )
    for ( int i = 0; i < cnCount; ++i ) {
       for ( int lang = 0; lang < lnCount; ++lang ) {
          SCOPED_TRACE( testing::Message() << i << '/' << lang );
+         ASSERT_NE( Cst_CountryNameFull[i][lang], nullptr );
          EXPECT_EQ( *Cst_CountryNameFull[i][lang] != '\0', i != cnUnd );
       }
    }
@@ -133,6 +137,10 @@ TEST( Resources, AccentedCountryNamesAreUtf8 )
               QStringLiteral( "Deutschland" ) );
    EXPECT_EQ( QString::fromUtf8( Cst_CountryNameFull[cnUk][lnGerman] ),
               QStringLiteral( "Gro\u00dfbritannien" ) );
+   EXPECT_EQ( QString::fromUtf8( Cst_CountryNameFull[cnSe][lnFrench] ),
+              QStringLiteral( "Su\u00e8de" ) );
+   EXPECT_EQ( QString::fromUtf8( Cst_CountryNameFull[cnWor][lnGerman] ),
+              QStringLiteral( "Welt" ) );
 }
 
 // Out-of-range falling back to English is what makes Cst_IniLanguageDefault

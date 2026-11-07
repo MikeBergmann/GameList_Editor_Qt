@@ -174,7 +174,7 @@ struct SystemInfo
 // The row of aKind; the table is checked to follow the enum order.
 const SystemInfo& systemInfo( SystemKind aKind );
 
-// Two-letter codes as screenscraper.fr writes them. Cst_CountryName[cnUnd] is "".
+// screenscraper.fr region/country codes (mostly ISO, also asi, wor, oce). Cst_CountryName[cnUnd] is "".
 extern const char* const Cst_CountryName[cnCount];
 // Country name per UI language, indexed [country][lang].
 extern const char* const Cst_CountryNameFull[cnCount][lnCount];
