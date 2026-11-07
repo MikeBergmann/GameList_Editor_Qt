@@ -34,9 +34,7 @@ public:
    bool isCached() const;
    bool busy() const { return FBusy; }
 
-   // Empty aServer disables the proxy.
-   void setProxy( const QString& aServer, int aPort, const QString& aUser,
-                  const QString& aPassword );
+
    // For tests.
    void setUrl( const QUrl& aUrl ) { FUrl = aUrl; }
 

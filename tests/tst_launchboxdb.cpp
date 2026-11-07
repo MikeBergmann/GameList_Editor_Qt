@@ -269,7 +269,7 @@ TEST( LaunchBoxDb, NotFoundIsAnError )
    const LaunchBoxDb db = nesDb();
    const auto missing = db.find( query( QStringLiteral( "No Such Game" ), QStringLiteral( "Nope" ) ) );
    ASSERT_FALSE( missing );
-   EXPECT_EQ( missing.error(), QStringLiteral( "Game not found" ) );
+   EXPECT_EQ( missing.error(), QString( Cst_GameNotFound ) );
 }
 
 TEST( LaunchBoxDb, SimilarRanksTyposMissingSubtitlesAndAlternateNames )

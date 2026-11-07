@@ -99,9 +99,6 @@ class Scraper : public QObject
 public:
    explicit Scraper( QObject* aParent = nullptr );
 
-   // Empty aServer disables the proxy.
-   void setProxy( const QString& aServer, int aPort, const QString& aUser,
-                  const QString& aPassword );
 
    // The video is offered apart from the pictures, hence aWantVideo.
    void requestGame( const ScrapeRequest& aRequest, const QSet<QString>& aMediaTypes,
@@ -116,6 +113,7 @@ public:
    void requestMedia( const QVector<MediaInfo>& aMedia, int aMaxThreads = 1 );
 
 
+   // Written atomically; answers with fileSaved or fileSaveFailed.
    void downloadToFile( const QString& aUrl, const QString& aDestPath );
 
 signals:

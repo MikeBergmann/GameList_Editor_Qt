@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QNetworkProxy>
 #include <QPixmap>
 #include <QPlainTextEdit>
 #include <QProgressBar>
@@ -338,11 +339,10 @@ void ScrapePanel::activate()
       const int port = settings.value( Cst_IniProxyPort, 0 ).toInt();
       const QString user = settings.value( Cst_IniProxyUser ).toString();
       const QString password = settings.value( Cst_IniProxyPwd ).toString();
-      FScraper.setProxy( server, port, user, password );
-      FDump.setProxy( server, port, user, password );
+      QNetworkProxy::setApplicationProxy( QNetworkProxy(
+         QNetworkProxy::HttpProxy, server, static_cast<quint16>( port ), user, password ) );
    } else {
-      FScraper.setProxy( QString(), 0, QString(), QString() );
-      FDump.setProxy( QString(), 0, QString(), QString() );
+      QNetworkProxy::setApplicationProxy( QNetworkProxy::NoProxy );
    }
 
    FSSLogin = settings.value( Cst_IniSSUser ).toString();
@@ -590,7 +590,7 @@ void ScrapePanel::lookupLaunchBox()
 void ScrapePanel::pickLaunchBoxGame( const LaunchBoxQuery& aQuery )
 {
    if ( FLbIndex->gameCount() == 0 ) {
-      handleGameInfoFailed( QStringLiteral( "Game not found" ), {} );
+      handleGameInfoFailed( Cst_GameNotFound, {} );
       return;
    }
 

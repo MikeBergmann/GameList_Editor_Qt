@@ -284,7 +284,7 @@ inline constexpr QLatin1StringView Cst_RomName{ "&romnom=" };
 inline constexpr QLatin1StringView Cst_RomSize{ "&romtaille=" };
 inline constexpr QLatin1StringView Cst_SearchText{ "&recherche=" };
 
-// What Scraper reports when the server has no match; ScrapePanel offers a search on it.
+// What the scrapers report when nothing matches; ScrapePanel offers a search on it.
 inline constexpr QLatin1StringView Cst_GameNotFound{ "Game not found" };
 
 
