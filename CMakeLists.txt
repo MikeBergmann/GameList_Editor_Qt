@@ -118,6 +118,7 @@ add_library( gle_scraper STATIC
    src/scraper/LaunchBoxDb.cpp
    src/scraper/LaunchBoxDump.cpp
    src/scraper/Scraper.cpp
+   src/scraper/Unzip.cpp
 )
 target_include_directories( gle_scraper PUBLIC src/scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" )
 target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
