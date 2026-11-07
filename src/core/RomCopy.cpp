@@ -175,6 +175,6 @@ Result<> checkFreeSpace( const QString& aTargetDir, qint64 aBytes )
 
    return Error{ QStringLiteral( "Not enough space on %1: %2 MB needed, %3 MB free." )
                     .arg( volume.rootPath() )
-                    .arg( ( aBytes + 1048575 ) / 1048576 )
+                    .arg( aBytes / 1048576 + ( aBytes % 1048576 ? 1 : 0 ) )
                     .arg( volume.bytesAvailable() / 1048576 ) };
 }
