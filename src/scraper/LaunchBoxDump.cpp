@@ -1,11 +1,12 @@
 #include "LaunchBoxDump.h"
 
+#include "NetUtil.h"
 #include "Resources.h"
 #include "Unzip.h"
 
 #include <QDir>
 #include <QFile>
-#include <QNetworkProxy>
+
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSaveFile>
@@ -20,15 +21,6 @@ namespace {
 
 const QLatin1String Cst_ZipUrl( "https://gamesdb.launchbox-app.com/Metadata.zip" );
 const QLatin1String Cst_ZipName( "Metadata.zip" );
-
-QString describeError( const QNetworkReply* aReply )
-{
-   const QVariant status = aReply->attribute( QNetworkRequest::HttpStatusCodeAttribute );
-   QString description = aReply->errorString();
-   if ( status.isValid() )
-      description += QStringLiteral( " (HTTP %1)" ).arg( status.toInt() );
-   return description;
-}
 
 }  // namespace
 
@@ -67,16 +59,6 @@ bool LaunchBoxDump::isCached() const
                        [this]( const QString& aName ) { return QFile::exists( filePath( aName ) ); } );
 }
 
-void LaunchBoxDump::setProxy( const QString& aServer, int aPort, const QString& aUser,
-                              const QString& aPassword )
-{
-   if ( aServer.isEmpty() ) {
-      FManager.setProxy( QNetworkProxy::NoProxy );
-      return;
-   }
-   FManager.setProxy( QNetworkProxy( QNetworkProxy::HttpProxy, aServer,
-                                     static_cast<quint16>( aPort ), aUser, aPassword ) );
-}
 
 void LaunchBoxDump::refresh()
 {

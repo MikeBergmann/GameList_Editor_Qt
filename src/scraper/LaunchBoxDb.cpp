@@ -386,7 +386,7 @@ Result<LaunchBoxMatch> LaunchBoxDb::find( const LaunchBoxQuery& aQuery ) const
          return match;
       }
    }
-   return Error{ QStringLiteral( "Game not found" ) };
+   return Error{ QString( Cst_GameNotFound ) };
 }
 
 QVector<LaunchBoxCandidate> LaunchBoxDb::similar( const QString& aText, int aLimit ) const

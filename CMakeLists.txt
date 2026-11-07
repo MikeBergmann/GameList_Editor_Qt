@@ -117,6 +117,7 @@ configure_file( src/scraper/DevCredentials.h.in generated/DevCredentials.h @ONLY
 add_library( gle_scraper STATIC
    src/scraper/LaunchBoxDb.cpp
    src/scraper/LaunchBoxDump.cpp
+   src/scraper/NetUtil.cpp
    src/scraper/Scraper.cpp
    src/scraper/Unzip.cpp
 )

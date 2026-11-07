@@ -1,11 +1,11 @@
 #include "Scraper.h"
 
 #include "DevCredentials.h"
+#include "NetUtil.h"
+#include "PathUtil.h"
 
 #include <QDomDocument>
-#include <QFile>
 #include <QHash>
-#include <QNetworkProxy>
 #include <QNetworkReply>
 #include <QRegularExpression>
 #include <QStringList>
@@ -224,18 +224,9 @@ namespace {
 constexpr QLatin1StringView Cst_StreamError{
    "Oops !! An error has occured while reading the stream !!" };
 
-// errorString() reports "... - server replied: <reason phrase>", but HTTP/2
-// (which screenscraper.fr uses) has no textual reason phrase, so that half is
-// silently empty and the message names nothing useful. The status code is
-// still available regardless of protocol version, so append it explicitly.
-QString describeError( const QNetworkReply* aReply )
-{
-   const QVariant status = aReply->attribute( QNetworkRequest::HttpStatusCodeAttribute );
-   QString description = aReply->errorString();
-   if ( status.isValid() )
-      description += QStringLiteral( " (HTTP %1)" ).arg( status.toInt() );
-   return description;
-}
+constexpr QLatin1StringView Cst_NoDevCredentials{
+   "This build has no screenscraper.fr developer credentials. Rebuild with "
+   "-DGLE_SS_DEVID=... -DGLE_SS_DEVPWD=... (see README)." };
 
 }  // namespace
 
@@ -303,16 +294,6 @@ Scraper::Scraper( QObject* aParent ) : QObject( aParent )
    FManager.setTransferTimeout( QNetworkRequest::DefaultTransferTimeoutConstant );
 }
 
-void Scraper::setProxy( const QString& aServer, int aPort, const QString& aUser,
-                        const QString& aPassword )
-{
-   if ( aServer.isEmpty() ) {
-      FManager.setProxy( QNetworkProxy::NoProxy );
-      return;
-   }
-   FManager.setProxy( QNetworkProxy( QNetworkProxy::HttpProxy, aServer,
-                                     static_cast<quint16>( aPort ), aUser, aPassword ) );
-}
 
 // What the server actually sent, for the error dialog's details box and its export. Not
 // truncated. The request comes first so the details show which systemeid/crc/romnom were sent.
@@ -326,9 +307,7 @@ void Scraper::requestGame( const ScrapeRequest& aRequest, const QSet<QString>& a
                            bool aWantVideo, LangName aLanguage )
 {
    if ( !devCredentialsConfigured() ) {
-      emit gameInfoFailed( QStringLiteral(
-         "This build has no screenscraper.fr developer credentials. Rebuild with "
-         "-DGLE_SS_DEVID=... -DGLE_SS_DEVPWD=... (see README)." ) );
+      emit gameInfoFailed( Cst_NoDevCredentials );
       return;
    }
 
@@ -376,9 +355,7 @@ void Scraper::searchGames( const ScrapeRequest& aRequest, const QString& aText,
                            LangName aLanguage )
 {
    if ( !devCredentialsConfigured() ) {
-      emit searchFailed( QStringLiteral(
-         "This build has no screenscraper.fr developer credentials. Rebuild with "
-         "-DGLE_SS_DEVID=... -DGLE_SS_DEVPWD=... (see README)." ) );
+      emit searchFailed( Cst_NoDevCredentials );
       return;
    }
 
@@ -472,9 +449,9 @@ void Scraper::downloadToFile( const QString& aUrl, const QString& aDestPath )
          return;
       }
 
-      QFile file( aDestPath );
-      if ( !file.open( QIODevice::WriteOnly ) || file.write( data ) != data.size() ) {
-         emit fileSaveFailed( aDestPath, file.errorString() );
+      const Result<> saved = writeFileAtomically( aDestPath, data );
+      if ( !saved ) {
+         emit fileSaveFailed( aDestPath, saved.error() );
          return;
       }
       emit fileSaved( aDestPath );

@@ -284,7 +284,6 @@ TEST( LaunchBoxDump, RefreshDownloadsUnpacksAndThenAsksIfModified )
                                  { "Mame.xml", "<LaunchBox/>", false },
                                  { "Platforms.xml", "<LaunchBox/>", false } } ) );
    LaunchBoxDump dump( dir.filePath( "cache" ) );
-   dump.setProxy( {}, 0, {}, {} );
    dump.setUrl( server.url() );
    ASSERT_FALSE( dump.isCached() );
 
@@ -315,7 +314,6 @@ TEST( LaunchBoxDump, ABrokenDownloadFailsAndKeepsNoValidator )
    QTemporaryDir dir;
    FakeServer server( "this is not a zip" );
    LaunchBoxDump dump( dir.filePath( "cache" ) );
-   dump.setProxy( {}, 0, {}, {} );
    dump.setUrl( server.url() );
 
    const Outcome outcome = refreshAndWait( dump );
