@@ -44,6 +44,17 @@ QComboBox* flagCombo( QWidget* aParent, const char* aName )
    return combo;
 }
 
+// These delete the file from disk, so they ask first.
+bool confirmDelete( QWidget* aParent, const QString& aWhat )
+{
+   return QMessageBox::question(
+             aParent, QStringLiteral( "GameList Editor Qt" ),
+             QStringLiteral( "Delete the %1 of this game?\n"
+                             "The file goes to the trash (deleted where there is none) unless "
+                             "another game uses it." )
+                .arg( aWhat ) ) == QMessageBox::Yes;
+}
+
 }  // namespace
 
 GameEditPanel::GameEditPanel( QWidget* aParent ) : QWidget( aParent )
@@ -81,6 +92,7 @@ void GameEditPanel::buildLayout()
 
    Mmo_Description = new QPlainTextEdit( this );
    Mmo_Description->setObjectName( QStringLiteral( "Mmo_Description" ) );
+   Mmo_Description->setTabChangesFocus( true );
    connect( Mmo_Description, &QPlainTextEdit::textChanged, this, &GameEditPanel::updateDirty );
 
    Cbx_KidGame = flagCombo( this, "Cbx_KidGame" );
@@ -199,44 +211,19 @@ void GameEditPanel::buildLayout()
    Btn_ChangeVideo =
       button( "Btn_ChangeVideo", QStringLiteral( "Change Video" ), &GameEditPanel::chooseVideo );
 
-   // These delete the file from disk, so they ask first.
-   const auto confirmDelete = [this]( const QString& aWhat ) {
-      return QMessageBox::question(
-                this, QStringLiteral( "GameList Editor Qt" ),
-                QStringLiteral( "Delete the %1 of this game?\n"
-                                "The file goes to the trash (deleted where there is none) unless "
-                                "another game uses it." )
-                   .arg( aWhat ) ) == QMessageBox::Yes;
-   };
-
-   Btn_RemovePicture = new QPushButton( QStringLiteral( "Delete Picture" ), this );
-   Btn_RemovePicture->setObjectName( QStringLiteral( "Btn_RemovePicture" ) );
-   connect( Btn_RemovePicture, &QPushButton::clicked, this, [this, confirmDelete] {
-      const int index = FSelection.value( 0, -1 );
-      if ( !confirmDelete( QStringLiteral( "picture" ) ) || !mayLeave() )
-         return;
-      report( FGamelist ? FGamelist->removeImage( index ) : Result<>() );
-   } );
-
-   Btn_RemoveVideo = new QPushButton( QStringLiteral( "Delete Video" ), this );
-   Btn_RemoveVideo->setObjectName( QStringLiteral( "Btn_RemoveVideo" ) );
-   connect( Btn_RemoveVideo, &QPushButton::clicked, this, [this, confirmDelete] {
-      const int index = FSelection.value( 0, -1 );
-      if ( !confirmDelete( QStringLiteral( "video" ) ) || !mayLeave() )
-         return;
-      FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
-      report( FGamelist ? FGamelist->removeVideo( index ) : Result<>() );
-   } );
+   Btn_RemovePicture = button( "Btn_RemovePicture", QStringLiteral( "Delete Picture" ),
+                               &GameEditPanel::removePicture );
+   Btn_RemoveVideo =
+      button( "Btn_RemoveVideo", QStringLiteral( "Delete Video" ), &GameEditPanel::removeVideo );
 
    Btn_MoreInfos = new QPushButton( QStringLiteral( "More infos..." ), this );
    Btn_MoreInfos->setObjectName( QStringLiteral( "Btn_MoreInfos" ) );
    connect( Btn_MoreInfos, &QPushButton::clicked, this,
             [this] { emit moreInfosRequested( FSelection.value( 0, -1 ) ); } );
 
-   Btn_DeleteGame = new QPushButton( QStringLiteral( "Delete Game" ), this );
-   Btn_DeleteGame->setObjectName( QStringLiteral( "Btn_DeleteGame" ) );
+   Btn_DeleteGame =
+      button( "Btn_DeleteGame", QStringLiteral( "Delete Game" ), &GameEditPanel::deleteGame );
    Btn_DeleteGame->setVisible( false );
-   connect( Btn_DeleteGame, &QPushButton::clicked, this, &GameEditPanel::deleteGame );
 
    Btn_SaveChanges = new QPushButton( QStringLiteral( "Save Changes" ), this );
    Btn_SaveChanges->setObjectName( QStringLiteral( "Btn_SaveChanges" ) );
@@ -263,11 +250,25 @@ void GameEditPanel::buildLayout()
    bottom->addStretch( 1 );
    bottom->addWidget( Btn_SaveChanges );
 
+   QLabel* description = new QLabel( QStringLiteral( "Description" ), this );
+   description->setBuddy( Mmo_Description );
+
    QVBoxLayout* column = new QVBoxLayout( this );
    column->addLayout( top );
-   column->addWidget( new QLabel( QStringLiteral( "Description" ), this ) );
+   column->addWidget( description );
    column->addWidget( Mmo_Description, 1 );
    column->addLayout( bottom );
+
+   // Tab follows creation order by default, which is not screen order.
+   const QList<QWidget*> tabOrder = {
+      Edt_Name, Edt_RomPath, Edt_ReleaseDate, Edt_Genre, Edt_Region, Edt_NbPlayers, Edt_Rating,
+      Edt_Developer, Edt_Publisher, Cbx_KidGame, Cbx_Hidden, Cbx_Favorite,
+      Tbs_Media, Btn_PlayVideo, mute,
+      Btn_ChangeImage, Btn_RemovePicture, Btn_ChangeVideo, Btn_RemoveVideo,
+      Btn_SetDefaultPicture, Btn_ChangeAll,
+      Mmo_Description, Btn_MoreInfos, Btn_DeleteGame, Btn_SaveChanges };
+   for ( qsizetype i = 1; i < tabOrder.size(); ++i )
+      setTabOrder( tabOrder[i - 1], tabOrder[i] );
 }
 
 void GameEditPanel::setGamelist( Gamelist* aGamelist )
@@ -609,6 +610,25 @@ void GameEditPanel::chooseVideo()
    const int index = FSelection.value( 0, -1 );
    FPlayer->setSource( QUrl() );  // the new file replaces the one that is open
    report( FGamelist->setVideo( index, file ) );
+}
+
+void GameEditPanel::removePicture()
+{
+   const int index = FSelection.value( 0, -1 );
+   if ( !confirmDelete( this, QStringLiteral( "picture" ) ) || !mayLeave() )
+      return;
+
+   report( FGamelist ? FGamelist->removeImage( index ) : Result<>() );
+}
+
+void GameEditPanel::removeVideo()
+{
+   const int index = FSelection.value( 0, -1 );
+   if ( !confirmDelete( this, QStringLiteral( "video" ) ) || !mayLeave() )
+      return;
+
+   FPlayer->setSource( QUrl() );  // let go of the file before it is deleted
+   report( FGamelist ? FGamelist->removeVideo( index ) : Result<>() );
 }
 
 void GameEditPanel::setDefaultPicture()
