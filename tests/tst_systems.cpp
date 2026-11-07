@@ -32,6 +32,18 @@ struct EsdeFolder
    }
 };
 
+TEST( RomDirOf, IsTheGamelistFolderUnlessTheSystemNamesAnotherRomFolder )
+{
+   QTemporaryDir dir;
+   const QString root = QDir( dir.path() ).absolutePath();
+
+   EXPECT_EQ( romDirOf( SystemEntry( QStringLiteral( "snes" ), skOther, root + QStringLiteral( "/snes/gamelist.xml" ) ) ),
+              root + QStringLiteral( "/snes" ) );
+   EXPECT_EQ( romDirOf( SystemEntry( QStringLiteral( "snes" ), skOther, root + QStringLiteral( "/gl/snes/gamelist.xml" ),
+                                     root + QStringLiteral( "/roms/../roms/snes" ) ) ),
+              root + QStringLiteral( "/roms/snes" ) );
+}
+
 TEST( ScanEsde, SettingsWithSeveralRootsGiveTheRomFolderAndSkipSystemsWithoutGamelist )
 {
    EsdeFolder esde( "<bool name=\"DebugMode\" value=\"false\" />\n"

@@ -124,6 +124,12 @@ SystemEntry systemAt( const QString& aRootPath, const QString& aFolderName )
                    folder + QLatin1Char( '/' ) + Cst_GameListFileName );
 }
 
+QString romDirOf( const SystemEntry& aSystem )
+{
+   return aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
+                                   : QDir( aSystem.romDir ).absolutePath();
+}
+
 Result<> createGamelist( const QString& aPath )
 {
    if ( QFileInfo::exists( aPath ) )

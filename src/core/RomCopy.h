@@ -24,8 +24,6 @@ struct RomCopyPlan
    QStringList problems;    // files the ROM needs but cannot be copied (missing, outside the ROM folder)
 };
 
-// Whether both folders exist and are the same one, symlinks resolved.
-bool sameFolder( const QString& aA, const QString& aB );
 
 // aRomLink is the <path> text. The ROM and the files a .cue / .m3u / .gdi names are copied
 // when missing on the target or of another size. A folder ROM is a problem, not a copy.

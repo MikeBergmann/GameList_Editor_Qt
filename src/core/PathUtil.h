@@ -28,6 +28,9 @@ bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase );
 // another name is missed. Upgrade: compare file identity per entry.
 bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase );
 
+// Whether both paths exist and are the same file or folder, symlinks resolved.
+bool sameLocation( const QString& aA, const QString& aB );
+
 // Removes a file the user asked to delete: into the trash, or for good where there is
 // none (a network share). False when the file is still there.
 bool discardFile( const QString& aPath );

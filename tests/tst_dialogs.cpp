@@ -93,7 +93,7 @@ TEST( Dialogs, SyncDetailsListEachGameWithWhatChanges )
    SyncGame sonic;
    sonic.name = QStringLiteral( "Sonic" );
    sonic.fields = gfName | gfGenre;
-   sonic.copyImage = true;
+
    sonic.imageSource = QStringLiteral( "/m/Sonic.png" );
    SyncGame mario;
    mario.name = QStringLiteral( "Mario" );

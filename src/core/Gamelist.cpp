@@ -165,8 +165,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
    if ( QDomNode declaration = FDocument.firstChild(); declaration.isProcessingInstruction() )
       declaration.toProcessingInstruction().setData( QStringLiteral( "version=\"1.0\"" ) );
 
-   FRomDir = aSystem.romDir.isEmpty() ? QFileInfo( aSystem.gamelistPath ).absolutePath()
-                                      : QDir( aSystem.romDir ).absolutePath();
+   FRomDir = romDirOf( aSystem );
    FFoldsCase = volumeFoldsCase( aSystem.gamelistPath );
    if ( !aSystem.mediaDir.isEmpty() )
       FMediaDir = QDir( aSystem.mediaDir ).absolutePath();
