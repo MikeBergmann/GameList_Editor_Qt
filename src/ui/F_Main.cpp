@@ -185,6 +185,7 @@ void Frm_Editor::buildCentralWidget()
 QWidget* Frm_Editor::buildListColumn( QWidget* aParent )
 {
    QWidget* column = new QWidget( aParent );
+   FListColumn = column;
    QVBoxLayout* left = new QVBoxLayout( column );
    left->setContentsMargins( 0, 0, 0, 0 );
 
@@ -295,7 +296,7 @@ void Frm_Editor::connectSignals()
    // Disabling the host keeps each child's own enabled state for when the lock lifts.
    connect( FScrapePanel, &ScrapePanel::busyChanged, this, [this]( bool aBusy ) {
       FScrapeBusy = aBusy;
-      Lbx_Games->parentWidget()->setEnabled( !aBusy );
+      FListColumn->setEnabled( !aBusy );
       Pgc_Editor->setTabEnabled( Pgc_Editor->indexOf( FEditPanel ), !aBusy );
       menuBar()->setEnabled( !aBusy );
    } );

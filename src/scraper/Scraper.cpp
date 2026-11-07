@@ -114,7 +114,7 @@ Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QStr
    const QDomElement regions = game.firstChildElement( QLatin1String( Cst_RegionsNode ) );
    for ( QDomElement region = regions.firstChildElement(); !region.isNull();
          region = region.nextSiblingElement() )
-      regionNames << QLatin1String(
+      regionNames << QString::fromUtf8(
          Cst_CountryNameFull[countryFromShortName( region.text() )][aLanguage] );
    info.region = regionNames.join( QStringLiteral( " - " ) );
 

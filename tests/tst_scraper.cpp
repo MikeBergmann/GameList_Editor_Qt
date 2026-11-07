@@ -120,6 +120,16 @@ TEST( ParseScrapeResponse, GermanPicksItsOwnSynopsisButSpanishGenreFallsToEnglis
    EXPECT_EQ( spanish.value().genre, QStringLiteral( "Platform - Action" ) );
 }
 
+TEST( ParseScrapeResponse, RegionNamesKeepTheirAccents )
+{
+   const QByteArray reply = QByteArrayLiteral(
+      "<Data><jeu id=\"1\"><regions><region>br</region><region>se</region></regions></jeu></Data>" );
+
+   const Result<ScrapedInfo> parsed = parseScrapeResponse( reply, {}, false, lnFrench );
+   ASSERT_TRUE( parsed );
+   EXPECT_EQ( parsed.value().region, QStringLiteral( "Br\u00e9sil - Su\u00e8de" ) );
+}
+
 TEST( ParseScrapeResponse, FailsWithoutAGameNode )
 {
    const QByteArray errorDoc = QByteArrayLiteral( "<Data><erreur>Dev login error</erreur></Data>" );
