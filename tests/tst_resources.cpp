@@ -69,7 +69,7 @@ TEST( Resources, LaunchBoxPlatformNamesLineUpWithTheKinds )
 TEST( Resources, EverySystemLogoResolvesInTheQrc )
 {
    for ( int i = 0; i < skCount; ++i ) {
-      const QString logo = QLatin1String( Cst_LogoPicsFolder ) +
+      const QString logo = Cst_LogoPicsFolder +
                            QLatin1String( systemInfo( static_cast<SystemKind>( i ) ).logo );
       EXPECT_TRUE( QFile::exists( logo ) ) << logo.toStdString();
    }

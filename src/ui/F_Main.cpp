@@ -367,7 +367,8 @@ void Frm_Editor::onGenesisToggled()
       LoadSystemLogo( systemAt( Cbx_Systems->currentIndex() ).kind );
 }
 
-QAction* Frm_Editor::addOption( QMenu* aMenu, const QString& aText, const char* aKey, bool aDefault )
+QAction* Frm_Editor::addOption( QMenu* aMenu, const QString& aText, QLatin1StringView aKey,
+                                bool aDefault )
 {
    QAction* action = aMenu->addAction( aText );
    action->setCheckable( true );
@@ -378,34 +379,34 @@ QAction* Frm_Editor::addOption( QMenu* aMenu, const QString& aText, const char* 
 void Frm_Editor::LoadFromIni()
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
    // In menu order, so God mode is set before the option it gates.
    for ( const Option& option : std::as_const( FOptions ) )
-      option.action->setChecked( settings.value( QLatin1String( option.key ), option.fallback ).toBool() );
+      option.action->setChecked( settings.value( option.key, option.fallback ).toBool() );
 
    settings.endGroup();
-   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
-   restoreGeometry( settings.value( QLatin1String( Cst_IniGeometry ) ).toByteArray() );
-   Spl_Main->restoreState( settings.value( QLatin1String( Cst_IniSplitMain ) ).toByteArray() );
+   settings.beginGroup( Cst_IniWindow );
+   restoreGeometry( settings.value( Cst_IniGeometry ).toByteArray() );
+   Spl_Main->restoreState( settings.value( Cst_IniSplitMain ).toByteArray() );
 }
 
 void Frm_Editor::SaveToIni()
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
    for ( const Option& option : std::as_const( FOptions ) )
-      settings.setValue( QLatin1String( option.key ), option.action->isChecked() );
+      settings.setValue( option.key, option.action->isChecked() );
 
    // Without god mode there is no delete to skip the prompt for.
-   settings.setValue( QLatin1String( Cst_IniDelWoPrompt ),
+   settings.setValue( Cst_IniDelWoPrompt,
                       Mnu_GodMode->isChecked() && Mnu_DeleteWoPrompt->isChecked() );
 
    settings.endGroup();
-   settings.beginGroup( QLatin1String( Cst_IniWindow ) );
-   settings.setValue( QLatin1String( Cst_IniGeometry ), saveGeometry() );
-   settings.setValue( QLatin1String( Cst_IniSplitMain ), Spl_Main->saveState() );
+   settings.beginGroup( Cst_IniWindow );
+   settings.setValue( Cst_IniGeometry, saveGeometry() );
+   settings.setValue( Cst_IniSplitMain, Spl_Main->saveState() );
 }
 
 void Frm_Editor::showTipsAtStart()
@@ -486,12 +487,12 @@ void Frm_Editor::BuildSystemsList( bool aReload )
    }
 
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
    // Start where the user last picked, as long as that folder still exists.
    QString start = FRootPath;
    if ( start.isEmpty() ) {
-      const QString last = settings.value( QLatin1String( Cst_IniLastFolder ) ).toString();
+      const QString last = settings.value( Cst_IniLastFolder ).toString();
       if ( QDir( last ).exists() )
          start = last;
    }
@@ -501,7 +502,7 @@ void Frm_Editor::BuildSystemsList( bool aReload )
    if ( root.isEmpty() )
       return;
 
-   settings.setValue( QLatin1String( Cst_IniLastFolder ), root );
+   settings.setValue( Cst_IniLastFolder, root );
 
    openRootFolder( root );
 }
@@ -671,7 +672,7 @@ void Frm_Editor::LoadSystemLogo( SystemKind aKind )
    const SystemKind kind = ( aKind == skMegaDrive && Mnu_Genesis->isChecked() ) ? skGenesis : aKind;
 
    // A missing logo file just clears the label.
-   if ( !FSystemLogo.load( QLatin1String( Cst_LogoPicsFolder ) +
+   if ( !FSystemLogo.load( Cst_LogoPicsFolder +
                            QLatin1String( systemInfo( kind ).logo ) ) ) {
       clearSystemLogo();
       return;

@@ -117,7 +117,7 @@ Result<> checkSeekable( const QIODevice& aDevice )
 
 struct MediaSlot
 {
-   const char* media;
+   QLatin1StringView media;
    QStringList types;  // LaunchBox Type values, best first
 };
 
@@ -512,9 +512,9 @@ ScrapedInfo LaunchBoxDb::toInfo( const Entry& aGame, const LaunchBoxQuery& aQuer
       boxRegions.prepend( box2d->region );
 
    for ( const MediaSlot& slot : mediaSlots() ) {
-      if ( !aQuery.mediaTypes.contains( QLatin1String( slot.media ) ) )
+      if ( !aQuery.mediaTypes.contains( slot.media ) )
          continue;
-      const bool is3d = QLatin1String( slot.media ) == QLatin1String( Cst_MediaBox3d );
+      const bool is3d = slot.media == Cst_MediaBox3d;
       const Image* image = pick( slot.types, is3d ? boxRegions : regions );
       if ( !image || image->fileName.isEmpty() )
          continue;

@@ -8,7 +8,7 @@
 namespace {
 
 // Markup rather than plain text so the fixed URLs become clickable links.
-constexpr const char* Cst_AboutHtml = R"html(
+constexpr QLatin1StringView Cst_AboutHtml{ R"html(
 <p>GameList Editor Qt manages the <code>gamelist.xml</code> of a
 <a href="https://www.recalbox.com/">Recalbox</a> or
 <a href="https://retropie.org.uk/">RetroPie</a> installation.</p>
@@ -19,7 +19,7 @@ Original source code:
 
 <p>This is an AI assisted port to C++/Qt6, sourcecode can be found at <a href="https://github.com/MikeBergmann/GameList_Editor_Qt">github.com/MikeBergmann/GameList_Editor_Qt</a></p>
 
-)html";
+)html" };
 
 }  // namespace
 
@@ -32,7 +32,7 @@ Frm_About::Frm_About( QWidget* aParent ) : QDialog( aParent )
    // Empty when not set (tests), in which case the line is left out.
    const QString version = QCoreApplication::applicationVersion().toHtmlEscaped();
    Red_About->setHtml( ( version.isEmpty() ? QString() : QStringLiteral( "<p><b>Version %1</b></p>" ).arg( version ) )
-                       + QLatin1String( Cst_AboutHtml ) );
+                       + Cst_AboutHtml );
 
    QDialogButtonBox* buttons = new QDialogButtonBox( QDialogButtonBox::Close, this );
    connect( buttons, &QDialogButtonBox::rejected, this, &QDialog::reject );

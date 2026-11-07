@@ -49,4 +49,4 @@ Result<QString> stageAndSwap( const QString& aTarget, const QString& aFailure,
 
 // For files with several top-level elements (a gamelist beside <alternativeEmulator>,
 // es_settings.xml): the wrapper goes after the declaration so its encoding still applies.
-QByteArray wrapInRoot( const QByteArray& aXml, const char* aRoot );
+QByteArray wrapInRoot( const QByteArray& aXml, QLatin1StringView aRoot );

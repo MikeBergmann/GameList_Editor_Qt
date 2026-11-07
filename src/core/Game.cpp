@@ -51,13 +51,13 @@ QString displayDateToGamelist( const QString& aDate )
 
    switch ( aDate.size() ) {
       case 4:  // yyyy
-         return aDate + QLatin1String( Cst_DateLongFill ) + QLatin1String( Cst_DateSuffix );
+         return aDate + Cst_DateLongFill + Cst_DateSuffix;
       case 7:  // MM/yyyy
-         return aDate.mid( 3, 4 ) + aDate.left( 2 ) + QLatin1String( Cst_DateShortFill ) +
-                QLatin1String( Cst_DateSuffix );
+         return aDate.mid( 3, 4 ) + aDate.left( 2 ) + Cst_DateShortFill +
+                Cst_DateSuffix;
       case 10:  // dd/MM/yyyy
          return aDate.mid( 6, 4 ) + aDate.mid( 3, 2 ) + aDate.left( 2 ) +
-                QLatin1String( Cst_DateSuffix );
+                Cst_DateSuffix;
       default: return {};
    }
 }

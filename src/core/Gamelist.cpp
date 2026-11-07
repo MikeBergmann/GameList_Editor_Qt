@@ -19,16 +19,16 @@ namespace {
 
 // ES-DE writes <alternativeEmulator> beside <gameList>, and XML allows one root: the file
 // is parsed under this wrapper, which load() then takes out again.
-constexpr const char* Cst_Wrapper = "gle-root";
-constexpr const char* Cst_GameList = "gameList";
+constexpr QLatin1StringView Cst_Wrapper{ "gle-root" };
+constexpr QLatin1StringView Cst_GameList{ "gameList" };
 
 // The layout EmulationStation writes, for systems with no media yet.
-constexpr const char* Cst_DefaultImageFolder = "./media/images/";
-constexpr const char* Cst_DefaultVideoFolder = "./media/videos/";
+constexpr QLatin1StringView Cst_DefaultImageFolder{ "./media/images/" };
+constexpr QLatin1StringView Cst_DefaultVideoFolder{ "./media/videos/" };
 
 // ES-DE keeps one folder per media type; covers and videos are the types this editor writes.
-constexpr const char* Cst_EsdeImageType = "covers";
-constexpr const char* Cst_EsdeVideoType = "videos";
+constexpr QLatin1StringView Cst_EsdeImageType{ "covers" };
+constexpr QLatin1StringView Cst_EsdeVideoType{ "videos" };
 const QStringList Cst_EsdeMediaTypes = {
    QStringLiteral( "3dboxes" ),   QStringLiteral( "backcovers" ),    QStringLiteral( "covers" ),
    QStringLiteral( "custom" ),    QStringLiteral( "fanart" ),        QStringLiteral( "manuals" ),
@@ -73,10 +73,10 @@ QString folderOf( const QString& aLink )
 }
 
 // aDash when aLink is <ROM name><aDash>.<ext>: new media then follows that style.
-QString dashOf( const Game& aGame, const QString& aLink, const char* aDash )
+QString dashOf( const Game& aGame, const QString& aLink, QLatin1StringView aDash )
 {
    const QString base = QFileInfo( aLink ).completeBaseName();
-   const QString dash = QLatin1String( aDash );
+   const QString dash = aDash;
    if ( !base.endsWith( dash, Qt::CaseInsensitive ) )
       return {};
 
@@ -87,9 +87,9 @@ QString dashOf( const Game& aGame, const QString& aLink, const char* aDash )
 }
 
 // A missing node reads as empty.
-QString childText( const QDomElement& aNode, const char* aName )
+QString childText( const QDomElement& aNode, QLatin1StringView aName )
 {
-   return aNode.firstChildElement( QLatin1String( aName ) ).text();
+   return aNode.firstChildElement( aName ).text();
 }
 
 // The directory follows existing case ("Media/" for "media/"). The file name stays
@@ -115,7 +115,7 @@ QString esdeMediaSuffix( bool aIsImage, const QString& aSuffix )
    return ( aIsImage ? Cst_EsdeImageExtensions : Cst_EsdeVideoExtensions ).contains( lower ) ? lower : QString();
 }
 
-QString Gamelist::domText( int aIndex, const char* aName ) const
+QString Gamelist::domText( int aIndex, QLatin1StringView aName ) const
 {
    return childText( FEntries.value( aIndex ).node, aName );
 }
@@ -129,8 +129,8 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
    FDocument = QDomDocument();
    FGameList = QDomElement();
    FEntries.clear();
-   FImageFolder = QLatin1String( Cst_DefaultImageFolder );
-   FVideoFolder = QLatin1String( Cst_DefaultVideoFolder );
+   FImageFolder = Cst_DefaultImageFolder;
+   FVideoFolder = Cst_DefaultVideoFolder;
    FImageDash.clear();
    FVideoDash.clear();
    FNameCounts.clear();
@@ -151,7 +151,7 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
                        .arg( column ) };
    }
 
-   FGameList = FDocument.documentElement().firstChildElement( QLatin1String( Cst_GameList ) );
+   FGameList = FDocument.documentElement().firstChildElement( Cst_GameList );
    if ( FGameList.isNull() )
       return Error{ QStringLiteral( "%1 has no <gameList>." ).arg( aSystem.gamelistPath ) };
 
@@ -174,8 +174,8 @@ Result<> Gamelist::load( const SystemEntry& aSystem, bool aAllowEmpty )
    bool imageFolderFound = false;
    bool videoFolderFound = false;
 
-   for ( QDomElement node = FGameList.firstChildElement( QLatin1String( Cst_Game ) );
-         !node.isNull(); node = node.nextSiblingElement( QLatin1String( Cst_Game ) ) ) {
+   for ( QDomElement node = FGameList.firstChildElement( Cst_Game );
+         !node.isNull(); node = node.nextSiblingElement( Cst_Game ) ) {
 
       if ( !node.hasChildNodes() )
          continue;
@@ -243,8 +243,8 @@ Game Gamelist::gameFromNode( const QDomElement& aNode ) const
 QString Gamelist::conventionalPath( const Game& aGame, bool aIsImage, const QString& aSuffix ) const
 {
    const QString suffix = !aSuffix.isEmpty() ? aSuffix
-                          : QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
-   return FMediaDir + QLatin1Char( '/' ) + QLatin1String( aIsImage ? Cst_EsdeImageType : Cst_EsdeVideoType ) +
+                          : aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4;
+   return FMediaDir + QLatin1Char( '/' ) + ( aIsImage ? Cst_EsdeImageType : Cst_EsdeVideoType ) +
           QLatin1Char( '/' ) + mediaStem( aGame ) + suffix;
 }
 
@@ -268,8 +268,8 @@ void Gamelist::indexMedia()
    if ( !conventionalMedia() )
       return;
 
-   const auto index = [this]( const char* aType, const QStringList& aExtensions, QHash<QString, QString>& aIndex ) {
-      const QDir folder( resolvePath( FMediaDir + QLatin1Char( '/' ) + QLatin1String( aType ) ) );
+   const auto index = [this]( QLatin1StringView aType, const QStringList& aExtensions, QHash<QString, QString>& aIndex ) {
+      const QDir folder( resolvePath( FMediaDir + QLatin1Char( '/' ) + aType ) );
       const auto rank = [&]( const QString& aPath ) {
          const QString extension = QFileInfo( aPath ).suffix();
          return aExtensions.indexOf( FFoldsCase ? extension.toLower() : extension );
@@ -329,7 +329,7 @@ Result<int> Gamelist::addGames( const QStringList& aRomPaths )
          continue;
       seen.insert( key );
 
-      QDomElement node = FDocument.createElement( QLatin1String( Cst_Game ) );
+      QDomElement node = FDocument.createElement( Cst_Game );
       FGameList.appendChild( node );
       setChildText( node, Cst_Path, QStringLiteral( "./" ) + relative );
       setChildText( node, Cst_Name, info.completeBaseName() );
@@ -400,18 +400,18 @@ Result<> Gamelist::save()
    return {};
 }
 
-QDomElement Gamelist::ensureChild( QDomElement aNode, const char* aName )
+QDomElement Gamelist::ensureChild( QDomElement aNode, QLatin1StringView aName )
 {
-   QDomElement child = aNode.firstChildElement( QLatin1String( aName ) );
+   QDomElement child = aNode.firstChildElement( aName );
    if ( child.isNull() ) {
-      child = FDocument.createElement( QLatin1String( aName ) );
+      child = FDocument.createElement( aName );
       aNode.appendChild( child );
    }
 
    return child;
 }
 
-void Gamelist::setChildText( QDomElement aNode, const char* aName, const QString& aText )
+void Gamelist::setChildText( QDomElement aNode, QLatin1StringView aName, const QString& aText )
 {
    QDomElement child = ensureChild( aNode, aName );
 
@@ -513,7 +513,7 @@ void Gamelist::applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSe
    Game& game = FEntries[aIndex].game;
    QDomElement node = FEntries[aIndex].node;
 
-   const auto write = [&]( GameField aField, const char* aName, const QString& aValue,
+   const auto write = [&]( GameField aField, QLatin1StringView aName, const QString& aValue,
                            QString& aStored ) {
       if ( !( aWhich & aField ) )
          return;
@@ -538,10 +538,11 @@ void Gamelist::applyFieldsTo( int aIndex, const GameFields& aValues, GameFieldSe
       game.releaseDate = stored.isEmpty() ? QString() : aValues.releaseDate;
    }
 
-   const auto writeFlag = [&]( GameField aField, const char* aName, int aValue, int& aStored ) {
+   const auto writeFlag = [&]( GameField aField, QLatin1StringView aName, int aValue,
+                               int& aStored ) {
       if ( !( aWhich & aField ) )
          return;
-      setChildText( node, aName, QLatin1String( aValue == 0 ? Cst_False : Cst_True ) );
+      setChildText( node, aName, aValue == 0 ? Cst_False : Cst_True );
       aStored = aValue;
    };
 
@@ -557,7 +558,7 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage, const QString& aSuff
    const QString folder = aIsImage ? FImageFolder : FVideoFolder;
    const QString& dash = aIsImage ? FImageDash : FVideoDash;
    const QString suffix = !aSuffix.isEmpty() ? aSuffix
-                          : QLatin1String( aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4 );
+                          : aIsImage ? Cst_ImageSuffixPng : Cst_VideoSuffixMp4;
 
    // ES-DE has one file per stem, so a taken name is not a reason to pick another.
    if ( conventionalMedia() )
@@ -824,7 +825,7 @@ Result<> Gamelist::setVideo( int aIndex, const QString& aSourcePath )
       return valid;
 
    const Result<MediaWrite> write =
-      applyMediaFile( aIndex, false, aSourcePath, QLatin1String( Cst_VideoSuffixMp4 ) );
+      applyMediaFile( aIndex, false, aSourcePath, Cst_VideoSuffixMp4 );
    if ( !write )
       return write;
 
@@ -916,7 +917,7 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
          report.skipped << QStringLiteral( "%1: ES-DE cannot play this video format." ).arg( name );
          continue;
       } else {
-         write = applyMediaFile( copy.index, false, copy.source, QLatin1String( Cst_VideoSuffixMp4 ) );
+         write = applyMediaFile( copy.index, false, copy.source, Cst_VideoSuffixMp4 );
       }
 
       if ( !write ) {

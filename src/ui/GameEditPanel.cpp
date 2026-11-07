@@ -30,7 +30,7 @@ constexpr int Cst_VideoTab = 1;
 
 // The bundled generic picture.
 const QString Cst_DefaultPicture =
-   QLatin1String( Cst_DefaultPicsFolderPath ) + QLatin1String( Cst_DefaultImageName );
+   Cst_DefaultPicsFolderPath + Cst_DefaultImageName;
 
 // A No/Yes combo. -1 is "no answer", which is what several selected games show and
 // what the batch save reads as "leave it".

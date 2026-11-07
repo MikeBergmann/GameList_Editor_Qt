@@ -56,7 +56,7 @@ private:
    void LoadFromIni();
    void SaveToIni();
 
-   QAction* addOption( QMenu* aMenu, const QString& aText, const char* aKey, bool aDefault );
+   QAction* addOption( QMenu* aMenu, const QString& aText, QLatin1StringView aKey, bool aDefault );
 
    void BuildSystemsList( bool aReload = false );
    void Cbx_SystemsChange();
@@ -131,7 +131,7 @@ private:
    struct Option
    {
       QAction* action;
-      const char* key;
+      QLatin1StringView key;
       bool fallback;
    };
    QList<Option> FOptions;

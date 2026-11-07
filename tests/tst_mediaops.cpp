@@ -286,8 +286,8 @@ void expectLinksAre( const Gamelist& aList, int aIndex, const Game& aBefore, con
    EXPECT_EQ( game.physicalVideoPath, aBefore.physicalVideoPath );
    EXPECT_EQ( game.missingImage, aBefore.missingImage );
    EXPECT_EQ( game.missingVideo, aBefore.missingVideo );
-   EXPECT_EQ( aList.domText( aIndex, "image" ), aImageDom );
-   EXPECT_EQ( aList.domText( aIndex, "video" ), aVideoDom );
+   EXPECT_EQ( aList.domText( aIndex, Cst_ImageLink ), aImageDom );
+   EXPECT_EQ( aList.domText( aIndex, Cst_VideoLink ), aVideoDom );
 }
 
 TEST( MediaOps, LinkMediaFailedSaveLeavesGamesAndDocumentAsTheyWere )
@@ -300,10 +300,10 @@ TEST( MediaOps, LinkMediaFailedSaveLeavesGamesAndDocumentAsTheyWere )
    ASSERT_TRUE( list.load( fixture.snes ) );
    const Game before1 = list.at( 1 );
    const Game before2 = list.at( 2 );
-   const QString image1 = list.domText( 1, "image" );
-   const QString video1 = list.domText( 1, "video" );
-   const QString image2 = list.domText( 2, "image" );
-   const QString video2 = list.domText( 2, "video" );
+   const QString image1 = list.domText( 1, Cst_ImageLink );
+   const QString video1 = list.domText( 1, Cst_VideoLink );
+   const QString image2 = list.domText( 2, Cst_ImageLink );
+   const QString video2 = list.domText( 2, Cst_VideoLink );
 
    breakSave( fixture, list );
 
@@ -329,8 +329,8 @@ TEST( MediaOps, RenameMediaFailedSaveRenamesTheFilesBack )
    ASSERT_TRUE( list.load( fixture.snes ) );
    ASSERT_TRUE( list.linkMedia( { { 2, true, renamed } } ) );
    const Game before = list.at( 2 );
-   const QString image = list.domText( 2, "image" );
-   const QString video = list.domText( 2, "video" );
+   const QString image = list.domText( 2, Cst_ImageLink );
+   const QString video = list.domText( 2, Cst_VideoLink );
 
    const QVector<MediaRename> found = misnamedMedia( list );
    ASSERT_EQ( found.size(), 1 );
@@ -356,8 +356,8 @@ TEST( MediaOps, RenameMediaThatFailsMidwayPutsTheEarlierRenamesBack )
    ASSERT_TRUE( list.load( fixture.snes ) );
    ASSERT_TRUE( list.linkMedia( { { 2, true, renamed } } ) );
    const Game before = list.at( 2 );
-   const QString image = list.domText( 2, "image" );
-   const QString video = list.domText( 2, "video" );
+   const QString image = list.domText( 2, Cst_ImageLink );
+   const QString video = list.domText( 2, Cst_VideoLink );
 
    // The first rename works; the second names a file that is not there.
    const QString target = fixture.path( "snes/media/images/Vanished.jpg" );
