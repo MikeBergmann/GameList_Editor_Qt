@@ -110,9 +110,10 @@ Result<QString> swapIn( const QString& aStaged, const QString& aTarget )
    }
 
    if ( !QFile::rename( aStaged, aTarget ) ) {
-      if ( !backup.isEmpty() )
-         QFile::rename( backup, aTarget );
       QFile::remove( aStaged );
+      if ( !backup.isEmpty() && !QFile::rename( backup, aTarget ) )
+         return Error{
+            QStringLiteral( "Cannot write %1; the original is kept as %2." ).arg( aTarget, backup ) };
       return Error{ QStringLiteral( "Cannot write %1." ).arg( aTarget ) };
    }
 

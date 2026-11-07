@@ -175,6 +175,8 @@ private:
 
    QDomElement ensureChild( QDomElement aNode, QLatin1StringView aName );
    void setChildText( QDomElement aNode, QLatin1StringView aName, const QString& aText );
+   // An empty aLink removes the element, so a game that had none gets none.
+   void setLinkText( QDomElement aNode, bool aIsImage, const QString& aLink );
 
    // The one place a game's image or video link changes: DOM and Game together.
    // An empty aPhysical means no media. Does not save.
@@ -216,8 +218,10 @@ private:
    Result<> saveLinks();
    Result<> commitMedia( const QVector<MediaWrite>& aWrites );
    // Newest first: a game written twice in one batch holds its first snapshot last.
-   void rollbackMedia( const QVector<MediaWrite>& aWrites );
-   void undoMedia( const MediaWrite& aWrite );
+   // Returns aCause, plus the files that could not be put back.
+   [[nodiscard]] Error rollbackMedia( const QVector<MediaWrite>& aWrites, const QString& aCause );
+   // Empty, or what was left behind.
+   QString undoMedia( const MediaWrite& aWrite );
    void restoreLink( int aIndex, bool aIsImage, const Game& aBefore );
 
    void countDuplicates();

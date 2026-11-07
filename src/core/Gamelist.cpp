@@ -424,6 +424,15 @@ void Gamelist::setChildText( QDomElement aNode, QLatin1StringView aName, const Q
       child.appendChild( FDocument.createTextNode( aText ) );
 }
 
+void Gamelist::setLinkText( QDomElement aNode, bool aIsImage, const QString& aLink )
+{
+   const QLatin1StringView name = aIsImage ? Cst_ImageLink : Cst_VideoLink;
+   if ( aLink.isEmpty() )
+      aNode.removeChild( aNode.firstChildElement( name ) );
+   else
+      setChildText( aNode, name, aLink );
+}
+
 Result<> Gamelist::setFields( const QVector<int>& aTargets, const GameFields& aValues,
                               GameFieldSet aWhich )
 {
@@ -600,7 +609,7 @@ void Gamelist::setMediaLink( int aIndex, bool aIsImage, const QString& aLink,
       return;
    }
 
-   setChildText( entry.node, aIsImage ? Cst_ImageLink : Cst_VideoLink, aLink );
+   setLinkText( entry.node, aIsImage, aLink );
    ( aIsImage ? game.imagePath : game.videoPath ) = aLink;
    ( aIsImage ? game.physicalImagePath : game.physicalVideoPath ) = aPhysical;
    ( aIsImage ? game.missingImage : game.missingVideo ) = aPhysical.isEmpty();
@@ -638,32 +647,49 @@ Result<Gamelist::MediaWrite> Gamelist::applyImage( int aIndex, const QImage& aPi
 
 void Gamelist::restoreLink( int aIndex, bool aIsImage, const Game& aBefore )
 {
-   // ponytail: a game that had no <image>/<video> element ends up with an empty one;
-   // EmulationStation reads that as unset. Upgrade: remember the node and remove it.
    FEntries[aIndex].game = aBefore;
    if ( !conventionalMedia() )
-      setChildText( FEntries[aIndex].node, aIsImage ? Cst_ImageLink : Cst_VideoLink,
-                    aIsImage ? aBefore.imagePath : aBefore.videoPath );
+      setLinkText( FEntries[aIndex].node, aIsImage, aIsImage ? aBefore.imagePath : aBefore.videoPath );
 }
 
-void Gamelist::undoMedia( const MediaWrite& aWrite )
+QString Gamelist::undoMedia( const MediaWrite& aWrite )
 {
-   if ( !aWrite.target.isEmpty() ) {
-      if ( !aWrite.movedFrom.isEmpty() ) {
-         QFile::rename( aWrite.target, aWrite.movedFrom );
-      } else {
-         QFile::remove( aWrite.target );
-         if ( !aWrite.backup.isEmpty() )
-            QFile::rename( aWrite.backup, aWrite.target );
-      }
-   }
    restoreLink( aWrite.index, aWrite.isImage, aWrite.before );
+   if ( aWrite.target.isEmpty() )
+      return {};
+
+   if ( !aWrite.movedFrom.isEmpty() ) {
+      if ( QFile::rename( aWrite.target, aWrite.movedFrom ) )
+         return {};
+      return QStringLiteral( "%1 is still named %2." ).arg( aWrite.movedFrom, aWrite.target );
+   }
+
+   const bool removed = QFile::remove( aWrite.target ) || !QFileInfo::exists( aWrite.target );
+   if ( aWrite.backup.isEmpty() )
+      return removed ? QString() : QStringLiteral( "%1 could not be removed." ).arg( aWrite.target );
+   if ( removed && QFile::rename( aWrite.backup, aWrite.target ) )
+      return {};
+   return QStringLiteral( "%1 could not be put back; the original is kept as %2." )
+      .arg( aWrite.target, aWrite.backup );
 }
 
-void Gamelist::rollbackMedia( const QVector<MediaWrite>& aWrites )
+Error Gamelist::rollbackMedia( const QVector<MediaWrite>& aWrites, const QString& aCause )
 {
-   for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it )
-      undoMedia( *it );
+   QStringList left;
+   for ( auto it = aWrites.crbegin(); it != aWrites.crend(); ++it ) {
+      if ( const QString problem = undoMedia( *it ); !problem.isEmpty() )
+         left << problem;
+   }
+
+   if ( left.isEmpty() )
+      return Error{ aCause };
+
+   // A pulled card fails every file: name a few, count the rest.
+   const qsizetype shown = 5;
+   QString text = aCause + QStringLiteral( "\n\nThe undo failed:\n" ) + left.mid( 0, shown ).join( '\n' );
+   if ( left.size() > shown )
+      text += QStringLiteral( "\n...and %1 more." ).arg( left.size() - shown );
+   return Error{ text };
 }
 
 Result<> Gamelist::saveLinks()
@@ -673,10 +699,8 @@ Result<> Gamelist::saveLinks()
 
 Result<> Gamelist::commitMedia( const QVector<MediaWrite>& aWrites )
 {
-   if ( const Result<> saved = saveLinks(); !saved ) {
-      rollbackMedia( aWrites );
-      return saved;
-   }
+   if ( const Result<> saved = saveLinks(); !saved )
+      return rollbackMedia( aWrites, saved.error() );
 
    for ( const MediaWrite& write : aWrites ) {
       if ( !write.backup.isEmpty() )
@@ -727,10 +751,8 @@ Result<int> Gamelist::setDefaultImageForMissing( const QString& aSourcePath )
          continue;
 
       const Result<MediaWrite> write = applyImage( index, picture );
-      if ( !write ) {
-         rollbackMedia( writes );
-         return write;
-      }
+      if ( !write )
+         return rollbackMedia( writes, write.error() );
       writes.append( write.value() );
    }
 
@@ -789,9 +811,8 @@ Result<int> Gamelist::renameMedia( const QVector<MediaRename>& aRenames )
          continue;
 
       if ( !QFile::rename( rename.path, rename.newPath ) ) {
-         rollbackMedia( writes );
-         return Error{
-            QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) };
+         return rollbackMedia(
+            writes, QStringLiteral( "Cannot rename %1 to %2." ).arg( rename.path, rename.newPath ) );
       }
 
       Game& game = FEntries[rename.index].game;
@@ -883,10 +904,8 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
       if ( copy.index < 0 || copy.index >= FEntries.size() )
          continue;
 
-      if ( aProgress && !aProgress( copy ) ) {
-         rollbackMedia( writes );
-         return Error{ QStringLiteral( "Canceled." ) };
-      }
+      if ( aProgress && !aProgress( copy ) )
+         return rollbackMedia( writes, QStringLiteral( "Canceled." ) );
 
       // Games with one ES-DE media stem share the file; a second write would eat the first's backup.
       const QString stemKey = fileKey( mediaStem( FEntries.at( copy.index ).game ), FFoldsCase ) +
@@ -920,10 +939,8 @@ Result<MediaCopyReport> Gamelist::copyMedia( const QVector<MediaCopy>& aCopies, 
          write = applyMediaFile( copy.index, false, copy.source, Cst_VideoSuffixMp4 );
       }
 
-      if ( !write ) {
-         rollbackMedia( writes );
-         return write;
-      }
+      if ( !write )
+         return rollbackMedia( writes, write.error() );
       writes.append( write.value() );
       written.insert( stemKey );
    }
