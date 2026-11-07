@@ -37,7 +37,7 @@ QString resolvePath( const QString& aPath )
    else if ( resolved.size() == 2 && resolved.at( 1 ) == QLatin1Char( ':' ) )
       resolved += QLatin1Char( '/' );
 
-   // ponytail: a miss re-lists the containing directory for each component, so a
+   // Limitation: a miss re-lists the containing directory for each component, so a
    // ROM folder that is absent altogether costs one listing per game. That
    // only happens on the orphan path; cache listings per directory if it shows.
    for ( int index = 0; index < parts.size(); ++index ) {

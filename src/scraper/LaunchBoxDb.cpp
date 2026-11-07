@@ -37,7 +37,7 @@ QString articleFront( const QString& aName )
 }
 
 // Game::region and the ROM's (USA, Europe) tags, as LaunchBox region names, best first.
-// ponytail: Game::region is written in the UI language, so only English names match here.
+// Limitation: Game::region is written in the UI language, so only English names match here.
 QStringList regionPreference( const QString& aGameRegion, const QString& aRomName )
 {
    QStringList tokens = aGameRegion.split( QStringLiteral( " - " ), Qt::SkipEmptyParts );

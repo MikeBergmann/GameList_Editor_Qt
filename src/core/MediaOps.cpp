@@ -120,7 +120,7 @@ QStringList unlistedRoms( const Gamelist& aList )
          mediaDirs.insert( top.toLower() );
    }
 
-   // ponytail: a denylist, since the per-system ROM extensions live in
+   // Limitation: a denylist, since the per-system ROM extensions live in
    // EmulationStation's config, not here. A stray odd file shows up in the
    // list and gets unticked; Browse covers anything this hides.
    static const QSet<QString> notRoms = {
@@ -146,7 +146,7 @@ QStringList unlistedRoms( const Gamelist& aList )
               mediaDirs.contains( relative.section( QLatin1Char( '/' ), 0, 0 ).toLower() ) )
             continue;
 
-         // ponytail: a folder named like a file ("dig.scummvm") is one ROM, any other is
+         // Limitation: a folder named like a file ("dig.scummvm") is one ROM, any other is
          // entered. Without ES's extension list "Vol.2" looks like one too; untick it.
          if ( info.isDir() && ( suffix.isEmpty() || suffix.contains( QLatin1Char( ' ' ) ) ) ) {
             if ( !info.isSymLink() )
@@ -286,7 +286,7 @@ QVector<MediaRename> misnamedMedia( const Gamelist& aList, bool aStrict )
             info.suffix().isEmpty() ? game.romNameWoExt()
                                     : game.romNameWoExt() + QLatin1Char( '.' ) + info.suffix() );
 
-         // ponytail: a case-only rename on a case-folding filesystem is offered but
+         // Limitation: a case-only rename on a case-folding filesystem is offered but
          // QFile::rename may refuse it; the whole batch then rolls back. Upgrade: two
          // steps through a temporary name.
          if ( aList.fileShared( index, path, isImage ) ) {

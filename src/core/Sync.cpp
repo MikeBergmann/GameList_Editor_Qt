@@ -59,7 +59,7 @@ MediaVerdict judgeMedia( const Game& aSource, const Game* aTargetGame, bool aIsI
    if ( targetMissing )
       return { true, {} };
 
-   // ponytail: a converted picture can no longer be compared with its source, so it is copied
+   // Limitation: a converted picture can no longer be compared with its source, so it is copied
    // only when absent. Upgrade: remember the source hash on the target.
    if ( unreadable )
       return {};
@@ -83,7 +83,7 @@ QString rejection( const Game& aSource, bool aDuplicate, bool aOnTarget )
    if ( aSource.isOrphan )
       return QStringLiteral( "%1: the ROM %2 is missing on the master." ).arg( aSource.name, aSource.romPath );
 
-   // ponytail: addGames takes files only. Upgrade: let it add a folder ROM.
+   // Limitation: addGames takes files only. Upgrade: let it add a folder ROM.
    if ( QFileInfo( aSource.physicalRomPath ).isDir() )
       return QStringLiteral( "%1: %2 is a folder ROM; folder ROMs are not synced." ).arg( aSource.name, aSource.romPath );
 

@@ -138,7 +138,7 @@ public:
    QString domText( int aIndex, QLatin1StringView aName ) const;
 
    // Where new media goes, and whether it is named Sonic-image.png (dash style); both come
-   // from the first game that has any. ponytail: mixed styles follow that game; upgrade: vote.
+   // from the first game that has any. Limitation: mixed styles follow that game; upgrade: vote.
    const QString& imageFolder() const { return FImageFolder; }
    const QString& videoFolder() const { return FVideoFolder; }
 

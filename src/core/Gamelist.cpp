@@ -370,7 +370,7 @@ Result<> Gamelist::checkIndex( int aIndex ) const
 
 Result<> Gamelist::save()
 {
-   // ponytail: one copy per load, never pruned; cap or age them out if they pile up.
+   // Limitation: one copy per load, never pruned; cap or age them out if they pile up.
    if ( !FBackedUp ) {
       const QString backup =
          FSystem.gamelistPath + QDateTime::currentDateTime().toString( ".yyyyMMdd-HHmmss" ) + ".bak";
@@ -581,7 +581,7 @@ QString Gamelist::freeMediaLink( int aIndex, bool aIsImage, const QString& aSuff
       const QString link = folder + stem + dash + suffix;
       const QString target = writeTarget( FRomDir, link );
 
-      // ponytail: a scan of every game per attempt, so a ChangeAll over N games is O(N^2)
+      // Limitation: a scan of every game per attempt, so a ChangeAll over N games is O(N^2)
       // (~25M compares at 5000). Upgrade: a set of the taken keys, built once per batch.
       bool taken = false;
       for ( int index = 0; index < FEntries.size() && !taken; ++index ) {
@@ -602,7 +602,7 @@ void Gamelist::setMediaLink( int aIndex, bool aIsImage, const QString& aLink,
    Entry& entry = FEntries[aIndex];
    Game& game = entry.game;
    if ( conventionalMedia() ) {
-      // ponytail: a game sharing this media stem keeps its old paths until the next load.
+      // Limitation: a game sharing this media stem keeps its old paths until the next load.
       ( aIsImage ? game.physicalImagePath : game.physicalVideoPath ) =
          aPhysical.isEmpty() ? conventionalPath( game, aIsImage ) : aPhysical;
       ( aIsImage ? game.missingImage : game.missingVideo ) = aPhysical.isEmpty();

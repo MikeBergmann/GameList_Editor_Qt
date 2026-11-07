@@ -34,8 +34,8 @@ QStringList romParts( const QString& aRomPath );
 
 // aRomLink is the <path> text. The ROM and the files a .cue / .m3u / .gdi names are copied
 // when missing on the target or of another size. A folder ROM is a problem, not a copy.
-// ponytail: size only, no hash; a same-size changed ROM is not noticed. Upgrade: MD5 when sizes match.
-// ponytail: other multi-file formats are copied as the listed file only.
+// Limitation: size only, no hash; a same-size changed ROM is not noticed. Upgrade: MD5 when sizes match.
+// Limitation: other multi-file formats are copied as the listed file only.
 RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, const QString& aRomLink );
 
 // Each file is staged as *.gle-new and swapped in, so a broken copy never costs the old

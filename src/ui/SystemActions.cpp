@@ -313,7 +313,7 @@ void syncToOtherFolder( QWidget* aParent, const QString& aMasterRoot )
    QVector<SystemEntry> master = scanSystems( aMasterRoot );
    applySystemMap( master );
 
-   // ponytail: planning runs on the UI thread, repainting every 50 ms. Upgrade: plan in a worker.
+   // Limitation: planning runs on the UI thread, repainting every 50 ms. Upgrade: plan in a worker.
    QProgressDialog analysing( QStringLiteral( "Reading the gamelists..." ), QStringLiteral( "Cancel" ), 0, 0, aParent );
    analysing.setWindowTitle( QStringLiteral( "Analysing" ) );
    analysing.setWindowModality( Qt::WindowModal );

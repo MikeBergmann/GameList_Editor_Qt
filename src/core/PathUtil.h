@@ -24,7 +24,7 @@ QString fileKey( const QString& aPath, bool aFoldsCase );
 // Both paths are already clean, as every physical path is.
 bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase );
 
-// ponytail: canonicalises only same-named paths, to stay cheap; a symlinked file under
+// Limitation: canonicalises only same-named paths, to stay cheap; a symlinked file under
 // another name is missed. Upgrade: compare file identity per entry.
 bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase );
 

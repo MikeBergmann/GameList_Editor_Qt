@@ -17,7 +17,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 # Version from git: "v1.2.3" on a tag, "v1.2.3-5-g7d1a75e" after it, and
 # "2026.10.14+7d1a75e" (commit date + hash) while there is no tag at all.
 # "-dirty" is appended for uncommitted changes. "unknown" outside a git checkout.
-# ponytail: evaluated at configure time only, so an IDE build that never re-runs
+# Limitation: evaluated at configure time only, so an IDE build that never re-runs
 # CMake keeps a stale version; re-run the configure step to refresh it.
 set( GLE_VERSION "unknown" )
 find_package( Git QUIET )
@@ -91,7 +91,7 @@ set( GLE_SS_DEVID "$ENV{GLE_SS_DEVID}" CACHE STRING "screenscraper.fr devid" )
 set( GLE_SS_DEVPWD "$ENV{GLE_SS_DEVPWD}" CACHE STRING "screenscraper.fr devpassword" )
 # Emit each value as NUL-terminated, XOR-ed bytes so it is not a plain string in the binary.
 # Key byte i is (0xA5 + 31*i) & 0xFF; decodeDevSecret() in Scraper.cpp must use the same one.
-# ponytail: obfuscation only - the values still travel in every request URL.
+# Limitation: obfuscation only - the values still travel in every request URL.
 function( gle_xor_encode aVar aOut )
    string( HEX "${${aVar}}" hex )
    string( APPEND hex "00" )
