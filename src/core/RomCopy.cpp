@@ -59,6 +59,30 @@ bool isDiscDescription( const QString& aPath )
 
 }  // namespace
 
+QStringList discTracks( const QString& aPath )
+{
+   QStringList tracks;
+   if ( !isDiscDescription( aPath ) )
+      return tracks;
+
+   const QString folder = QFileInfo( aPath ).path();
+   for ( const QString& name : referencedFiles( aPath ) )
+      tracks << physicalPath( folder, name );
+   return tracks;
+}
+
+QStringList romParts( const QString& aRomPath )
+{
+   QStringList parts{ aRomPath };
+   for ( int next = 0; next < parts.size(); ++next ) {
+      for ( const QString& track : discTracks( parts.at( next ) ) ) {
+         if ( !parts.contains( track ) )
+            parts << track;
+      }
+   }
+   return parts;
+}
+
 bool sameFolder( const QString& aA, const QString& aB )
 {
    const QString a = QFileInfo( aA ).canonicalFilePath();
@@ -104,8 +128,8 @@ RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, c
       }
 
       if ( isDiscDescription( path ) ) {
-         for ( const QString& name : referencedFiles( path ) )
-            queue << physicalPath( info.path(), name );
+         for ( const QString& track : discTracks( path ) )
+            queue << track;
       }
    }
 

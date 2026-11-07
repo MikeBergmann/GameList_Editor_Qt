@@ -27,6 +27,13 @@ struct RomCopyPlan
 // Whether both folders exist and are the same one, symlinks resolved.
 bool sameFolder( const QString& aA, const QString& aB );
 
+// The files a .cue / .m3u / .gdi names, as physical paths. Empty for any other file.
+QStringList discTracks( const QString& aPath );
+
+// aRomPath first, then every file it needs, through nested descriptions (an .m3u of .cue
+// sheets). Missing files are listed too; no path is listed twice.
+QStringList romParts( const QString& aRomPath );
+
 // aRomLink is the <path> text. The ROM and the files a .cue / .m3u / .gdi names are copied
 // when missing on the target or of another size. A folder ROM is a problem, not a copy.
 // ponytail: size only, no hash; a same-size changed ROM is not noticed. Upgrade: MD5 when sizes match.
