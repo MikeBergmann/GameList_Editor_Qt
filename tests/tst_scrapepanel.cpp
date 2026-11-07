@@ -228,7 +228,7 @@ TEST( ScrapePanel, AFailedSaveLeavesTheGamelistAsItWas )
    EXPECT_EQ( panel.list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
    EXPECT_EQ( panel.list.at( 0 ).genre, QStringLiteral( "Platform" ) );
    EXPECT_EQ( panel.list.at( 0 ).publisher, QStringLiteral( "Sega" ) );
-   EXPECT_EQ( panel.list.domText( 0, "name" ), QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( panel.list.domText( 0, Cst_Name ), QStringLiteral( "Sonic The Hedgehog" ) );
 }
 
 const QByteArray Cst_LbMetadata = R"xml(<LaunchBox>

@@ -92,10 +92,10 @@ TEST( Gamelist, NodesStayAlignedWithGames )
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    for ( int index = 0; index < list.count(); ++index )
-      EXPECT_EQ( list.domText( index, "path" ), list.at( index ).romPath );
+      EXPECT_EQ( list.domText( index, Cst_Path ), list.at( index ).romPath );
 
-   EXPECT_TRUE( list.domText( list.count(), "path" ).isEmpty() );
-   EXPECT_TRUE( list.domText( -1, "path" ).isEmpty() );
+   EXPECT_TRUE( list.domText( list.count(), Cst_Path ).isEmpty() );
+   EXPECT_TRUE( list.domText( -1, Cst_Path ).isEmpty() );
 }
 
 // The ROM and the picture are on disk under a different case than the gamelist
@@ -343,7 +343,7 @@ TEST( Gamelist, SetFieldsCreatesMissingNodes )
    EXPECT_EQ( saved.at( 2 ).genre, QStringLiteral( "Shooter" ) );
    EXPECT_EQ( saved.at( 2 ).hidden, 1 );
    // Written as the literal "true", which is the only thing ES reads as true.
-   EXPECT_EQ( saved.domText( 2, "hidden" ), QStringLiteral( "true" ) );
+   EXPECT_EQ( saved.domText( 2, Cst_Hidden ), QStringLiteral( "true" ) );
 }
 
 TEST( Gamelist, BatchSetFieldsLeavesTheBlanksAlone )
@@ -558,7 +558,7 @@ TEST( Gamelist, RemoveGameDropsTheEntryAndItsFiles )
 
    // Written through, and the node list still lines up with the games.
    EXPECT_EQ( reload( fixture ).count(), 2 );
-   EXPECT_EQ( list.domText( 0, "path" ), list.at( 0 ).romPath );
+   EXPECT_EQ( list.domText( 0, Cst_Path ), list.at( 0 ).romPath );
 
    EXPECT_FALSE( list.removeGame( 2 ) );
 }
@@ -595,7 +595,7 @@ TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
 
    ASSERT_EQ( list.count(), 1 );
    EXPECT_EQ( list.at( 0 ).romPath, QStringLiteral( "./sub/Sonic.zip" ) );
-   EXPECT_EQ( list.domText( 0, "path" ), list.at( 0 ).romPath );
+   EXPECT_EQ( list.domText( 0, Cst_Path ), list.at( 0 ).romPath );
    EXPECT_EQ( reload( fixture ).count(), 1 );
    // Unlike removeGame, no file goes with the entry.
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
@@ -883,7 +883,7 @@ TEST( Gamelist, AFailedSetFieldsLeavesGameAndDocumentAsTheyWere )
    EXPECT_EQ( list.at( 2 ).name, QStringLiteral( "Vanished" ) );
    EXPECT_TRUE( list.at( 2 ).genre.isEmpty() );
    EXPECT_EQ( list.at( 2 ).hidden, 0 );
-   EXPECT_EQ( list.domText( 2, "name" ), QStringLiteral( "Vanished" ) );
+   EXPECT_EQ( list.domText( 2, Cst_Name ), QStringLiteral( "Vanished" ) );
 
    ASSERT_TRUE( QDir( fixture.snes.gamelistPath ).removeRecursively() );
    writeFile( fixture.snes.gamelistPath, Cst_Gamelist );
@@ -934,9 +934,9 @@ TEST( Gamelist, AFailedPerGameSetFieldsLeavesEveryGameAsItWas )
    EXPECT_FALSE( list.setFields(
       { { 0, one, GameFieldSet( gfName ) }, { 2, two, GameFieldSet( gfGenre ) } } ) );
    EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
-   EXPECT_EQ( list.domText( 0, "name" ), QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_EQ( list.domText( 0, Cst_Name ), QStringLiteral( "Sonic The Hedgehog" ) );
    EXPECT_TRUE( list.at( 2 ).genre.isEmpty() );
-   EXPECT_TRUE( list.domText( 2, "genre" ).isEmpty() );
+   EXPECT_TRUE( list.domText( 2, Cst_Genre ).isEmpty() );
    EXPECT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
 }
 
@@ -984,7 +984,7 @@ TEST( Gamelist, AFailedEditNamesLeavesGamesAndDocumentAsTheyWere )
    EXPECT_FALSE( list.editNames( { 0, 2 }, edit ) );
 
    EXPECT_EQ( list.at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
-   EXPECT_EQ( list.domText( 2, "name" ), QStringLiteral( "Vanished" ) );
+   EXPECT_EQ( list.domText( 2, Cst_Name ), QStringLiteral( "Vanished" ) );
    EXPECT_TRUE( list.nameIsDuplicated( QStringLiteral( "Sonic The Hedgehog" ) ) );
 }
 
@@ -1009,7 +1009,7 @@ TEST( Gamelist, DeleteOldBackupsKeepsTheNewestAndNothingElse )
    EXPECT_TRUE( QFileInfo::exists( fixture.snes.gamelistPath ) );
 }
 
-QString linkInDom( const Gamelist& aList, int aIndex, const char* aName )
+QString linkInDom( const Gamelist& aList, int aIndex, QLatin1StringView aName )
 {
    return aList.domText( aIndex, aName );
 }
@@ -1033,7 +1033,7 @@ TEST( Gamelist, SetVideoFailedSaveRestoresFilesDocumentAndGame )
    EXPECT_FALSE( QFileInfo::exists( video + QStringLiteral( ".gle-bak" ) ) );
    EXPECT_EQ( list.at( 0 ).videoPath, before.videoPath );
    EXPECT_EQ( list.at( 0 ).physicalVideoPath, before.physicalVideoPath );
-   EXPECT_EQ( linkInDom( list, 0, "video" ), before.videoPath );
+   EXPECT_EQ( linkInDom( list, 0, Cst_VideoLink ), before.videoPath );
 }
 
 TEST( Gamelist, SetVideoThatCannotBeCopiedKeepsTheOldVideo )
@@ -1064,7 +1064,7 @@ TEST( Gamelist, SetImageFailedSaveRestoresTheOldPicture )
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/Sonic.png" ) ) );
    EXPECT_EQ( list.at( 1 ).imagePath, linkBefore );
    EXPECT_EQ( list.at( 1 ).missingImage, missingBefore );
-   EXPECT_EQ( linkInDom( list, 1, "image" ), linkBefore );
+   EXPECT_EQ( linkInDom( list, 1, Cst_ImageLink ), linkBefore );
 }
 
 TEST( Gamelist, SetImageFailedSaveBringsBackAnOverwrittenPicture )
@@ -1275,8 +1275,8 @@ TEST( Gamelist, RemoveImageAndVideoFailedSaveKeepLinksAndFiles )
    EXPECT_EQ( list.at( 0 ).physicalVideoPath, before.physicalVideoPath );
    EXPECT_FALSE( list.at( 0 ).missingImage );
    EXPECT_FALSE( list.at( 0 ).missingVideo );
-   EXPECT_EQ( linkInDom( list, 0, "image" ), before.imagePath );
-   EXPECT_EQ( linkInDom( list, 0, "video" ), before.videoPath );
+   EXPECT_EQ( linkInDom( list, 0, Cst_ImageLink ), before.imagePath );
+   EXPECT_EQ( linkInDom( list, 0, Cst_VideoLink ), before.videoPath );
    EXPECT_TRUE( QFileInfo::exists( before.physicalImagePath ) );
    EXPECT_TRUE( QFileInfo::exists( before.physicalVideoPath ) );
 }
@@ -1349,7 +1349,7 @@ TEST( GamelistEsde, SetImageWritesCoversDropsTheOtherFormatAndLeavesTheGamelistA
    EXPECT_FALSE( QFileInfo::exists( esde.path( "media/snes/covers/Sub/Game.jpg" ) ) )
       << "the jpg would hide the new png";
    EXPECT_EQ( readAll( esde.system.gamelistPath ), before );
-   EXPECT_EQ( list.domText( 0, "image" ), QStringLiteral( "./images/legacy.png" ) );
+   EXPECT_EQ( list.domText( 0, Cst_ImageLink ), QStringLiteral( "./images/legacy.png" ) );
 }
 
 TEST( GamelistEsde, SetImageForAFolderRomKeepsTheFolderNameAndAddsNoTag )
@@ -1361,7 +1361,7 @@ TEST( GamelistEsde, SetImageForAFolderRomKeepsTheFolderNameAndAddsNoTag )
    ASSERT_TRUE( list.setImage( 1, tinyPicture() ) );
 
    EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/dig.scummvm.png" ) ) );
-   EXPECT_TRUE( list.domText( 1, "image" ).isEmpty() );
+   EXPECT_TRUE( list.domText( 1, Cst_ImageLink ).isEmpty() );
    EXPECT_FALSE( list.at( 1 ).missingImage );
 }
 
@@ -1515,7 +1515,7 @@ TEST( GamelistCopyMedia, AFailedSaveRollsBackEveryFileOfTheBatch )
       << "the replaced video must come back";
    EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4.gle-bak" ) ) );
    EXPECT_EQ( list.at( 2 ).imagePath, before.imagePath );
-   EXPECT_EQ( list.domText( 2, "image" ), before.imagePath );
+   EXPECT_EQ( list.domText( 2, Cst_ImageLink ), before.imagePath );
 }
 
 TEST( GamelistCopyMedia, EsdeGamesSharingAStemDoNotCostTheOriginalOnRollback )

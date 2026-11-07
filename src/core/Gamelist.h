@@ -134,7 +134,7 @@ public:
    void ensureHashes( int aIndex );
 
    // Child text as it is in the DOM, not the Game. Empty if absent.
-   QString domText( int aIndex, const char* aName ) const;
+   QString domText( int aIndex, QLatin1StringView aName ) const;
 
    // Where new media goes, and whether it is named Sonic-image.png (dash style); both come
    // from the first game that has any. ponytail: mixed styles follow that game; upgrade: vote.
@@ -173,8 +173,8 @@ private:
 
    Game gameFromNode( const QDomElement& aNode ) const;
 
-   QDomElement ensureChild( QDomElement aNode, const char* aName );
-   void setChildText( QDomElement aNode, const char* aName, const QString& aText );
+   QDomElement ensureChild( QDomElement aNode, QLatin1StringView aName );
+   void setChildText( QDomElement aNode, QLatin1StringView aName, const QString& aText );
 
    // The one place a game's image or video link changes: DOM and Game together.
    // An empty aPhysical means no media. Does not save.

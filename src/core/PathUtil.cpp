@@ -167,7 +167,7 @@ bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
    return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
 }
 
-QByteArray wrapInRoot( const QByteArray& aXml, const char* aRoot )
+QByteArray wrapInRoot( const QByteArray& aXml, QLatin1StringView aRoot )
 {
    qsizetype at = aXml.startsWith( "\xEF\xBB\xBF" ) ? 3 : 0;
    if ( aXml.mid( at ).startsWith( "<?xml" ) ) {
@@ -176,5 +176,6 @@ QByteArray wrapInRoot( const QByteArray& aXml, const char* aRoot )
          at = end + 2;
    }
 
-   return aXml.left( at ) + '<' + aRoot + '>' + aXml.mid( at ) + "</" + aRoot + '>';
+   const QByteArray root( aRoot.data(), aRoot.size() );
+   return aXml.left( at ) + '<' + root + '>' + aXml.mid( at ) + "</" + root + '>';
 }

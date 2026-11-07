@@ -83,36 +83,36 @@ void Frm_Network::Execute()
 void Frm_Network::loadFromSettings()
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
-   Edt_ScreenLogin->setText( settings.value( QLatin1String( Cst_IniSSUser ) ).toString() );
-   Edt_ScreenPwd->setText( settings.value( QLatin1String( Cst_IniSSPwd ) ).toString() );
+   Edt_ScreenLogin->setText( settings.value( Cst_IniSSUser ).toString() );
+   Edt_ScreenPwd->setText( settings.value( Cst_IniSSPwd ).toString() );
    Cbx_ScrapeLanguage->setCurrentIndex( langFromIndex(
-      settings.value( QLatin1String( Cst_IniLanguage ), Cst_IniLanguageDefault ).toInt() ) );
+      settings.value( Cst_IniLanguage, Cst_IniLanguageDefault ).toInt() ) );
 
-   Grp_Proxy->setChecked( settings.value( QLatin1String( Cst_IniProxyUse ), false ).toBool() );
-   Edt_ProxyServer->setText( settings.value( QLatin1String( Cst_IniProxyServer ) ).toString() );
-   Edt_ProxyPort->setText( settings.value( QLatin1String( Cst_IniProxyPort ) ).toString() );
-   Edt_ProxyUser->setText( settings.value( QLatin1String( Cst_IniProxyUser ) ).toString() );
-   Edt_ProxyPwd->setText( settings.value( QLatin1String( Cst_IniProxyPwd ) ).toString() );
+   Grp_Proxy->setChecked( settings.value( Cst_IniProxyUse, false ).toBool() );
+   Edt_ProxyServer->setText( settings.value( Cst_IniProxyServer ).toString() );
+   Edt_ProxyPort->setText( settings.value( Cst_IniProxyPort ).toString() );
+   Edt_ProxyUser->setText( settings.value( Cst_IniProxyUser ).toString() );
+   Edt_ProxyPwd->setText( settings.value( Cst_IniProxyPwd ).toString() );
 }
 
 void Frm_Network::saveToSettings()
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
-   settings.setValue( QLatin1String( Cst_IniSSUser ), Edt_ScreenLogin->text() );
-   settings.setValue( QLatin1String( Cst_IniSSPwd ), Edt_ScreenPwd->text() );
-   settings.setValue( QLatin1String( Cst_IniLanguage ), Cbx_ScrapeLanguage->currentIndex() );
+   settings.setValue( Cst_IniSSUser, Edt_ScreenLogin->text() );
+   settings.setValue( Cst_IniSSPwd, Edt_ScreenPwd->text() );
+   settings.setValue( Cst_IniLanguage, Cbx_ScrapeLanguage->currentIndex() );
 
-   settings.setValue( QLatin1String( Cst_IniProxyUse ), Grp_Proxy->isChecked() );
-   settings.setValue( QLatin1String( Cst_IniProxyServer ), Edt_ProxyServer->text() );
+   settings.setValue( Cst_IniProxyUse, Grp_Proxy->isChecked() );
+   settings.setValue( Cst_IniProxyServer, Edt_ProxyServer->text() );
    // An empty port is stored as 0: the scraper treats it as "no port given" and a missing
    // key would read back as an empty string.
-   settings.setValue( QLatin1String( Cst_IniProxyPort ), Edt_ProxyPort->text().isEmpty()
+   settings.setValue( Cst_IniProxyPort, Edt_ProxyPort->text().isEmpty()
                                                             ? QStringLiteral( "0" )
                                                             : Edt_ProxyPort->text() );
-   settings.setValue( QLatin1String( Cst_IniProxyUser ), Edt_ProxyUser->text() );
-   settings.setValue( QLatin1String( Cst_IniProxyPwd ), Edt_ProxyPwd->text() );
+   settings.setValue( Cst_IniProxyUser, Edt_ProxyUser->text() );
+   settings.setValue( Cst_IniProxyPwd, Edt_ProxyPwd->text() );
 }

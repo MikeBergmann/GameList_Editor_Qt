@@ -29,7 +29,8 @@ QString esdeSetting( const QString& aAppData, const char* aName )
 {
    QFile file( aAppData + QLatin1String( "/settings/es_settings.xml" ) );
    QDomDocument settings;
-   if ( !file.open( QIODevice::ReadOnly ) || !settings.setContent( wrapInRoot( file.readAll(), "settings" ) ) )
+   if ( !file.open( QIODevice::ReadOnly ) ||
+        !settings.setContent( wrapInRoot( file.readAll(), QLatin1StringView( "settings" ) ) ) )
       return {};
 
    for ( QDomElement node = settings.documentElement().firstChildElement( QStringLiteral( "string" ) );
@@ -105,7 +106,7 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath )
 
    for ( const QString& folder : folders ) {
       const QString gamelist = resolvePath(
-         layout.lists.filePath( folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) ) );
+         layout.lists.filePath( folder + QLatin1Char( '/' ) + Cst_GameListFileName ) );
       if ( !QFileInfo::exists( gamelist ) )
          continue;
 
@@ -120,7 +121,7 @@ SystemEntry systemAt( const QString& aRootPath, const QString& aFolderName )
    const RootLayout layout = rootLayout( aRootPath );
    const QString folder = resolvePath( layout.lists.filePath( aFolderName ) );
    return entryIn( layout, aFolderName,
-                   folder + QLatin1Char( '/' ) + QLatin1String( Cst_GameListFileName ) );
+                   folder + QLatin1Char( '/' ) + Cst_GameListFileName );
 }
 
 Result<> createGamelist( const QString& aPath )
@@ -145,7 +146,7 @@ Result<> createGamelist( const QString& aPath )
 void applySystemMap( QVector<SystemEntry>& aSystems )
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+   settings.beginGroup( Cst_IniSystemMap );
    for ( SystemEntry& system : aSystems )
       if ( system.kind == skOther && settings.contains( system.folderName ) )
          system.kind = systemKindFromFolder( settings.value( system.folderName ).toString() );
@@ -154,7 +155,7 @@ void applySystemMap( QVector<SystemEntry>& aSystems )
 void setSystemMapping( const QString& aFolderName, SystemKind aKind )
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniSystemMap ) );
+   settings.beginGroup( Cst_IniSystemMap );
    if ( aKind == skOther )
       settings.remove( aFolderName );
    else

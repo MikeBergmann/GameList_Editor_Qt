@@ -28,8 +28,8 @@ const QStringList Cst_VideoSearchFolders = { QStringLiteral( "./media/videos/" )
                                              QStringLiteral( "./videos/" ) };
 
 // What scrapers append to the ROM name, in order of preference: the plain name first.
-const QStringList Cst_ImageStems = { QString(), QLatin1String( Cst_ImageDash ) };
-const QStringList Cst_VideoStems = { QString(), QLatin1String( Cst_VideoDash ) };
+const QStringList Cst_ImageStems = { QString(), Cst_ImageDash };
+const QStringList Cst_VideoStems = { QString(), Cst_VideoDash };
 
 // Kind of file by MIME type, so no extension list to keep.
 const QString Cst_ImageMime = QStringLiteral( "image/" );

@@ -152,8 +152,7 @@ enum CountryName
    cnCount
 };
 
-// const char*, not QString: Qt6 decodes those as UTF-8, which the accented
-// entries of Cst_CountryNameFull need, and they cost no static construction.
+// Country names stay const char*: they are UTF-8, which QLatin1StringView would mangle.
 
 struct SystemInfo
 {
@@ -190,135 +189,135 @@ LangName langFromIndex( int aNumber );
 
 // --- gamelist.xml: node and attribute names -------------------------------
 
-inline constexpr const char* Cst_GameListFileName = "gamelist.xml";
-inline constexpr const char* Cst_Game = "game";
-inline constexpr const char* Cst_Path = "path";
-inline constexpr const char* Cst_Name = "name";
-inline constexpr const char* Cst_Description = "desc";
-inline constexpr const char* Cst_ImageLink = "image";
-inline constexpr const char* Cst_VideoLink = "video";
-inline constexpr const char* Cst_Rating = "rating";
-inline constexpr const char* Cst_ReleaseDate = "releasedate";
-inline constexpr const char* Cst_Developer = "developer";
-inline constexpr const char* Cst_Publisher = "publisher";
-inline constexpr const char* Cst_Genre = "genre";
-inline constexpr const char* Cst_Players = "players";
-inline constexpr const char* Cst_Region = "region";
-inline constexpr const char* Cst_Playcount = "playcount";
-inline constexpr const char* Cst_LastPlayed = "lastplayed";
-inline constexpr const char* Cst_KidGame = "kidgame";
-inline constexpr const char* Cst_Hidden = "hidden";
-inline constexpr const char* Cst_Favorite = "favorite";
-inline constexpr const char* Cst_True = "true";
-inline constexpr const char* Cst_False = "false";
+inline constexpr QLatin1StringView Cst_GameListFileName{ "gamelist.xml" };
+inline constexpr QLatin1StringView Cst_Game{ "game" };
+inline constexpr QLatin1StringView Cst_Path{ "path" };
+inline constexpr QLatin1StringView Cst_Name{ "name" };
+inline constexpr QLatin1StringView Cst_Description{ "desc" };
+inline constexpr QLatin1StringView Cst_ImageLink{ "image" };
+inline constexpr QLatin1StringView Cst_VideoLink{ "video" };
+inline constexpr QLatin1StringView Cst_Rating{ "rating" };
+inline constexpr QLatin1StringView Cst_ReleaseDate{ "releasedate" };
+inline constexpr QLatin1StringView Cst_Developer{ "developer" };
+inline constexpr QLatin1StringView Cst_Publisher{ "publisher" };
+inline constexpr QLatin1StringView Cst_Genre{ "genre" };
+inline constexpr QLatin1StringView Cst_Players{ "players" };
+inline constexpr QLatin1StringView Cst_Region{ "region" };
+inline constexpr QLatin1StringView Cst_Playcount{ "playcount" };
+inline constexpr QLatin1StringView Cst_LastPlayed{ "lastplayed" };
+inline constexpr QLatin1StringView Cst_KidGame{ "kidgame" };
+inline constexpr QLatin1StringView Cst_Hidden{ "hidden" };
+inline constexpr QLatin1StringView Cst_Favorite{ "favorite" };
+inline constexpr QLatin1StringView Cst_True{ "true" };
+inline constexpr QLatin1StringView Cst_False{ "false" };
 
 // <releasedate> is yyyymmddT000000; short fields are padded out to these.
-inline constexpr const char* Cst_DateShortFill = "00";
-inline constexpr const char* Cst_DateLongFill = "0000";
-inline constexpr const char* Cst_DateSuffix = "T000000";
+inline constexpr QLatin1StringView Cst_DateShortFill{ "00" };
+inline constexpr QLatin1StringView Cst_DateLongFill{ "0000" };
+inline constexpr QLatin1StringView Cst_DateSuffix{ "T000000" };
 
-inline constexpr const char* Cst_ImageSuffixPng = ".png";
-inline constexpr const char* Cst_VideoSuffixMp4 = ".mp4";
+inline constexpr QLatin1StringView Cst_ImageSuffixPng{ ".png" };
+inline constexpr QLatin1StringView Cst_VideoSuffixMp4{ ".mp4" };
 
 // Scrapers may append these to the ROM name: Sonic-image.png, Sonic-video.mp4.
-inline constexpr const char* Cst_ImageDash = "-image";
-inline constexpr const char* Cst_VideoDash = "-video";
-inline constexpr const char* Cst_TxtExtension = ".txt";
+inline constexpr QLatin1StringView Cst_ImageDash{ "-image" };
+inline constexpr QLatin1StringView Cst_VideoDash{ "-video" };
+inline constexpr QLatin1StringView Cst_TxtExtension{ ".txt" };
 
 // --- bundled assets -------------------------------------------------------
 
 // .qrc prefixes, not filesystem paths - see Resources/assets.qrc. QPixmap reads
 // ":/" transparently, POSIX calls do not.
-inline constexpr const char* Cst_DefaultPicsFolderPath = ":/DefaultPictures/";
-inline constexpr const char* Cst_LogoPicsFolder = ":/SystemsLogos/";
-inline constexpr const char* Cst_DefaultImageName = "default.png";
+inline constexpr QLatin1StringView Cst_DefaultPicsFolderPath{ ":/DefaultPictures/" };
+inline constexpr QLatin1StringView Cst_LogoPicsFolder{ ":/SystemsLogos/" };
+inline constexpr QLatin1StringView Cst_DefaultImageName{ "default.png" };
 
 // --- QSettings: group and keys --------------------------------------------
 
-inline constexpr const char* Cst_IniOptions = "Options";
-inline constexpr const char* Cst_IniGodMode = "GodMode";
-inline constexpr const char* Cst_IniAutoHash = "AutoHash";
-inline constexpr const char* Cst_IniDelWoPrompt = "DelWoPrompt";
-inline constexpr const char* Cst_ShowTips = "ShowTips";
-inline constexpr const char* Cst_IniGenesisLogo = "GenesisLogo";
-inline constexpr const char* Cst_IniAutoplayVideo = "AutoplayVideo";
-inline constexpr const char* Cst_IniLanguage = "Language";
-inline constexpr const char* Cst_IniSSUser = "SSUser";
-inline constexpr const char* Cst_IniSSPwd = "SSPwd";
-inline constexpr const char* Cst_IniProxyUser = "ProxyUser";
-inline constexpr const char* Cst_IniProxyPwd = "ProxyPwd";
-inline constexpr const char* Cst_IniProxyServer = "ProxyServer";
-inline constexpr const char* Cst_IniProxyPort = "ProxyPort";
-inline constexpr const char* Cst_IniProxyUse = "ProxyUse";
-inline constexpr const char* Cst_IniLastFolder = "LastFolder";
+inline constexpr QLatin1StringView Cst_IniOptions{ "Options" };
+inline constexpr QLatin1StringView Cst_IniGodMode{ "GodMode" };
+inline constexpr QLatin1StringView Cst_IniAutoHash{ "AutoHash" };
+inline constexpr QLatin1StringView Cst_IniDelWoPrompt{ "DelWoPrompt" };
+inline constexpr QLatin1StringView Cst_ShowTips{ "ShowTips" };
+inline constexpr QLatin1StringView Cst_IniGenesisLogo{ "GenesisLogo" };
+inline constexpr QLatin1StringView Cst_IniAutoplayVideo{ "AutoplayVideo" };
+inline constexpr QLatin1StringView Cst_IniLanguage{ "Language" };
+inline constexpr QLatin1StringView Cst_IniSSUser{ "SSUser" };
+inline constexpr QLatin1StringView Cst_IniSSPwd{ "SSPwd" };
+inline constexpr QLatin1StringView Cst_IniProxyUser{ "ProxyUser" };
+inline constexpr QLatin1StringView Cst_IniProxyPwd{ "ProxyPwd" };
+inline constexpr QLatin1StringView Cst_IniProxyServer{ "ProxyServer" };
+inline constexpr QLatin1StringView Cst_IniProxyPort{ "ProxyPort" };
+inline constexpr QLatin1StringView Cst_IniProxyUse{ "ProxyUse" };
+inline constexpr QLatin1StringView Cst_IniLastFolder{ "LastFolder" };
 
-inline constexpr const char* Cst_IniWindow = "Window";
-inline constexpr const char* Cst_IniGeometry = "Geometry";
-inline constexpr const char* Cst_IniSplitMain = "SplitMain";
+inline constexpr QLatin1StringView Cst_IniWindow{ "Window" };
+inline constexpr QLatin1StringView Cst_IniGeometry{ "Geometry" };
+inline constexpr QLatin1StringView Cst_IniSplitMain{ "SplitMain" };
 // Folder name -> known system's folder name ("amiga500" = "amiga"), for
 // folders the tables do not recognise.
-inline constexpr const char* Cst_IniSystemMap = "SystemMap";
+inline constexpr QLatin1StringView Cst_IniSystemMap{ "SystemMap" };
 // Validators of the cached LaunchBox dump, sent back as If-None-Match / If-Modified-Since.
-inline constexpr const char* Cst_IniLaunchBoxETag = "LaunchBoxETag";
-inline constexpr const char* Cst_IniLaunchBoxModified = "LaunchBoxModified";
+inline constexpr QLatin1StringView Cst_IniLaunchBoxETag{ "LaunchBoxETag" };
+inline constexpr QLatin1StringView Cst_IniLaunchBoxModified{ "LaunchBoxModified" };
 // Scrape tab source: 0 ScreenScraper (the default), 1 LaunchBox.
-inline constexpr const char* Cst_IniScrapeSource = "ScrapeSource";
+inline constexpr QLatin1StringView Cst_IniScrapeSource{ "ScrapeSource" };
 
 // Language is the one key whose default is not the zero value (lnFrench is 0).
 inline constexpr int Cst_IniLanguageDefault = lnEnglish;
 
 // --- screenscraper.fr -----------------------------------------------------
 
-inline constexpr const char* Cst_ScraperAddress = "https://www.screenscraper.fr/api2/";
-inline constexpr const char* Cst_Category = "jeuInfos.php";
-inline constexpr const char* Cst_SearchCategory = "jeuRecherche.php";
-inline constexpr const char* Cst_ScrapeLogin = "?devid=";
-inline constexpr const char* Cst_ScrapePwd = "&devpassword=";
+inline constexpr QLatin1StringView Cst_ScraperAddress{ "https://www.screenscraper.fr/api2/" };
+inline constexpr QLatin1StringView Cst_Category{ "jeuInfos.php" };
+inline constexpr QLatin1StringView Cst_SearchCategory{ "jeuRecherche.php" };
+inline constexpr QLatin1StringView Cst_ScrapeLogin{ "?devid=" };
+inline constexpr QLatin1StringView Cst_ScrapePwd{ "&devpassword=" };
 
-inline constexpr const char* Cst_DevSoftName = "&softname=GameListEditorQtv1";
-inline constexpr const char* Cst_Output = "&output=xml";
-inline constexpr const char* Cst_SSId = "&ssid=";
-inline constexpr const char* Cst_SSPwd = "&sspassword=";
-inline constexpr const char* Cst_Crc = "&crc=";
-inline constexpr const char* Cst_SystemId = "&systemeid=";
-inline constexpr const char* Cst_RomName = "&romnom=";
-inline constexpr const char* Cst_RomSize = "&romtaille=";
-inline constexpr const char* Cst_SearchText = "&recherche=";
+inline constexpr QLatin1StringView Cst_DevSoftName{ "&softname=GameListEditorQtv1" };
+inline constexpr QLatin1StringView Cst_Output{ "&output=xml" };
+inline constexpr QLatin1StringView Cst_SSId{ "&ssid=" };
+inline constexpr QLatin1StringView Cst_SSPwd{ "&sspassword=" };
+inline constexpr QLatin1StringView Cst_Crc{ "&crc=" };
+inline constexpr QLatin1StringView Cst_SystemId{ "&systemeid=" };
+inline constexpr QLatin1StringView Cst_RomName{ "&romnom=" };
+inline constexpr QLatin1StringView Cst_RomSize{ "&romtaille=" };
+inline constexpr QLatin1StringView Cst_SearchText{ "&recherche=" };
 
 // What Scraper reports when the server has no match; ScrapePanel offers a search on it.
-inline constexpr const char* Cst_GameNotFound = "Game not found";
+inline constexpr QLatin1StringView Cst_GameNotFound{ "Game not found" };
 
 
 // Reply nodes. French, because the API is.
-inline constexpr const char* Cst_DataNode = "Data";
-inline constexpr const char* Cst_GameNode = "jeu";
-inline constexpr const char* Cst_GamesNode = "jeux";
-inline constexpr const char* Cst_UserNode = "ssuser";
-inline constexpr const char* Cst_ThreadNode = "maxthreads";
-inline constexpr const char* Cst_MediaNode = "medias";
-inline constexpr const char* Cst_NamesNode = "noms";
-inline constexpr const char* Cst_RegionsNode = "regions";
-inline constexpr const char* Cst_EditNode = "editeur";
-inline constexpr const char* Cst_DevNode = "developpeur";
-inline constexpr const char* Cst_NoteNode = "note";
-inline constexpr const char* Cst_PlayersNode = "joueurs";
-inline constexpr const char* Cst_SynopNode = "synopsis";
-inline constexpr const char* Cst_DateNode = "dates";
-inline constexpr const char* Cst_GenreNode = "genres";
-inline constexpr const char* Cst_AttType = "type";
-inline constexpr const char* Cst_AttFormat = "format";
-inline constexpr const char* Cst_AttRegion = "region";
-inline constexpr const char* Cst_AttLang = "langue";
-inline constexpr const char* Cst_AttId = "id";
-inline constexpr const char* Cst_PngExt = "png";
+inline constexpr QLatin1StringView Cst_DataNode{ "Data" };
+inline constexpr QLatin1StringView Cst_GameNode{ "jeu" };
+inline constexpr QLatin1StringView Cst_GamesNode{ "jeux" };
+inline constexpr QLatin1StringView Cst_UserNode{ "ssuser" };
+inline constexpr QLatin1StringView Cst_ThreadNode{ "maxthreads" };
+inline constexpr QLatin1StringView Cst_MediaNode{ "medias" };
+inline constexpr QLatin1StringView Cst_NamesNode{ "noms" };
+inline constexpr QLatin1StringView Cst_RegionsNode{ "regions" };
+inline constexpr QLatin1StringView Cst_EditNode{ "editeur" };
+inline constexpr QLatin1StringView Cst_DevNode{ "developpeur" };
+inline constexpr QLatin1StringView Cst_NoteNode{ "note" };
+inline constexpr QLatin1StringView Cst_PlayersNode{ "joueurs" };
+inline constexpr QLatin1StringView Cst_SynopNode{ "synopsis" };
+inline constexpr QLatin1StringView Cst_DateNode{ "dates" };
+inline constexpr QLatin1StringView Cst_GenreNode{ "genres" };
+inline constexpr QLatin1StringView Cst_AttType{ "type" };
+inline constexpr QLatin1StringView Cst_AttFormat{ "format" };
+inline constexpr QLatin1StringView Cst_AttRegion{ "region" };
+inline constexpr QLatin1StringView Cst_AttLang{ "langue" };
+inline constexpr QLatin1StringView Cst_AttId{ "id" };
+inline constexpr QLatin1StringView Cst_PngExt{ "png" };
 
 // <media type="..."> values the scraper offers, in the order the scrape panel shows them.
-inline constexpr const char* Cst_MediaBox2d = "box-2D";
-inline constexpr const char* Cst_MediaScreenShot = "ss";
-inline constexpr const char* Cst_MediaSsTitle = "sstitle";
-inline constexpr const char* Cst_MediaBox3d = "box-3D";
-inline constexpr const char* Cst_MediaMix1 = "mixrbv1";
-inline constexpr const char* Cst_MediaMix2 = "mixrbv2";
-inline constexpr const char* Cst_MediaArcadeBox1 = "ssarcademyboxv1";
-inline constexpr const char* Cst_MediaWheel = "wheel";
-inline constexpr const char* Cst_MediaVideo = "video";
+inline constexpr QLatin1StringView Cst_MediaBox2d{ "box-2D" };
+inline constexpr QLatin1StringView Cst_MediaScreenShot{ "ss" };
+inline constexpr QLatin1StringView Cst_MediaSsTitle{ "sstitle" };
+inline constexpr QLatin1StringView Cst_MediaBox3d{ "box-3D" };
+inline constexpr QLatin1StringView Cst_MediaMix1{ "mixrbv1" };
+inline constexpr QLatin1StringView Cst_MediaMix2{ "mixrbv2" };
+inline constexpr QLatin1StringView Cst_MediaArcadeBox1{ "ssarcademyboxv1" };
+inline constexpr QLatin1StringView Cst_MediaWheel{ "wheel" };
+inline constexpr QLatin1StringView Cst_MediaVideo{ "video" };

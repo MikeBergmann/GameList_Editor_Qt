@@ -169,8 +169,8 @@ void ScrapePanel::buildLayout()
    Cbo_Source->addItems( { QStringLiteral( "ScreenScraper" ), QStringLiteral( "LaunchBox" ) } );
    connect( Cbo_Source, &QComboBox::currentIndexChanged, this, [this]( int aIndex ) {
       QSettings settings;
-      settings.beginGroup( QLatin1String( Cst_IniOptions ) );
-      settings.setValue( QLatin1String( Cst_IniScrapeSource ), aIndex );
+      settings.beginGroup( Cst_IniOptions );
+      settings.setValue( Cst_IniScrapeSource, aIndex );
       applySource();
    } );
 
@@ -331,13 +331,13 @@ void ScrapePanel::setBusy( bool aBusy )
 void ScrapePanel::activate()
 {
    QSettings settings;
-   settings.beginGroup( QLatin1String( Cst_IniOptions ) );
+   settings.beginGroup( Cst_IniOptions );
 
-   if ( settings.value( QLatin1String( Cst_IniProxyUse ), false ).toBool() ) {
-      const QString server = settings.value( QLatin1String( Cst_IniProxyServer ) ).toString();
-      const int port = settings.value( QLatin1String( Cst_IniProxyPort ), 0 ).toInt();
-      const QString user = settings.value( QLatin1String( Cst_IniProxyUser ) ).toString();
-      const QString password = settings.value( QLatin1String( Cst_IniProxyPwd ) ).toString();
+   if ( settings.value( Cst_IniProxyUse, false ).toBool() ) {
+      const QString server = settings.value( Cst_IniProxyServer ).toString();
+      const int port = settings.value( Cst_IniProxyPort, 0 ).toInt();
+      const QString user = settings.value( Cst_IniProxyUser ).toString();
+      const QString password = settings.value( Cst_IniProxyPwd ).toString();
       FScraper.setProxy( server, port, user, password );
       FDump.setProxy( server, port, user, password );
    } else {
@@ -345,14 +345,14 @@ void ScrapePanel::activate()
       FDump.setProxy( QString(), 0, QString(), QString() );
    }
 
-   FSSLogin = settings.value( QLatin1String( Cst_IniSSUser ) ).toString();
-   FSSPassword = settings.value( QLatin1String( Cst_IniSSPwd ) ).toString();
+   FSSLogin = settings.value( Cst_IniSSUser ).toString();
+   FSSPassword = settings.value( Cst_IniSSPwd ).toString();
 
    FLanguage = langFromIndex(
-      settings.value( QLatin1String( Cst_IniLanguage ), Cst_IniLanguageDefault ).toInt() );
+      settings.value( Cst_IniLanguage, Cst_IniLanguageDefault ).toInt() );
 
    Cbo_Source->setCurrentIndex(
-      settings.value( QLatin1String( Cst_IniScrapeSource ), Cst_SourceScreenScraper ).toInt() ==
+      settings.value( Cst_IniScrapeSource, Cst_SourceScreenScraper ).toInt() ==
             Cst_SourceLaunchBox
          ? Cst_SourceLaunchBox
          : Cst_SourceScreenScraper );
@@ -391,7 +391,7 @@ void ScrapePanel::setFields( const GameFields& aFields )
 QSet<QString> ScrapePanel::mediaTypes() const
 {
    QSet<QString> types;
-   const QVector<QPair<QCheckBox*, const char*>> map = {
+   const QVector<QPair<QCheckBox*, QLatin1StringView>> map = {
       { Chk_Box2D, Cst_MediaBox2d },
       { Chk_Box3D, Cst_MediaBox3d },
       { Chk_Mix1, Cst_MediaMix1 },
@@ -403,7 +403,7 @@ QSet<QString> ScrapePanel::mediaTypes() const
    };
    for ( const auto& pair : map )
       if ( pair.first->isChecked() )
-         types.insert( QLatin1String( pair.second ) );
+         types.insert( pair.second );
    return types;
 }
 
@@ -619,7 +619,7 @@ void ScrapePanel::pickLaunchBoxGame( const LaunchBoxQuery& aQuery )
 
 void ScrapePanel::handleScrapeFailed( const QString& aMessage, const QString& aDetails )
 {
-   if ( aMessage != QLatin1String( Cst_GameNotFound ) || !FGamelist || FIndex < 0 ) {
+   if ( aMessage != Cst_GameNotFound || !FGamelist || FIndex < 0 ) {
       handleGameInfoFailed( aMessage, aDetails );
       return;
    }
@@ -659,7 +659,7 @@ void ScrapePanel::handleSearchReady( const QVector<ScrapeCandidate>& aCandidates
       return;
    }
    if ( rows.isEmpty() ) {
-      handleGameInfoFailed( QLatin1String( Cst_GameNotFound ), FNotFoundDetails );
+      handleGameInfoFailed( Cst_GameNotFound, FNotFoundDetails );
       return;
    }
 

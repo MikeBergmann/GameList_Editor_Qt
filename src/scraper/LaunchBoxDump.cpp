@@ -295,10 +295,10 @@ void LaunchBoxDump::refresh()
    // Validators only count while the files they describe are there.
    if ( isCached() ) {
       QSettings settings;
-      settings.beginGroup( QLatin1String( Cst_IniOptions ) );
-      const QByteArray etag = settings.value( QLatin1String( Cst_IniLaunchBoxETag ) ).toString().toUtf8();
+      settings.beginGroup( Cst_IniOptions );
+      const QByteArray etag = settings.value( Cst_IniLaunchBoxETag ).toString().toUtf8();
       const QByteArray modified =
-         settings.value( QLatin1String( Cst_IniLaunchBoxModified ) ).toString().toUtf8();
+         settings.value( Cst_IniLaunchBoxModified ).toString().toUtf8();
       if ( !etag.isEmpty() )
          request.setRawHeader( "If-None-Match", etag );
       if ( !modified.isEmpty() )
@@ -386,9 +386,9 @@ void LaunchBoxDump::unpack()
       QFile::remove( zipPath );
       // Stored only now: a failed unpack must make the next refresh download again.
       QSettings settings;
-      settings.beginGroup( QLatin1String( Cst_IniOptions ) );
-      settings.setValue( QLatin1String( Cst_IniLaunchBoxETag ), FETag );
-      settings.setValue( QLatin1String( Cst_IniLaunchBoxModified ), FModified );
+      settings.beginGroup( Cst_IniOptions );
+      settings.setValue( Cst_IniLaunchBoxETag, FETag );
+      settings.setValue( Cst_IniLaunchBoxModified, FModified );
       FBusy = false;
       emit finished( true );
    } );
