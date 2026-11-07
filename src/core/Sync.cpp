@@ -120,13 +120,7 @@ SyncGame planGame( SystemPlan& aPlan, const Gamelist& aMaster, const Gamelist& a
          aPlan.problems << verdict.problem;
       if ( !verdict.copy )
          continue;
-      if ( isImage ) {
-         game.copyImage = true;
-         game.imageSource = source.physicalImagePath;
-      } else {
-         game.copyVideo = true;
-         game.videoSource = source.physicalVideoPath;
-      }
+      ( isImage ? game.imageSource : game.videoSource ) = isImage ? source.physicalImagePath : source.physicalVideoPath;
    }
    return game;
 }
@@ -236,9 +230,9 @@ TargetChanges collectChanges( const SystemPlan& aPlan, const Gamelist& aMaster, 
          ++aReport.updated;
       if ( game.fields )
          changes.updates.append( { index, gameFields( aMaster.at( game.sourceIndex ) ), game.fields } );
-      if ( game.copyImage )
+      if ( !game.imageSource.isEmpty() )
          changes.copies.append( { index, true, game.imageSource } );
-      if ( game.copyVideo )
+      if ( !game.videoSource.isEmpty() )
          changes.copies.append( { index, false, game.videoSource } );
    }
    return changes;
@@ -373,7 +367,8 @@ SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
          matched.insert( targetIndex );
 
       const SyncGame game = planGame( plan, master, target, i, targetIndex );
-      if ( targetIndex < 0 || game.fields || !game.rom.files.isEmpty() || game.copyImage || game.copyVideo )
+      if ( targetIndex < 0 || game.fields || !game.rom.files.isEmpty() ||
+                 !game.imageSource.isEmpty() || !game.videoSource.isEmpty() )
          plan.games.append( game );
       else
          ++plan.unchanged;
@@ -496,7 +491,8 @@ int syncStepCount( const SyncPlan& aPlan )
       if ( system.isEmpty() )
          continue;
       for ( const SyncGame& game : system.games )
-         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) + game.copyImage + game.copyVideo;
+         steps += ( system.copyRoms ? static_cast<int>( game.rom.files.size() ) : 0 ) +
+                         !game.imageSource.isEmpty() + !game.videoSource.isEmpty();
       ++steps;
    }
    return steps;

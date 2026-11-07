@@ -32,7 +32,7 @@ QString describe( const SystemPlan& aSystem )
    int romFiles = 0;
    for ( const SyncGame& game : aSystem.games ) {
       ++( game.targetIndex < 0 ? added : updated );
-      media += game.copyImage + game.copyVideo;
+      media += !game.imageSource.isEmpty() + !game.videoSource.isEmpty();
       romFiles += static_cast<int>( game.rom.files.size() );
    }
 
@@ -80,9 +80,9 @@ QString gameLine( const SyncGame& aGame )
       parts << QStringLiteral( "fields: %1" ).arg( fieldNames( aGame.fields ) );
    if ( !aGame.rom.files.isEmpty() )
       parts << QStringLiteral( "ROM: %1 file(s), %2" ).arg( aGame.rom.files.size() ).arg( size( aGame.rom.bytes ) );
-   if ( aGame.copyImage )
+   if ( !aGame.imageSource.isEmpty() )
       parts << QStringLiteral( "cover: %1" ).arg( QFileInfo( aGame.imageSource ).fileName() );
-   if ( aGame.copyVideo )
+   if ( !aGame.videoSource.isEmpty() )
       parts << QStringLiteral( "video: %1" ).arg( QFileInfo( aGame.videoSource ).fileName() );
    return QStringLiteral( "   %1%2" ).arg( aGame.name, parts.isEmpty() ? QString() : QStringLiteral( "  [%1]" ).arg( parts.join( QStringLiteral( "; " ) ) ) );
 }
