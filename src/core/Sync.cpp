@@ -10,11 +10,19 @@
 
 namespace {
 
-
 // By the file's case on disk, so a Windows link matches the file a sync copied.
 QString romKey( const Gamelist& aList, const QString& aPhysicalPath, bool aFoldsCase )
 {
    return fileKey( QDir( aList.romDir() ).relativeFilePath( aPhysicalPath ), aFoldsCase );
+}
+
+// A duplicate on the list: the last one wins.
+QHash<QString, int> romIndex( const Gamelist& aList, bool aFoldsCase )
+{
+   QHash<QString, int> keys;
+   for ( int i = 0; i < aList.count(); ++i )
+      keys.insert( romKey( aList, aList.at( i ).physicalRomPath, aFoldsCase ), i );
+   return keys;
 }
 
 // Same size, then same MD5. A missing target differs.
@@ -57,6 +65,203 @@ MediaVerdict judgeMedia( const Game& aSource, const Game* aTargetGame, bool aIsI
       return {};
 
    return { mediaDiffers( source, aIsImage ? aTargetGame->physicalImagePath : aTargetGame->physicalVideoPath ), {} };
+}
+
+// Why a master game stays off the plan; empty when it can go on.
+QString rejection( const Game& aSource, bool aDuplicate, bool aOnTarget )
+{
+   if ( QDir::isAbsolutePath( aSource.romPath ) )
+      return QStringLiteral( "%1: the path %2 is absolute and cannot be matched." ).arg( aSource.name, aSource.romPath );
+
+   if ( aDuplicate )
+      return QStringLiteral( "%1: %2 is listed more than once on the master; the first is used." )
+         .arg( aSource.name, aSource.romPath );
+
+   if ( aOnTarget )
+      return {};
+
+   if ( aSource.isOrphan )
+      return QStringLiteral( "%1: the ROM %2 is missing on the master." ).arg( aSource.name, aSource.romPath );
+
+   // ponytail: addGames takes files only. Upgrade: let it add a folder ROM.
+   if ( QFileInfo( aSource.physicalRomPath ).isDir() )
+      return QStringLiteral( "%1: %2 is a folder ROM; folder ROMs are not synced." ).arg( aSource.name, aSource.romPath );
+
+   return {};
+}
+
+// What one master game needs on the target (aTargetIndex -1: it is new there). The problems
+// of its ROM files and media, and the ROM bytes, are added to aPlan.
+SyncGame planGame( SystemPlan& aPlan, const Gamelist& aMaster, const Gamelist& aTarget, int aSourceIndex,
+                   int aTargetIndex )
+{
+   const Game& source = aMaster.at( aSourceIndex );
+   SyncGame game;
+   game.sourceIndex = aSourceIndex;
+   game.targetIndex = aTargetIndex;
+   game.name = source.name;
+   game.romLink = source.romPath;
+
+   const GameFields values = gameFields( source );
+   game.fields = ( aTargetIndex < 0 ? filledFields( values ) : changedFields( aTarget.at( aTargetIndex ), values ) ) &
+                 syncedFields();
+
+   if ( aPlan.copyRoms && !source.isOrphan ) {
+      game.rom = planRomCopy( aMaster.romDir(), romDirOf( aPlan.pair.target ), source.romPath );
+      aPlan.problems << game.rom.problems;
+      aPlan.romBytes += game.rom.bytes;
+   }
+
+   const Game* existing = aTargetIndex < 0 ? nullptr : &aTarget.at( aTargetIndex );
+   const bool targetEsde = !aPlan.pair.target.mediaDir.isEmpty();
+   for ( const bool isImage : { true, false } ) {
+      const MediaVerdict verdict = judgeMedia( source, existing, isImage, targetEsde );
+      if ( !verdict.problem.isEmpty() )
+         aPlan.problems << verdict.problem;
+      if ( !verdict.copy )
+         continue;
+      if ( isImage ) {
+         game.copyImage = true;
+         game.imageSource = source.physicalImagePath;
+      } else {
+         game.copyVideo = true;
+         game.videoSource = source.physicalVideoPath;
+      }
+   }
+   return game;
+}
+
+using Proceed = std::function<bool( const QString& )>;
+
+Result<> checkMasterUnchanged( const SystemPlan& aPlan, const Gamelist& aMaster )
+{
+   for ( const SyncGame& game : aPlan.games ) {
+      if ( game.sourceIndex < 0 || game.sourceIndex >= aMaster.count() ||
+           aMaster.at( game.sourceIndex ).romPath != game.romLink )
+         return Error{ QStringLiteral( "The master's %1 changed since the plan was made. Plan again." )
+                          .arg( aPlan.pair.source.folderName ) };
+   }
+   return {};
+}
+
+// Loads the target and checks that every game the plan matched is still the same ROM.
+Result<> loadTarget( const SystemPlan& aPlan, const Gamelist& aMaster, Gamelist& aTarget )
+{
+   if ( const Result<> loaded = aTarget.load( aPlan.pair.target, true ); !loaded )
+      return loaded;
+
+   const bool foldsCase = aTarget.foldsCase();
+   for ( const SyncGame& game : aPlan.games ) {
+      if ( game.targetIndex < 0 )
+         continue;
+      if ( game.targetIndex >= aTarget.count() ||
+           romKey( aTarget, aTarget.at( game.targetIndex ).physicalRomPath, foldsCase ) !=
+              romKey( aMaster, aMaster.at( game.sourceIndex ).physicalRomPath, foldsCase ) )
+         return Error{ QStringLiteral( "%1 changed since the plan was made. Plan again." )
+                          .arg( aPlan.pair.source.folderName ) };
+   }
+   return {};
+}
+
+Result<> copyPlannedRoms( const SystemPlan& aPlan, const Proceed& aProceed )
+{
+   QVector<RomFile> files;
+   for ( const SyncGame& game : aPlan.games )
+      files += game.rom.files;
+   if ( !aPlan.copyRoms || files.isEmpty() )
+      return {};
+
+   if ( const Result<> space = checkFreeSpace( romDirOf( aPlan.pair.target ), aPlan.romBytes ); !space )
+      return space;
+
+   return copyRomFiles( files, [&]( const RomFile& aFile ) {
+      return aProceed( QStringLiteral( "%1: copying %2" )
+                          .arg( aPlan.pair.source.folderName, QFileInfo( aFile.source ).fileName() ) );
+   } );
+}
+
+// Puts the plan's new games on the target. Returns the key of each ROM given to addGames,
+// by plan row. A ROM that did not reach the target (missing on the master) cannot become a game.
+Result<QHash<int, QString>> addNewGames( const SystemPlan& aPlan, Gamelist& aTarget, SystemReport& aReport )
+{
+   QStringList romPaths;
+   QHash<int, QString> addedKeys;
+   for ( int i = 0; i < aPlan.games.size(); ++i ) {
+      const SyncGame& game = aPlan.games.at( i );
+      if ( game.targetIndex >= 0 )
+         continue;
+      const QString path = physicalPath( aTarget.romDir(), game.romLink );
+      if ( QFileInfo( path ).isFile() ) {
+         romPaths << path;
+         addedKeys.insert( i, romKey( aTarget, path, aTarget.foldsCase() ) );
+      } else {
+         aReport.skipped << QStringLiteral( "%1: the ROM is not on the target." ).arg( game.name );
+      }
+   }
+
+   if ( !romPaths.isEmpty() ) {
+      const Result<int> added = aTarget.addGames( romPaths );
+      if ( !added )
+         return added;
+      aReport.added = added.value();
+   }
+   return addedKeys;
+}
+
+struct TargetChanges
+{
+   QVector<FieldUpdate> updates;
+   QVector<MediaCopy> copies;
+};
+
+// Resolves each plan row to its target index (after addGames, so the indices are fresh).
+TargetChanges collectChanges( const SystemPlan& aPlan, const Gamelist& aMaster, const Gamelist& aTarget,
+                              const QHash<int, QString>& aAddedKeys, SystemReport& aReport )
+{
+   const QHash<QString, int> targetKeys = romIndex( aTarget, aTarget.foldsCase() );
+   TargetChanges changes;
+
+   for ( int i = 0; i < aPlan.games.size(); ++i ) {
+      const SyncGame& game = aPlan.games.at( i );
+      if ( game.targetIndex < 0 && !aAddedKeys.contains( i ) )
+         continue;
+
+      const int index = game.targetIndex >= 0 ? game.targetIndex : targetKeys.value( aAddedKeys.value( i ), -1 );
+      if ( index < 0 ) {
+         aReport.skipped << QStringLiteral( "%1: not found on the target after adding." ).arg( game.name );
+         continue;
+      }
+
+      if ( game.targetIndex >= 0 )
+         ++aReport.updated;
+      if ( game.fields )
+         changes.updates.append( { index, gameFields( aMaster.at( game.sourceIndex ) ), game.fields } );
+      if ( game.copyImage )
+         changes.copies.append( { index, true, game.imageSource } );
+      if ( game.copyVideo )
+         changes.copies.append( { index, false, game.videoSource } );
+   }
+   return changes;
+}
+
+Result<> writeChanges( const TargetChanges& aChanges, Gamelist& aTarget, SystemReport& aReport,
+                       const Proceed& aProceed )
+{
+   if ( !aChanges.updates.isEmpty() ) {
+      if ( const Result<> set = aTarget.setFields( aChanges.updates ); !set )
+         return set;
+   }
+
+   if ( !aChanges.copies.isEmpty() ) {
+      const Result<MediaCopyReport> copied = aTarget.copyMedia( aChanges.copies, [&]( const MediaCopy& aCopy ) {
+         return aProceed( QStringLiteral( "%1: copying %2" ).arg( aReport.name, QFileInfo( aCopy.source ).fileName() ) );
+      } );
+      if ( !copied )
+         return copied;
+      aReport.mediaCopied = copied.value().copied;
+      aReport.skipped << copied.value().skipped;
+   }
+   return {};
 }
 
 }  // namespace
@@ -143,22 +348,11 @@ SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
    }
 
    const bool foldsCase = target.foldsCase();
-   const bool targetEsde = !aPair.target.mediaDir.isEmpty();
-   const QString targetRomDir = romDirOf( aPair.target );
-   plan.copyRoms = !sameLocation( master.romDir(), targetRomDir );
-
-   const auto keyOf = [foldsCase]( const Gamelist& aList, const Game& aGame ) {
-      return romKey( aList, aGame.physicalRomPath, foldsCase );
-   };
-
-   QHash<QString, int> targetKeys;
-   for ( int i = 0; i < target.count(); ++i )
-      targetKeys.insert( keyOf( target, target.at( i ) ), i );  // a duplicate on the target: the last one wins
+   plan.copyRoms = !sameLocation( master.romDir(), romDirOf( aPair.target ) );
+   const QHash<QString, int> targetKeys = romIndex( target, foldsCase );
 
    QSet<int> matched;
    QSet<QString> seen;
-   const GameFieldSet mask = syncedFields();
-
    for ( int i = 0; i < master.count(); ++i ) {
       const Game& source = master.at( i );
       if ( !proceed( QStringLiteral( "%1: comparing game %2 of %3, %4" )
@@ -168,67 +362,17 @@ SystemPlan planSystem( const SystemPair& aPair, const SyncProgress& aProgress )
                         .arg( source.name ) ) )
          return plan;
 
-      if ( QDir::isAbsolutePath( source.romPath ) ) {
-         plan.problems << QStringLiteral( "%1: the path %2 is absolute and cannot be matched." )
-                             .arg( source.name, source.romPath );
-         continue;
-      }
-
-      const QString key = keyOf( master, source );
-      if ( seen.contains( key ) ) {
-         plan.problems << QStringLiteral( "%1: %2 is listed more than once on the master; the first is used." )
-                             .arg( source.name, source.romPath );
+      const QString key = romKey( master, source.physicalRomPath, foldsCase );
+      const int targetIndex = targetKeys.value( key, -1 );
+      if ( const QString problem = rejection( source, seen.contains( key ), targetIndex >= 0 ); !problem.isEmpty() ) {
+         plan.problems << problem;
          continue;
       }
       seen.insert( key );
-
-      const int targetIndex = targetKeys.value( key, -1 );
       if ( targetIndex >= 0 )
          matched.insert( targetIndex );
 
-      if ( source.isOrphan && targetIndex < 0 ) {
-         plan.problems << QStringLiteral( "%1: the ROM %2 is missing on the master." ).arg( source.name, source.romPath );
-         continue;
-      }
-
-      // ponytail: addGames takes files only. Upgrade: let it add a folder ROM.
-      if ( targetIndex < 0 && QFileInfo( source.physicalRomPath ).isDir() ) {
-         plan.problems << QStringLiteral( "%1: %2 is a folder ROM; folder ROMs are not synced." )
-                             .arg( source.name, source.romPath );
-         continue;
-      }
-
-      SyncGame game;
-      game.sourceIndex = i;
-      game.targetIndex = targetIndex;
-      game.name = source.name;
-      game.romLink = source.romPath;
-
-      const GameFields values = gameFields( source );
-      game.fields = ( targetIndex < 0 ? filledFields( values ) : changedFields( target.at( targetIndex ), values ) ) & mask;
-
-      if ( plan.copyRoms && !source.isOrphan ) {
-         game.rom = planRomCopy( master.romDir(), targetRomDir, source.romPath );
-         plan.problems << game.rom.problems;
-         plan.romBytes += game.rom.bytes;
-      }
-
-      const Game* existing = targetIndex < 0 ? nullptr : &target.at( targetIndex );
-      for ( const bool isImage : { true, false } ) {
-         const MediaVerdict verdict = judgeMedia( source, existing, isImage, targetEsde );
-         if ( !verdict.problem.isEmpty() )
-            plan.problems << verdict.problem;
-         if ( !verdict.copy )
-            continue;
-         if ( isImage ) {
-            game.copyImage = true;
-            game.imageSource = source.physicalImagePath;
-         } else {
-            game.copyVideo = true;
-            game.videoSource = source.physicalVideoPath;
-         }
-      }
-
+      const SyncGame game = planGame( plan, master, target, i, targetIndex );
       if ( targetIndex < 0 || game.fields || !game.rom.files.isEmpty() || game.copyImage || game.copyVideo )
          plan.games.append( game );
       else
@@ -283,67 +427,30 @@ SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress
       return report;
 
    const auto fail = [&report]( const QString& aMessage ) {
-      report.error = aMessage;
+      report.error = report.canceled ? QStringLiteral( "Canceled." ) : aMessage;
       return report;
    };
-   const auto proceed = [&]( const QString& aMessage ) {
-      if ( aProgress && !aProgress( aMessage ) ) {
+   const Proceed proceed = [&]( const QString& aMessage ) {
+      if ( aProgress && !aProgress( aMessage ) )
          report.canceled = true;
-         return false;
-      }
-      return true;
+      return !report.canceled;
    };
 
    Gamelist master;
    if ( const Result<> loaded = master.load( aPlan.pair.source, true ); !loaded )
       return fail( loaded.error() );
-
-   for ( const SyncGame& game : aPlan.games ) {
-      if ( game.sourceIndex < 0 || game.sourceIndex >= master.count() ||
-           master.at( game.sourceIndex ).romPath != game.romLink )
-         return fail( QStringLiteral( "The master's %1 changed since the plan was made. Plan again." ).arg( report.name ) );
-   }
-
-   Gamelist target;
-   const auto keyOf = [&target]( const Gamelist& aList, const QString& aPhysicalPath ) {
-      return romKey( aList, aPhysicalPath, target.foldsCase() );
-   };
-   const auto loadTarget = [&]() -> Result<> {
-      if ( const Result<> loaded = target.load( aPlan.pair.target, true ); !loaded )
-         return loaded;
-      for ( const SyncGame& game : aPlan.games ) {
-         if ( game.targetIndex < 0 )
-            continue;
-         if ( game.targetIndex >= target.count() ||
-              keyOf( target, target.at( game.targetIndex ).physicalRomPath ) !=
-                 keyOf( master, master.at( game.sourceIndex ).physicalRomPath ) )
-            return Error{ QStringLiteral( "%1 changed since the plan was made. Plan again." ).arg( report.name ) };
-      }
-      return {};
-   };
+   if ( const Result<> unchanged = checkMasterUnchanged( aPlan, master ); !unchanged )
+      return fail( unchanged.error() );
 
    // Before the ROMs too, so a stale plan copies nothing.
+   Gamelist target;
    if ( !aPlan.createTarget ) {
-      if ( const Result<> ready = loadTarget(); !ready )
+      if ( const Result<> ready = loadTarget( aPlan, master, target ); !ready )
          return fail( ready.error() );
    }
 
-   if ( aPlan.copyRoms ) {
-      QVector<RomFile> files;
-      for ( const SyncGame& game : aPlan.games )
-         files += game.rom.files;
-
-      if ( !files.isEmpty() ) {
-         if ( const Result<> space = checkFreeSpace( romDirOf( aPlan.pair.target ), aPlan.romBytes ); !space )
-            return fail( space.error() );
-
-         const Result<> copied = copyRomFiles( files, [&]( const RomFile& aFile ) {
-            return proceed( QStringLiteral( "%1: copying %2" ).arg( report.name, QFileInfo( aFile.source ).fileName() ) );
-         } );
-         if ( !copied )
-            return fail( report.canceled ? QStringLiteral( "Canceled." ) : copied.error() );
-      }
-   }
+   if ( const Result<> copied = copyPlannedRoms( aPlan, proceed ); !copied )
+      return fail( copied.error() );
 
    if ( !proceed( QStringLiteral( "%1: writing the gamelist and media" ).arg( report.name ) ) )
       return fail( QStringLiteral( "Canceled." ) );
@@ -354,74 +461,16 @@ SystemReport applySystem( const SystemPlan& aPlan, const SyncProgress& aProgress
    }
 
    // Again: the copy may have run long enough for EmulationStation to rewrite the gamelist.
-   if ( const Result<> ready = loadTarget(); !ready )
+   if ( const Result<> ready = loadTarget( aPlan, master, target ); !ready )
       return fail( ready.error() );
 
-   // A ROM that did not reach the target (missing on the master) cannot become a game.
-   QStringList romPaths;
-   QHash<int, QString> addedKeys;  // plan row: the key of the ROM given to addGames
-   for ( int i = 0; i < aPlan.games.size(); ++i ) {
-      const SyncGame& game = aPlan.games.at( i );
-      if ( game.targetIndex >= 0 )
-         continue;
-      const QString path = physicalPath( target.romDir(), game.romLink );
-      if ( QFileInfo( path ).isFile() ) {
-         romPaths << path;
-         addedKeys.insert( i, keyOf( target, path ) );
-      } else {
-         report.skipped << QStringLiteral( "%1: the ROM is not on the target." ).arg( game.name );
-      }
-   }
+   const Result<QHash<int, QString>> added = addNewGames( aPlan, target, report );
+   if ( !added )
+      return fail( added.error() );
 
-   if ( !romPaths.isEmpty() ) {
-      const Result<int> added = target.addGames( romPaths );
-      if ( !added )
-         return fail( added.error() );
-      report.added = added.value();
-   }
-
-   QHash<QString, int> targetKeys;
-   for ( int i = 0; i < target.count(); ++i )
-      targetKeys.insert( keyOf( target, target.at( i ).physicalRomPath ), i );
-
-   QVector<FieldUpdate> updates;
-   QVector<MediaCopy> copies;
-   for ( int i = 0; i < aPlan.games.size(); ++i ) {
-      const SyncGame& game = aPlan.games.at( i );
-      if ( game.targetIndex < 0 && !addedKeys.contains( i ) )
-         continue;
-
-      const Game& source = master.at( game.sourceIndex );
-      const int index = game.targetIndex >= 0 ? game.targetIndex : targetKeys.value( addedKeys.value( i ), -1 );
-      if ( index < 0 ) {
-         report.skipped << QStringLiteral( "%1: not found on the target after adding." ).arg( game.name );
-         continue;
-      }
-
-      if ( game.targetIndex >= 0 )
-         ++report.updated;
-      if ( game.fields )
-         updates.append( { index, gameFields( source ), game.fields } );
-      if ( game.copyImage )
-         copies.append( { index, true, game.imageSource } );
-      if ( game.copyVideo )
-         copies.append( { index, false, game.videoSource } );
-   }
-
-   if ( !updates.isEmpty() ) {
-      if ( const Result<> set = target.setFields( updates ); !set )
-         return fail( set.error() );
-   }
-
-   if ( !copies.isEmpty() ) {
-      const Result<MediaCopyReport> copied = target.copyMedia( copies, [&]( const MediaCopy& aCopy ) {
-         return proceed( QStringLiteral( "%1: copying %2" ).arg( report.name, QFileInfo( aCopy.source ).fileName() ) );
-      } );
-      if ( !copied )
-         return fail( report.canceled ? QStringLiteral( "Canceled." ) : copied.error() );
-      report.mediaCopied = copied.value().copied;
-      report.skipped << copied.value().skipped;
-   }
+   const TargetChanges changes = collectChanges( aPlan, master, target, added.value(), report );
+   if ( const Result<> written = writeChanges( changes, target, report, proceed ); !written )
+      return fail( written.error() );
    return report;
 }
 
