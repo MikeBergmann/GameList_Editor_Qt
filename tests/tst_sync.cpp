@@ -303,8 +303,8 @@ TEST( SyncPlan, LegacyToEsdeKeepsAMatchingCoverAndPlansOnlyWhatEsdeCanRead )
    ASSERT_EQ( system.games.size(), 1 ) << "Sonic: converted cover present, flv unplayable: nothing to do";
    const SyncGame& mario = system.games.first();
    EXPECT_EQ( mario.name, QStringLiteral( "Mario" ) );
-   EXPECT_TRUE( mario.copyImage );
-   EXPECT_TRUE( mario.copyVideo );
+   EXPECT_FALSE( mario.imageSource.isEmpty() );
+   EXPECT_FALSE( mario.videoSource.isEmpty() );
    EXPECT_EQ( system.problems.size(), 1 );
    EXPECT_TRUE( system.problems.first().contains( QStringLiteral( "flv" ) ) );
 }
@@ -325,7 +325,7 @@ TEST( SyncPlan, EsdeToLegacyFindsTheMastersMediaByRomName )
    EXPECT_TRUE( system.createTarget );
    ASSERT_EQ( system.games.size(), 1 );
    EXPECT_EQ( system.games.first().imageSource, roots.master( "downloaded_media/snes/covers/Sonic.jpg" ) );
-   EXPECT_FALSE( system.games.first().copyVideo );
+   EXPECT_TRUE( system.games.first().videoSource.isEmpty() );
    EXPECT_EQ( system.games.first().fields, GameFieldSet( gfName | gfGenre ) );
 }
 

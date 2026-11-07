@@ -38,10 +38,8 @@ struct SyncGame
    QString romLink;       // the master's <path>
    RomCopyPlan rom;       // empty when the ROM folders are the same one
    GameFieldSet fields;   // what to write: what differs, or what is set for a new game
-   bool copyImage = false;
-   bool copyVideo = false;
-   QString imageSource;   // absolute, when copyImage
-   QString videoSource;   // absolute, when copyVideo
+   QString imageSource;   // absolute; empty: no picture to copy
+   QString videoSource;   // absolute; empty: no video to copy
 };
 
 struct SystemPlan

@@ -35,6 +35,9 @@ QVector<SystemEntry> scanSystems( const QString& aRootPath );
 // The entry a system would have under aRootPath, whether or not its gamelist exists yet.
 SystemEntry systemAt( const QString& aRootPath, const QString& aFolderName );
 
+// The absolute folder <path> and media links are relative to.
+QString romDirOf( const SystemEntry& aSystem );
+
 // An empty <gameList/>, folders included. An Error if the file already exists.
 Result<> createGamelist( const QString& aPath );
 

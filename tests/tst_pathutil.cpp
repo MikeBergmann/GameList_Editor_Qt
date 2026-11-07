@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
@@ -55,6 +56,17 @@ TEST( PathUtil, FileKeyAndSameFileFoldCaseOnlyWhenAsked )
    EXPECT_EQ( fileKey( QStringLiteral( "/a/Sonic.zip" ), true ), QStringLiteral( "/a/sonic.zip" ) );
    EXPECT_FALSE( sameFile( QStringLiteral( "/a/Sonic.zip" ), QStringLiteral( "/a/sonic.zip" ), false ) );
    EXPECT_TRUE( sameFile( QStringLiteral( "/a/Sonic.zip" ), QStringLiteral( "/a/sonic.zip" ), true ) );
+}
+
+TEST( PathUtil, SameLocationSeesThroughSpellingAndIsFalseForAPathThatIsNotThere )
+{
+   QTemporaryDir dir;
+   ASSERT_TRUE( QDir().mkpath( dir.filePath( QStringLiteral( "a" ) ) ) );
+   ASSERT_TRUE( QDir().mkpath( dir.filePath( QStringLiteral( "b" ) ) ) );
+
+   EXPECT_TRUE( sameLocation( dir.filePath( QStringLiteral( "a" ) ), dir.filePath( QStringLiteral( "b/../a/" ) ) ) );
+   EXPECT_FALSE( sameLocation( dir.filePath( QStringLiteral( "a" ) ), dir.filePath( QStringLiteral( "b" ) ) ) );
+   EXPECT_FALSE( sameLocation( dir.filePath( QStringLiteral( "nope" ) ), dir.filePath( QStringLiteral( "nope" ) ) ) );
 }
 
 }  // namespace

@@ -83,12 +83,6 @@ QStringList romParts( const QString& aRomPath )
    return parts;
 }
 
-bool sameFolder( const QString& aA, const QString& aB )
-{
-   const QString a = QFileInfo( aA ).canonicalFilePath();
-   return !a.isEmpty() && a == QFileInfo( aB ).canonicalFilePath();
-}
-
 RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, const QString& aRomLink )
 {
    RomCopyPlan plan;

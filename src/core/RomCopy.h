@@ -24,8 +24,6 @@ struct RomCopyPlan
    QStringList problems;    // files the ROM needs but cannot be copied (missing, outside the ROM folder)
 };
 
-// Whether both folders exist and are the same one, symlinks resolved.
-bool sameFolder( const QString& aA, const QString& aB );
 
 // The files a .cue / .m3u / .gdi names, as physical paths. Empty for any other file.
 QStringList discTracks( const QString& aPath );
