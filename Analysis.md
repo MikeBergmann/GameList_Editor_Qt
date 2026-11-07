@@ -42,6 +42,9 @@ Other Design decisions:
 - Tests use their own `main()` because widgets need a `QApplication`. It defaults to the `offscreen` platform (so CI needs no X server) and redirects `QSettings` to a temporary directory so tests never touch the real config.
 - CI builds and runs `ctest` on Ubuntu, on Windows (Qt's MinGW kit) and on macOS. There is still no macOS release; the job only keeps the code building there.
 - Tests that need a case-sensitive filesystem skip themselves on Windows and macOS, so only the Linux job runs them.
+- A second Linux job (`sanitize` in `ci.yml`) builds Debug with ASan and UBSan and runs the tests. Debug keeps Qt's own bounds asserts on, which matter because games are addressed by index and `removeGame(s)` shifts them. Leak detection is off (Qt and fontconfig report leaks that are not ours). The sanitizers cannot run on MinGW, hence Linux only. They only see code the tests execute, so the network side of the scraper is not covered.
+- Clazy is not used. Its bug checks (`connect-3arg-lambda`, `lambda-in-connect`) target lambdas that outlive their object, and every `connect` here already uses `this` as context and captures by value. The rest is performance advice that does not matter for a gamelist editor, and it needs a Clang build with the plugin plus suppressions for the noise. A one-off run is fine; a permanent CI job is not worth it.
+- Code coverage is not measured. A percentage says which lines ran, not whether the assertions check anything, and the numbers would be misleading here: the widget code is only smoke-tested, the scraper's network path cannot run in CI, and platform branches (case-sensitive filesystem, Windows file locking) execute on only one runner each. The rule "non-trivial logic leaves a test behind" is the check we use, and a coverage target would invite tests written to hit lines.
 
 ## Deviations from the Delphi original
 

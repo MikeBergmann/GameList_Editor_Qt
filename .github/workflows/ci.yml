@@ -32,3 +32,34 @@ jobs:
       # tests/main.cpp defaults QT_QPA_PLATFORM to "offscreen", so no X server is needed.
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  sanitize:
+    # Debug keeps Qt's bounds asserts on; MinGW has no sanitizers, so this is Linux only.
+    runs-on: ubuntu-24.04
+    env:
+      # Qt and fontconfig report leaks that are not ours.
+      ASAN_OPTIONS: detect_leaks=0
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ \
+            qt6-base-dev qt6-multimedia-dev libgl1-mesa-dev \
+            zlib1g-dev libgtest-dev
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
