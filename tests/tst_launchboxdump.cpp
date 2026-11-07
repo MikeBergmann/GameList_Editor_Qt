@@ -3,6 +3,7 @@
 #include "LaunchBoxDump.h"
 
 #include "QtPrinters.h"
+#include "Unzip.h"
 
 #include <gtest/gtest.h>
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Result.h"
-
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QString>
@@ -14,9 +12,6 @@ class QNetworkReply;
 class QSaveFile;
 class QThread;
 
-// Extracts the named entries of a zip into aDestDir, each written atomically and only once all
-// of them inflated and matched their CRC. Stored and deflated entries; no zip64, no encryption.
-Result<> unzipEntries( const QString& aZipPath, const QStringList& aNames, const QString& aDestDir );
 
 // Keeps a local copy of LaunchBox's Metadata.zip, unpacked, in a cache folder. Asynchronous, on
 // the calling thread; only the inflating runs on a worker. The zip is deleted after unpacking.
