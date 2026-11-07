@@ -38,8 +38,8 @@ void setTrashEnabled( bool aEnabled );
 // Atomic: an Error leaves any existing file at aPath as it was.
 Result<> writeFileAtomically( const QString& aPath, const QByteArray& aContent );
 
-// Renames aStaged to aTarget; a replaced aTarget is kept as *.gle-bak, whose name is returned
-// (empty if none). On an Error, aTarget is as it was and aStaged is gone.
+// Renames aStaged to aTarget, keeping a replaced aTarget as *.gle-bak (returned; empty if none).
+// On an Error aStaged is gone and aTarget is as it was, or the Error names its *.gle-bak.
 Result<QString> swapIn( const QString& aStaged, const QString& aTarget );
 
 // Has aWrite fill aTarget.gle-new (false: it failed), then swapIn. Same contract as swapIn;

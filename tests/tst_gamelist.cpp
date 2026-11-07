@@ -1083,6 +1083,50 @@ TEST( Gamelist, SetImageFailedSaveBringsBackAnOverwrittenPicture )
    EXPECT_FALSE( QFileInfo::exists( picture + QStringLiteral( ".gle-bak" ) ) );
 }
 
+TEST( Gamelist, FailedUndoNamesTheKeptOriginal )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "src/a.png" ), "new" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const QString picture = fixture.path( "snes/media/images/Sonic.png" );
+   writeFile( picture, "old" );
+
+   int calls = 0;
+   const Result<MediaCopyReport> failed = list.copyMedia(
+      { { 0, true, fixture.path( "src/a.png" ) }, { 2, true, fixture.path( "src/a.png" ) } },
+      [&]( const MediaCopy& ) {
+         if ( calls++ == 0 )
+            return true;
+         EXPECT_TRUE( QFile::remove( picture ) );
+         EXPECT_TRUE( QDir().mkpath( picture + QStringLiteral( "/in-the-way" ) ) );
+         return false;
+      } );
+
+   ASSERT_FALSE( failed );
+   EXPECT_TRUE( failed.error().contains( QStringLiteral( ".gle-bak" ) ) )
+      << "a folder blocks the undo, so the error must say where the original is: "
+      << failed.error().toStdString();
+   EXPECT_EQ( readAll( picture + QStringLiteral( ".gle-bak" ) ), QByteArray( "old" ) );
+}
+
+TEST( Gamelist, RemovedAndRolledBackLinksLeaveNoEmptyElement )
+{
+   Fixture fixture;
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.removeVideo( 0 ) );
+
+   breakSave( fixture, list );
+   EXPECT_FALSE( list.setImage( 2, QStringLiteral( ":/DefaultPictures/default.png" ) ) );
+   ASSERT_TRUE( QDir( fixture.snes.gamelistPath ).removeRecursively() );
+   ASSERT_TRUE( list.save() );
+
+   const QByteArray saved = readAll( fixture.snes.gamelistPath );
+   EXPECT_FALSE( saved.contains( "<video" ) ) << "the only video was removed";
+   EXPECT_FALSE( saved.contains( "<image/>" ) ) << "game 2 had no image before the failed setImage";
+}
+
 TEST( Gamelist, ChangeAllIsAllOrNothing )
 {
    Fixture fixture;
