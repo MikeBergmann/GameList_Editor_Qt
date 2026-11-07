@@ -105,7 +105,8 @@ public:
    Result<> removeVideo( int aIndex );
 
    // Also deletes the ROM and media (to the trash when there is one), except files
-   // another game still uses, unless aDeleteFiles is false.
+   // another game still uses, unless aDeleteFiles is false. A .cue / .m3u / .gdi takes the
+   // tracks it names in the ROM folder along, unless another game's ROM needs them too.
    // Later indices shift down. The value lists files that could not be deleted;
    // the game is gone regardless. An Error leaves everything as it was.
    Result<QStringList> removeGame( int aIndex, bool aDeleteFiles = true );
@@ -158,6 +159,10 @@ private:
 
    // Whether an entry other than aSkip (-1: none) has the same file in aMember.
    bool sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const;
+
+   // The tracks of aGame's disc description that exist inside the ROM folder and that no
+   // listed game's ROM needs. Never the ROM itself.
+   QStringList exclusiveTracks( const Game& aGame ) const;
 
    Result<> removeMedia( int aIndex, bool aIsImage );
 

@@ -1,6 +1,7 @@
 #include "Gamelist.h"
 
 #include "PathUtil.h"
+#include "RomCopy.h"
 
 #include <algorithm>
 #include <utility>
@@ -968,6 +969,31 @@ bool Gamelist::sharedFile( int aSkip, const QString& aPath, QString Game::*aMemb
    return false;
 }
 
+QStringList Gamelist::exclusiveTracks( const Game& aGame ) const
+{
+   QStringList candidates = romParts( aGame.physicalRomPath );
+   candidates.removeFirst();
+   if ( candidates.isEmpty() )
+      return {};
+
+   QStringList inUse;
+   for ( const Entry& entry : FEntries )
+      inUse << romParts( entry.game.physicalRomPath );
+
+   const QDir romDir( FRomDir );
+   QStringList tracks;
+   for ( const QString& path : std::as_const( candidates ) ) {
+      const QString relative = romDir.relativeFilePath( path );
+      const bool inside = !relative.startsWith( QLatin1String( "../" ) ) && !QDir::isAbsolutePath( relative );
+      const bool needed = std::any_of( inUse.cbegin(), inUse.cend(), [&]( const QString& aUsed ) {
+         return sameFileOnDisk( aUsed, path, FFoldsCase );
+      } );
+      if ( inside && !needed && QFileInfo( path ).isFile() )
+         tracks << path;
+   }
+   return tracks;
+}
+
 bool Gamelist::fileShared( int aIndex, const QString& aPhysicalPath, bool aIsImage ) const
 {
    return sharedFile( aIndex, aPhysicalPath,
@@ -1019,6 +1045,11 @@ Result<QStringList> Gamelist::removeGame( int aIndex, bool aDeleteFiles )
    QStringList stuck;
    if ( !aDeleteFiles )
       return stuck;
+
+   for ( const QString& track : exclusiveTracks( game ) ) {
+      if ( !discardFile( track ) )
+         stuck << track;
+   }
 
    if ( conventionalMedia() ) {
       // Games with one media stem (Sonic.zip, Sonic.7z) share it, so it stays while one is left.

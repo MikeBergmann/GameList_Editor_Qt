@@ -580,6 +580,77 @@ TEST( Gamelist, RemoveGameCanKeepTheFiles )
    EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/videos/Sonic.mp4" ) ) );
 }
 
+TEST( Gamelist, RemoveGameDeletesTheTracksOfACueSheetButNotUnlistedFiles )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), "<gameList><game><path>./Disc.cue</path></game></gameList>" );
+   writeFile( fixture.path( "snes/Disc.cue" ), "FILE \"Disc (Track 1).bin\" BINARY\nFILE Track2.bin BINARY\n" );
+   writeFile( fixture.path( "snes/Disc (Track 1).bin" ), "one" );
+   writeFile( fixture.path( "snes/Track2.bin" ), "two" );
+   writeFile( fixture.path( "snes/Unlisted.bin" ), "not part of it" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   const Result<QStringList> removed = list.removeGame( 0 );
+   ASSERT_TRUE( removed ) << removed.error().toStdString();
+
+   EXPECT_TRUE( removed.value().isEmpty() );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Disc.cue" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Disc (Track 1).bin" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Track2.bin" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Unlisted.bin" ) ) );
+}
+
+TEST( Gamelist, RemoveGameKeepsTheTracksWhenTheFilesStay )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), "<gameList><game><path>./Disc.cue</path></game></gameList>" );
+   writeFile( fixture.path( "snes/Disc.cue" ), "FILE Track.bin BINARY\n" );
+   writeFile( fixture.path( "snes/Track.bin" ), "one" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.removeGame( 0, false ) );
+
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Track.bin" ) ) );
+}
+
+TEST( Gamelist, RemoveGameKeepsATrackAnotherSheetStillNames )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ),
+              "<gameList><game><path>./A.cue</path></game><game><path>./B.cue</path></game></gameList>" );
+   writeFile( fixture.path( "snes/A.cue" ), "FILE Shared.bin BINARY\nFILE OnlyA.bin BINARY\n" );
+   writeFile( fixture.path( "snes/B.cue" ), "FILE Shared.bin BINARY\n" );
+   writeFile( fixture.path( "snes/Shared.bin" ), "shared" );
+   writeFile( fixture.path( "snes/OnlyA.bin" ), "a" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.removeGame( 0 ) );
+
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/OnlyA.bin" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Shared.bin" ) ) ) << "B.cue still needs it";
+
+   ASSERT_TRUE( list.removeGame( 0 ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Shared.bin" ) ) );
+}
+
+TEST( Gamelist, RemoveGameNeverDeletesATrackOutsideTheRomFolder )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ), "<gameList><game><path>./Disc.cue</path></game></gameList>" );
+   writeFile( fixture.path( "snes/Disc.cue" ), "FILE ../elsewhere/Track.bin BINARY\n" );
+   writeFile( fixture.path( "elsewhere/Track.bin" ), "one" );
+
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+   ASSERT_TRUE( list.removeGame( 0 ) );
+
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/Disc.cue" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "elsewhere/Track.bin" ) ) );
+}
+
 TEST( Gamelist, RemoveGamesDropsOnlyTheEntries )
 {
    Fixture fixture;
@@ -1451,6 +1522,20 @@ TEST( GamelistEsde, RemoveGameDeletesItsMediaInEveryTypeFolder )
                               "media/snes/manuals/Sub/Game.pdf" } )
       EXPECT_FALSE( QFileInfo::exists( esde.path( file ) ) ) << file;
    EXPECT_TRUE( QFileInfo::exists( esde.path( "media/snes/covers/Other.jpeg" ) ) );
+}
+
+TEST( GamelistEsde, RemoveGameDeletesTheTracksOfACueSheet )
+{
+   EsdeLayout esde( "<game><path>./Disc.cue</path><name>Disc</name></game>" );
+   writeFile( esde.path( "roms/snes/Disc.cue" ), "FILE Track.bin BINARY\n" );
+   writeFile( esde.path( "roms/snes/Track.bin" ), "one" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( esde.system ) );
+
+   ASSERT_TRUE( list.removeGame( 0 ) );
+
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "roms/snes/Disc.cue" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( esde.path( "roms/snes/Track.bin" ) ) );
 }
 
 TEST( GamelistEsde, RemoveGameKeepsMediaAnotherRomWithTheSameStemStillUses )
