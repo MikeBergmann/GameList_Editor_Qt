@@ -73,6 +73,7 @@ add_library( gle_core STATIC
    src/core/Gamelist.cpp
    src/core/GamelistFilter.cpp
    src/core/GamelistModel.cpp
+   src/core/ImageOps.cpp
    src/core/MediaOps.cpp
    src/core/NameEdit.cpp
    src/core/PathUtil.cpp
@@ -158,6 +159,7 @@ add_executable( tests
    tests/tst_game.cpp
    tests/tst_gamelist.cpp
    tests/tst_gamelistmodel.cpp
+   tests/tst_imageops.cpp
    tests/tst_launchboxdb.cpp
    tests/tst_launchboxdump.cpp
    tests/tst_mediaops.cpp

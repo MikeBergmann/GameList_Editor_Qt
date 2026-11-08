@@ -27,6 +27,10 @@ constexpr QLatin1StringView Cst_GameList{ "gameList" };
 constexpr QLatin1StringView Cst_DefaultImageFolder{ "./media/images/" };
 constexpr QLatin1StringView Cst_DefaultVideoFolder{ "./media/videos/" };
 
+// A session backup is "<gamelist>.<stamp>.bak"; the search glob is made from the same stamp.
+const QString Cst_BackupStamp = QStringLiteral( ".yyyyMMdd-HHmmss" );
+const QString Cst_BackupSuffix = QStringLiteral( ".bak" );
+
 // ES-DE keeps one folder per media type; covers and videos are the types this editor writes.
 constexpr QLatin1StringView Cst_EsdeImageType{ "covers" };
 constexpr QLatin1StringView Cst_EsdeVideoType{ "videos" };
@@ -368,12 +372,25 @@ Result<> Gamelist::checkIndex( int aIndex ) const
    return {};
 }
 
+QString Gamelist::backupPath( const QString& aGamelistPath )
+{
+   return aGamelistPath + QDateTime::currentDateTime().toString( Cst_BackupStamp ) + Cst_BackupSuffix;
+}
+
+QString Gamelist::backupFilter( const QString& aGamelistName )
+{
+   QString stamp = Cst_BackupStamp;
+   for ( QChar& letter : stamp ) {
+      if ( letter.isLetter() )
+         letter = QLatin1Char( '?' );
+   }
+   return aGamelistName + stamp + Cst_BackupSuffix;
+}
+
 Result<> Gamelist::save()
 {
-   // Limitation: one copy per load, never pruned; cap or age them out if they pile up.
    if ( !FBackedUp ) {
-      const QString backup =
-         FSystem.gamelistPath + QDateTime::currentDateTime().toString( ".yyyyMMdd-HHmmss" ) + ".bak";
+      const QString backup = backupPath( FSystem.gamelistPath );
       if ( !QFile::exists( backup ) && !QFile::copy( FSystem.gamelistPath, backup ) )
          return Error{ QStringLiteral( "Cannot back up %1 to %2" )
                           .arg( FSystem.gamelistPath, backup ) };

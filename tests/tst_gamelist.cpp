@@ -919,23 +919,19 @@ TEST( Gamelist, SavingBacksUpTheOriginalOncePerLoad )
    ASSERT_TRUE( list.load( fixture.snes ) );
    const QByteArray original = readAll( fixture.snes.gamelistPath );
 
-   const auto backups = [&fixture]() {
-      return QFileInfo( fixture.snes.gamelistPath )
-         .dir()
-         .entryList( { QStringLiteral( "gamelist.xml.*.bak" ) }, QDir::Files );
-   };
+   const auto backups = [&list]() { return gamelistBackups( list ); };
 
    GameFields values = gameFields( list.at( 0 ) );
    values.genre = QStringLiteral( "First" );
    ASSERT_TRUE( list.setFields( { 0 }, values, GameFieldSet( gfGenre ) ) );
 
-   ASSERT_EQ( backups().size(), 1 );
-   EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
+   ASSERT_EQ( backups().size(), 1 ) << "gamelistBackups must find what save() wrote";
+   EXPECT_EQ( readAll( backups().first() ), original );
 
    values.genre = QStringLiteral( "Second" );
    ASSERT_TRUE( list.setFields( { 0 }, values, GameFieldSet( gfGenre ) ) );
    EXPECT_EQ( backups().size(), 1 ) << "a second save in the same load must not add one";
-   EXPECT_EQ( readAll( fixture.path( "snes/" ) + backups().first() ), original );
+   EXPECT_EQ( readAll( backups().first() ), original );
 }
 
 TEST( Gamelist, AFailedSetFieldsLeavesGameAndDocumentAsTheyWere )
