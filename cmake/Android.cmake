@@ -1,14 +1,17 @@
-# Android: only core and scraper build; the Widgets front end and the tests do not.
+# Core, scraper and the controllers; the Widgets front end and the tests do not build here.
 # Included from the top-level CMakeLists.txt, which then returns.
 
 qt_policy( SET QTP0001 NEW )
 qt_policy( SET QTP0002 NEW )
-qt_add_executable( gle_smoke src/mobile/main_android.cpp )
-target_link_libraries( gle_smoke PRIVATE gle_scraper Qt6::Quick Qt6::QuickControls2 )
+qt_add_executable( gle_smoke src/mobile/main_android.cpp Resources/assets.qrc )
+target_link_libraries( gle_smoke PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 )
 qt_add_qml_module( gle_smoke
    URI GleMobile
    VERSION 1.0
-   QML_FILES src/mobile/qml/InputSpike.qml
+   QML_FILES
+      src/mobile/qml/Main.qml
+      src/mobile/qml/SystemsPage.qml
+      src/mobile/qml/GamesPage.qml
 )
 
 # Qt's TLS backend on Android is OpenSSL, and the device does not provide a usable one.

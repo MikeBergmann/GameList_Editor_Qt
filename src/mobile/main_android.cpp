@@ -1,156 +1,32 @@
-// Phase 1/2 smoke test: load real gamelists, then write to a scratch folder on each storage root
-// and log PASS/FAIL (adb logcat | findstr GLE).
+// Android entry point: the QML front end over the mobile controllers.
 
-#include "Gamelist.h"
-#include "PathUtil.h"
-#include "Systems.h"
+#include "GamesController.h"
+#include "LibraryController.h"
 
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
+#include <QCoreApplication>
 #include <QGuiApplication>
-#include <QImage>
-#include <QKeyEvent>
 #include <QQmlApplicationEngine>
-#include <QSslSocket>
-#include <QTimer>
-
-namespace
-{
-   void check( bool aOk, const QString& aWhat )
-   {
-      qInfo( "GLE write: %s %s", aOk ? "PASS" : "FAIL", qPrintable( aWhat ) );
-   }
-
-   template <typename T>
-   bool checkResult( const Result<T>& aResult, const QString& aWhat )
-   {
-      check( static_cast<bool>( aResult ), aResult ? aWhat : aWhat + ": " + aResult.error() );
-      return static_cast<bool>( aResult );
-   }
-
-   bool writeFile( const QString& aPath, const QByteArray& aBytes )
-   {
-      QFile file( aPath );
-      return file.open( QIODevice::WriteOnly ) && file.write( aBytes ) == aBytes.size();
-   }
-
-   void readTest( const QString& aRoot )
-   {
-      const QVector<SystemEntry> systems = scanSystems( aRoot );
-      qInfo( "GLE smoke: %lld systems under %s", static_cast<long long>( systems.size() ),
-             qPrintable( aRoot ) );
-
-      for ( const SystemEntry& system : systems )
-      {
-         Gamelist list;
-         const Result<> loaded = list.load( system );
-         if ( loaded )
-            qInfo( "GLE smoke: %s: %d games", qPrintable( system.folderName ), list.count() );
-         else
-            qInfo( "GLE smoke: %s: FAILED %s", qPrintable( system.folderName ),
-                   qPrintable( loaded.error() ) );
-      }
-   }
-
-   // Writes only under <aRoot>/gle_write_test, which it deletes first and last.
-   void writeTest( const QString& aRoot )
-   {
-      const QString base = aRoot + "/gle_write_test";
-      qInfo( "GLE write: === %s", qPrintable( base ) );
-      QDir( base ).removeRecursively();
-
-      if ( !QDir().mkpath( base + "/nes" ) )
-      {
-         check( false, "mkpath" );
-         return;
-      }
-      const SystemEntry system = systemAt( base, "nes" );
-      const QString romPath = base + "/nes/Sonic.nes";
-      check( writeFile( romPath, "rom" ), "write ROM file" );
-      if ( !checkResult( createGamelist( system.gamelistPath ), "createGamelist" ) )
-         return;
-      qInfo( "GLE write: volume folds case: %d", volumeFoldsCase( system.gamelistPath ) ? 1 : 0 );
-
-      Gamelist list;
-      if ( !checkResult( list.load( system, true ), "load empty" ) ||
-           !checkResult( list.addGames( { romPath } ), "addGames" ) )
-         return;
-      check( list.count() == 1, "one game" );
-
-      GameFields fields;
-      fields.name = QStringLiteral( "Sonic Test" );
-      checkResult( list.setFields( { 0 }, fields, gfName ), "setFields (QSaveFile)" );
-
-      QImage picture( 64, 64, QImage::Format_RGB32 );
-      picture.fill( Qt::red );
-      checkResult( list.setImage( 0, picture ), "setImage (QImage::save + rename)" );
-
-      const QString videoSource = base + "/source.mp4";
-      check( writeFile( videoSource, "video" ), "write video source" );
-      checkResult( list.setVideo( 0, videoSource ), "setVideo (QFile::copy)" );
-
-      Gamelist again;
-      if ( checkResult( again.load( system ), "reload" ) )
-      {
-         check( again.at( 0 ).name == fields.name, "name survived the save" );
-         const QString image = physicalPath( again.romDir(), again.at( 0 ).imagePath );
-         const QString video = physicalPath( again.romDir(), again.at( 0 ).videoPath );
-         check( QFile::exists( image ), "image file exists: " + image );
-         check( QFile::exists( video ), "video file exists: " + video );
-      }
-
-      const QString cased = base + "/nes/CaseTest.PNG";
-      check( writeFile( cased, "x" ), "write CaseTest.PNG" );
-      const QString found = resolvePath( base + "/nes/casetest.png" );
-      check( QFile::exists( found ) && QFileInfo( found ).fileName().compare( "casetest.png", Qt::CaseInsensitive ) == 0,
-             "resolvePath finds a differently-cased file: " + found );
-
-      checkResult( list.removeGame( 0, true ), "removeGame with files" );
-      check( !QFile::exists( romPath ), "ROM file removed" );
-
-      check( QDir( base ).removeRecursively(), "cleanup" );
-   }
-   // Logs what the pad and keyboard really send, before QML sees it.
-   class KeyLogger : public QObject
-   {
-   public:
-      bool eventFilter( QObject*, QEvent* aEvent ) override
-      {
-         if ( aEvent->type() == QEvent::KeyPress || aEvent->type() == QEvent::KeyRelease )
-         {
-            const auto* key = static_cast<QKeyEvent*>( aEvent );
-            qInfo( "GLE input: %s key=0x%x scan=%u vk=%u text='%s'",
-                   aEvent->type() == QEvent::KeyPress ? "down" : "up  ", static_cast<unsigned>( key->key() ),
-                   key->nativeScanCode(), key->nativeVirtualKey(), qPrintable( key->text() ) );
-         }
-         return false;
-      }
-   };
-}  // namespace
+#include <QQmlContext>
+#include <QSettings>
 
 int main( int argc, char** argv )
 {
    QGuiApplication app( argc, argv );
-   KeyLogger keyLogger;
-   app.installEventFilter( &keyLogger );
+
+   // Same names as the desktop app, so the settings keys mean the same thing.
+   QCoreApplication::setOrganizationName( QStringLiteral( "GameListEditorQt" ) );
+   QCoreApplication::setApplicationName( QStringLiteral( "GameListEditorQt" ) );
+   QSettings::setDefaultFormat( QSettings::IniFormat );
+
+   LibraryController library;
+   GamesController games( &library );
 
    QQmlApplicationEngine engine;
+   engine.rootContext()->setContextProperty( QStringLiteral( "library" ), &library );
+   engine.rootContext()->setContextProperty( QStringLiteral( "games" ), &games );
    QObject::connect( &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit( 1 ); }, Qt::QueuedConnection );
-   engine.loadFromModule( "GleMobile", "InputSpike" );
-
-   qInfo( "GLE smoke: ssl=%d", QSslSocket::supportsSsl() ? 1 : 0 );
-
-   // Limitation: throwaway paths (internal storage, this device's SD card).
-   QTimer::singleShot( 500, &app, []
-                       {
-                          readTest( QStringLiteral( "/storage/emulated/0/gle_smoke" ) );
-                          readTest( QStringLiteral( "/storage/1107-2E5F/ROMs" ) );
-                          writeTest( QStringLiteral( "/storage/emulated/0" ) );
-                          writeTest( QStringLiteral( "/storage/1107-2E5F" ) );
-                          qInfo( "GLE write: done" );
-                       } );
+   engine.loadFromModule( "GleMobile", "Main" );
 
    return app.exec();
 }
