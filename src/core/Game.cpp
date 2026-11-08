@@ -39,7 +39,7 @@ QString gamelistDateToDisplay( const QString& aValue )
 
 QString displayDateToGamelist( const QString& aDate )
 {
-   if ( aDate.isEmpty() || !aDate.at( 0 ).isDigit() )
+   if ( !displayDateToDate( aDate ).isValid() )
       return {};
 
    switch ( aDate.size() ) {
@@ -67,14 +67,17 @@ QDate displayDateToDate( const QString& aDisplayDate )
 
 QString isoDateToDisplay( const QString& aIso )
 {
+   QString display;
    switch ( aIso.size() ) {
-      case 4: return aIso;
-      case 7: return aIso.mid( 5, 2 ) + QLatin1Char( '/' ) + aIso.left( 4 );
+      case 4: display = aIso; break;
+      case 7: display = aIso.mid( 5, 2 ) + QLatin1Char( '/' ) + aIso.left( 4 ); break;
       case 10:
-         return aIso.mid( 8, 2 ) + QLatin1Char( '/' ) + aIso.mid( 5, 2 ) + QLatin1Char( '/' ) +
-                aIso.left( 4 );
-      default: return {};
+         display = aIso.mid( 8, 2 ) + QLatin1Char( '/' ) + aIso.mid( 5, 2 ) + QLatin1Char( '/' ) +
+                   aIso.left( 4 );
+         break;
+      default: break;
    }
+   return displayDateToDate( display ).isValid() ? display : QString();
 }
 
 GameFields gameFields( const Game& aGame )

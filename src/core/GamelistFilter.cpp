@@ -95,6 +95,8 @@ bool matchesCategory( const Gamelist& aList, const Game& aGame, const FilterSpec
          if ( !referenceDate.isValid() )
             referenceDate = QDate::currentDate();
          const QDate date = displayDateToDate( aGame.releaseDate );
+         if ( !date.isValid() )
+            return false;
          return aFilter.category == FilterCategory::SameOrEarlierDate ? date <= referenceDate
                                                                       : date >= referenceDate;
       }
