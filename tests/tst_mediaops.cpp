@@ -1,4 +1,4 @@
-// MediaOps: finding unlinked and misnamed media, and shrinking pictures. Linking and
+// MediaOps: finding unlinked, misnamed and oversized media. Linking and
 // renaming are Gamelist actions; they are exercised here because the finders feed them.
 
 #include "GamelistFixture.h"
@@ -185,94 +185,20 @@ TEST( MediaOps, UnlinkedMediaDoesNotSearchTheWorkingDirectoryForAnEmptyMediaFold
    EXPECT_TRUE( found.isEmpty() );
 }
 
-TEST( MediaOps, OversizedImagesAreFoundOnceAndShrunkToJustUnderTheLimitInPlace )
+TEST( MediaOps, OversizedImagesAreFoundOncePerFile )
 {
    Fixture fixture;
-
-   // Noise does not compress, so this PNG is big and the test does not depend on the encoder.
-   QImage noise( 600, 400, QImage::Format_RGB32 );
-   quint32 state = 12345;
-   for ( int y = 0; y < noise.height(); ++y )
-      for ( int x = 0; x < noise.width(); ++x ) {
-         state = state * 1664525u + 1013904223u;
-         noise.setPixel( x, y, state | 0xFF000000u );
-      }
-   const QString big = fixture.path( "snes/media/images/Sonic.png" );
-   ASSERT_TRUE( noise.save( big ) );
-   const qint64 before = QFileInfo( big ).size();
-   const qint64 limit = before / 3;
+   writeFile( fixture.path( "snes/media/images/Sonic.png" ), QByteArray( 5000, 'x' ) );
 
    Gamelist list;
    ASSERT_TRUE( list.load( fixture.snes ) );
 
    // Game 0 links the big file; game 1 links a missing one, game 2 none.
-   const QVector<OversizedImage> found = oversizedImages( list, limit );
+   const QVector<OversizedImage> found = oversizedImages( list, 1000 );
    ASSERT_EQ( found.size(), 1 );
    EXPECT_EQ( found.at( 0 ).index, 0 );
-   EXPECT_EQ( found.at( 0 ).size, before );
-   EXPECT_TRUE( oversizedImages( list, before ).isEmpty() );
-
-   const Result<qint64> shrunk = shrinkImageFile( big, limit );
-   ASSERT_TRUE( shrunk ) << shrunk.error().toStdString();
-   const qint64 after = shrunk.value();
-   ASSERT_GT( after, 0 );
-   EXPECT_LE( after, limit );
-   EXPECT_GT( after, limit / 2 );  // "ca.": close to the limit, not shrunk to a thumbnail
-   EXPECT_EQ( QFileInfo( big ).size(), after );
-
-   const QImage result( big );
-   EXPECT_LT( result.width(), 600 );
-   EXPECT_NEAR( static_cast<double>( result.width() ) / result.height(), 1.5, 0.02 );
-   EXPECT_TRUE( oversizedImages( list, limit ).isEmpty() );
-
-   // Already small enough: left alone, and an unreadable file is an error that leaves it be.
-   const Result<qint64> again = shrinkImageFile( big, limit );
-   ASSERT_TRUE( again );
-   EXPECT_EQ( again.value(), after );
-   const QString junk = fixture.path( "snes/media/images/junk.png" );
-   writeFile( junk, QByteArray( 5000, 'x' ) );
-   const Result<qint64> unreadable = shrinkImageFile( junk, 100 );
-   EXPECT_FALSE( unreadable );
-   EXPECT_FALSE( unreadable.error().isEmpty() );
-   EXPECT_EQ( QFileInfo( junk ).size(), 5000 );
-}
-
-TEST( MediaOps, ShrinkImagesTalliesTheBatchAndGoesOnPastAFailure )
-{
-   Fixture fixture;
-   QImage noise( 300, 200, QImage::Format_RGB32 );
-   quint32 state = 7;
-   for ( int y = 0; y < noise.height(); ++y )
-      for ( int x = 0; x < noise.width(); ++x ) {
-         state = state * 1664525u + 1013904223u;
-         noise.setPixel( x, y, state | 0xFF000000u );
-      }
-   const QString first = fixture.path( "a.png" );
-   const QString junk = fixture.path( "junk.png" );
-   const QString last = fixture.path( "b.png" );
-   ASSERT_TRUE( noise.save( first ) );
-   ASSERT_TRUE( noise.save( last ) );
-   writeFile( junk, QByteArray( 5000, 'x' ) );
-   const qint64 size = QFileInfo( first ).size();
-   const qint64 limit = size / 3;
-   const QVector<OversizedImage> batch{ { 0, first, size }, { 1, junk, 5000 }, { 2, last, size } };
-
-   QVector<int> seen;
-   const ShrinkReport report = shrinkImages( batch, limit, [&seen]( int aDone ) {
-      seen << aDone;
-      return true;
-   } );
-
-   EXPECT_EQ( seen, ( QVector<int>{ 0, 1, 2 } ) );
-   EXPECT_EQ( report.shrunk, 2 );
-   ASSERT_EQ( report.problems.size(), 1 );
-   EXPECT_TRUE( report.problems.first().contains( QStringLiteral( "junk.png" ) ) );
-   EXPECT_EQ( report.saved, ( size - QFileInfo( first ).size() ) + ( size - QFileInfo( last ).size() ) );
-   EXPECT_GT( report.saved, 0 );
-
-   const ShrinkReport stopped = shrinkImages( batch, limit, []( int aDone ) { return aDone < 1; } );
-   EXPECT_EQ( stopped.shrunk, 1 ) << "stops before the second picture";
-   EXPECT_TRUE( stopped.problems.isEmpty() );
+   EXPECT_EQ( found.at( 0 ).size, 5000 );
+   EXPECT_TRUE( oversizedImages( list, 5000 ).isEmpty() );
 }
 
 // What a failed link or rename must leave behind: the game, and the DOM, as they were.

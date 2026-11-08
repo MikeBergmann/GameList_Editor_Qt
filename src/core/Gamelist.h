@@ -82,6 +82,10 @@ public:
 
    Result<> save();
 
+   // The name save() gives the session backup, and the glob matching every such name.
+   static QString backupPath( const QString& aGamelistPath );
+   static QString backupFilter( const QString& aGamelistName );
+
    // Saves. An Error leaves games, document and file as they were.
    Result<> setFields( const QVector<int>& aTargets, const GameFields& aValues, GameFieldSet aWhich );
 
