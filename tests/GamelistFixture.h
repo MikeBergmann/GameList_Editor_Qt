@@ -79,6 +79,7 @@ struct Fixture
 {
    QTemporaryDir dir;
    SystemEntry snes;
+   SystemEntry pcecd;  // a disc system: its ROMs can be .cue sheets
 
    Fixture()
    {
@@ -91,6 +92,7 @@ struct Fixture
       EXPECT_TRUE( QDir().mkpath( path( "no-gamelist-here" ) ) );
 
       snes = { QStringLiteral( "snes" ), skSNES, path( "snes/gamelist.xml" ) };
+      pcecd = { QStringLiteral( "pcenginecd" ), skPCECD, path( "pcenginecd/gamelist.xml" ) };
    }
 
    QString path( const char* aRelative ) const
