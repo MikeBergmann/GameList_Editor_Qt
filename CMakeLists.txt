@@ -47,26 +47,32 @@ message( STATUS "GameListEditorQt version: ${GLE_VERSION}" )
 file( WRITE "${CMAKE_BINARY_DIR}/version.txt" "${GLE_VERSION}\n" )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
-find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
+if( ANDROID )
+   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Xml Network )
+else()
+   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
+endif()
 if( MINGW AND NOT ZLIB_ROOT )
    # Qt's MinGW kit ships zlib in the compiler sysroot, which CMake does not search.
    get_filename_component( _mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY )
    set( ZLIB_ROOT "${_mingw_bin}/../x86_64-w64-mingw32" )
 endif()
 find_package( ZLIB REQUIRED )
-find_package( GTest QUIET )
-if( NOT GTest_FOUND )
-   # No system GTest (typical on Windows): build it from source.
-   include( FetchContent )
-   FetchContent_Declare( googletest
-      URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-      DOWNLOAD_EXTRACT_TIMESTAMP TRUE )
-   set( INSTALL_GTEST OFF CACHE BOOL "" FORCE )
-   set( gtest_force_shared_crt ON CACHE BOOL "" FORCE )
-   FetchContent_MakeAvailable( googletest )
-endif()
+if( NOT ANDROID )
+   find_package( GTest QUIET )
+   if( NOT GTest_FOUND )
+      # No system GTest (typical on Windows): build it from source.
+      include( FetchContent )
+      FetchContent_Declare( googletest
+         URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+         DOWNLOAD_EXTRACT_TIMESTAMP TRUE )
+      set( INSTALL_GTEST OFF CACHE BOOL "" FORCE )
+      set( gtest_force_shared_crt ON CACHE BOOL "" FORCE )
+      FetchContent_MakeAvailable( googletest )
+   endif()
 
-include( GoogleTest )
+   include( GoogleTest )
+endif()
 
 add_library( gle_core STATIC
    src/core/Game.cpp
@@ -125,6 +131,11 @@ add_library( gle_scraper STATIC
 )
 target_include_directories( gle_scraper PUBLIC src/scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" )
 target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
+
+if( ANDROID )
+   include( cmake/Android.cmake )
+   return()
+endif()
 
 add_library( gle_ui STATIC
    src/ui/GameEditPanel.cpp
