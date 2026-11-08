@@ -3,6 +3,7 @@
 #include "Result.h"
 
 #include <QByteArray>
+#include <QCryptographicHash>
 #include <QString>
 
 #include <functional>
@@ -53,3 +54,8 @@ Result<QString> stageAndSwap( const QString& aTarget, const QString& aFailure,
 // For files with several top-level elements (a gamelist beside <alternativeEmulator>,
 // es_settings.xml): the wrapper goes after the declaration so its encoding still applies.
 QByteArray wrapInRoot( const QByteArray& aXml, QLatin1StringView aRoot );
+
+// Uppercase hex, matching the values already stored in existing gamelists.
+// Empty if the file cannot be read.
+QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm );
+QString fileCrc32( const QString& aPath );

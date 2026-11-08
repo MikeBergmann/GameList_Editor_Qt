@@ -6,8 +6,11 @@
 #include <QSaveFile>
 #include <QStringList>
 
+#include <zlib.h>
+
 namespace {
 bool GTrashEnabled = true;
+constexpr int Cst_ChunkSize = 64 * 1024;
 }
 
 // Gamelist paths are relative to the system folder and start with "./", which
@@ -185,4 +188,38 @@ QByteArray wrapInRoot( const QByteArray& aXml, QLatin1StringView aRoot )
 
    const QByteArray root( aRoot.data(), aRoot.size() );
    return aXml.left( at ) + '<' + root + '>' + aXml.mid( at ) + "</" + root + '>';
+}
+
+QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm )
+{
+   QFile file( aPath );
+   if ( !file.open( QIODevice::ReadOnly ) )
+      return {};
+
+   QCryptographicHash hash( aAlgorithm );
+   if ( !hash.addData( &file ) )
+      return {};
+
+   return QString::fromLatin1( hash.result().toHex() ).toUpper();
+}
+
+// Qt has no CRC32, so this is zlib's - already a dependency of Qt6Core.
+QString fileCrc32( const QString& aPath )
+{
+   QFile file( aPath );
+   if ( !file.open( QIODevice::ReadOnly ) )
+      return {};
+
+   uLong crc = crc32( 0, nullptr, 0 );
+   QByteArray chunk( Cst_ChunkSize, '\0' );
+   for ( qint64 read = file.read( chunk.data(), chunk.size() ); read > 0;
+         read = file.read( chunk.data(), chunk.size() ) ) {
+      crc = crc32( crc, reinterpret_cast<const Bytef*>( chunk.constData() ),
+                   static_cast<uInt>( read ) );
+   }
+
+   if ( file.error() != QFileDevice::NoError )
+      return {};
+
+   return QString::number( crc, 16 ).toUpper().rightJustified( 8, QLatin1Char( '0' ) );
 }

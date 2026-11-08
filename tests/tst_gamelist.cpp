@@ -5,6 +5,7 @@
 #include "GamelistFilter.h"
 #include "GamelistFixture.h"
 #include "MediaOps.h"
+#include "PathUtil.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
@@ -278,6 +279,10 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
    EXPECT_TRUE( gamelistDateToDisplay( QString() ).isEmpty() );
    EXPECT_TRUE( gamelistDateToDisplay( QStringLiteral( "not a date" ) ).isEmpty() );
 
+   // A day without a month would read as MM/yyyy and corrupt the date on the next save.
+   EXPECT_EQ( gamelistDateToDisplay( QStringLiteral( "19910023T000000" ) ),
+              QStringLiteral( "1991" ) );
+
    EXPECT_EQ( displayDateToGamelist( QStringLiteral( "23/06/1991" ) ),
               QStringLiteral( "19910623T000000" ) );
    EXPECT_EQ( displayDateToGamelist( QStringLiteral( "06/1991" ) ),
@@ -293,6 +298,15 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
            QStringLiteral( "19910000T000000" ) } ) {
       EXPECT_EQ( displayDateToGamelist( gamelistDateToDisplay( stored ) ), stored );
    }
+}
+
+TEST( Gamelist, ParsesDisplayDatesToQDate )
+{
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "23/06/1991" ) ), QDate( 1991, 6, 23 ) );
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "06/1991" ) ), QDate( 1991, 6, 1 ) );
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "1991" ) ), QDate( 1991, 1, 1 ) );
+   EXPECT_FALSE( displayDateToDate( QString() ).isValid() );
+   EXPECT_FALSE( displayDateToDate( QStringLiteral( "31/02/1991" ) ).isValid() );
 }
 
 // --- write ------------------------------------------------------
