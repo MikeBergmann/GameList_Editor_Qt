@@ -132,6 +132,14 @@ add_library( gle_scraper STATIC
 target_include_directories( gle_scraper PUBLIC src/scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" )
 target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
 
+# Core and Gui only, so the desktop tests can drive it; the QML front end is Android-only.
+add_library( gle_mobile_controllers STATIC
+   src/mobile/controllers/GamesController.cpp
+   src/mobile/controllers/LibraryController.cpp
+)
+target_include_directories( gle_mobile_controllers PUBLIC src/mobile/controllers )
+target_link_libraries( gle_mobile_controllers PUBLIC Qt6::Core Qt6::Gui gle_core )
+
 if( ANDROID )
    include( cmake/Android.cmake )
    return()
@@ -175,6 +183,7 @@ add_executable( tests
    tests/tst_launchboxdb.cpp
    tests/tst_launchboxdump.cpp
    tests/tst_mediaops.cpp
+   tests/tst_mobile_controllers.cpp
    tests/tst_pathutil.cpp
    tests/tst_resources.cpp
    tests/tst_result.cpp
@@ -187,7 +196,7 @@ add_executable( tests
    Resources/assets.qrc
 )
 target_include_directories( tests PRIVATE tests )
-target_link_libraries( tests PRIVATE gle_core gle_scraper gle_ui GTest::gtest )
+target_link_libraries( tests PRIVATE gle_core gle_scraper gle_ui gle_mobile_controllers GTest::gtest )
 
 enable_testing()
 gtest_discover_tests( tests )
