@@ -106,3 +106,9 @@ QString displayDateToGamelist( const QString& aDate );
 
 // A partial display date is its first day. Invalid for empty or unparseable input.
 QDate displayDateToDate( const QString& aDisplayDate );
+
+// A scraper's ISO "yyyy-mm-dd", "yyyy-mm" or "yyyy" as the editor shows it. Empty for anything else.
+QString isoDateToDisplay( const QString& aIso );
+
+// <lastplayed> as dd/MM/yyyy HH:mm:ss. Empty for a value gamelistDateTime rejects.
+QString gamelistDateTimeToDisplay( const QString& aValue );

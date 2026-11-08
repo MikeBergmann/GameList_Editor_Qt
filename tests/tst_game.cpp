@@ -63,6 +63,14 @@ TEST( Game, RejectsUnparseableGamelistDateTimes )
    EXPECT_FALSE( gamelistDateTime( QStringLiteral( "20130231T180000" ) ).isValid() );
 }
 
+TEST( Game, FormatsGamelistDateTimesForDisplay )
+{
+   EXPECT_EQ( gamelistDateTimeToDisplay( QStringLiteral( "20130101T180530" ) ),
+              QStringLiteral( "01/01/2013 18:05:30" ) );
+   EXPECT_TRUE( gamelistDateTimeToDisplay( QString() ).isEmpty() );
+   EXPECT_TRUE( gamelistDateTimeToDisplay( QStringLiteral( "0" ) ).isEmpty() );
+}
+
 TEST( Assets, QrcIsCompiledIntoTheBinary )
 {
    EXPECT_TRUE( QFile::exists( QStringLiteral( ":/DefaultPictures/default.png" ) ) );

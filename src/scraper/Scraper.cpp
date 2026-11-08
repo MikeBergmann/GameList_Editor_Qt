@@ -1,6 +1,7 @@
 #include "Scraper.h"
 
 #include "DevCredentials.h"
+#include "Game.h"
 #include "NetUtil.h"
 #include "PathUtil.h"
 
@@ -21,18 +22,6 @@ QString decodeDevSecret( const unsigned char* aData )
       if ( c == '\0' )
          return QString::fromUtf8( out );
       out.append( c );
-   }
-}
-
-QString formatScrapedDate( const QString& aValue )
-{
-   switch ( aValue.size() ) {
-      case 4: return aValue;
-      case 7: return aValue.mid( 5, 2 ) + QLatin1Char( '/' ) + aValue.left( 4 );
-      case 10:
-         return aValue.mid( 8, 2 ) + QLatin1Char( '/' ) + aValue.mid( 5, 2 ) + QLatin1Char( '/' ) +
-                aValue.left( 4 );
-      default: return {};
    }
 }
 
@@ -125,7 +114,7 @@ Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QStr
    info.description = pickLocalized( childDict( synopsis, Cst_AttLang ), textFallback );
 
    const QDomElement dates = game.firstChildElement( Cst_DateNode );
-   info.releaseDate = formatScrapedDate( pickLocalized(
+   info.releaseDate = isoDateToDisplay( pickLocalized(
       childDict( dates, Cst_AttRegion ),
       { langStr, QLatin1String( Cst_CountryName[cnEu] ), QLatin1String( Cst_CountryName[cnWor] ),
         QLatin1String( Cst_CountryName[cnUs] ), QLatin1String( Cst_CountryName[cnJp] ) } ) );

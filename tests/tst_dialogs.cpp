@@ -58,6 +58,7 @@ TEST( Dialogs, MoreInfosShowsAGamesFilesAndFields )
    EXPECT_EQ( text( "Edt_Image" ), QStringLiteral( "/media/snes/covers/Sonic.png (missing)" ) );
    EXPECT_TRUE( text( "Edt_Video" ).isEmpty() ) << "no link, so no path and no \"(missing)\"";
    EXPECT_EQ( text( "Edt_Playcount" ), QStringLiteral( "12" ) );
+   EXPECT_EQ( text( "Edt_LastPlayed" ), QStringLiteral( "01/01/2013 18:00:00" ) );
    EXPECT_EQ( text( "Edt_Crc32" ), QStringLiteral( "352441C2" ) );
 }
 

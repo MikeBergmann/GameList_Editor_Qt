@@ -65,6 +65,18 @@ QDate displayDateToDate( const QString& aDisplayDate )
    }
 }
 
+QString isoDateToDisplay( const QString& aIso )
+{
+   switch ( aIso.size() ) {
+      case 4: return aIso;
+      case 7: return aIso.mid( 5, 2 ) + QLatin1Char( '/' ) + aIso.left( 4 );
+      case 10:
+         return aIso.mid( 8, 2 ) + QLatin1Char( '/' ) + aIso.mid( 5, 2 ) + QLatin1Char( '/' ) +
+                aIso.left( 4 );
+      default: return {};
+   }
+}
+
 GameFields gameFields( const Game& aGame )
 {
    GameFields fields;
@@ -148,4 +160,10 @@ QDateTime gamelistDateTime( const QString& aValue )
 {
    // 'T' is quoted because a bare t is Qt's time-zone specifier.
    return QDateTime::fromString( aValue, QStringLiteral( "yyyyMMdd'T'HHmmss" ) );
+}
+
+QString gamelistDateTimeToDisplay( const QString& aValue )
+{
+   const QDateTime parsed = gamelistDateTime( aValue );
+   return parsed.isValid() ? parsed.toString( QStringLiteral( "dd/MM/yyyy HH:mm:ss" ) ) : QString();
 }

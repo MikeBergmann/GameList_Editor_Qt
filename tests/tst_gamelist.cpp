@@ -309,6 +309,15 @@ TEST( Gamelist, ParsesDisplayDatesToQDate )
    EXPECT_FALSE( displayDateToDate( QStringLiteral( "31/02/1991" ) ).isValid() );
 }
 
+TEST( Gamelist, ConvertsScraperIsoDatesToDisplay )
+{
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991-06-23" ) ), QStringLiteral( "23/06/1991" ) );
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991-06" ) ), QStringLiteral( "06/1991" ) );
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991" ) ), QStringLiteral( "1991" ) );
+   EXPECT_TRUE( isoDateToDisplay( QString() ).isEmpty() );
+   EXPECT_TRUE( isoDateToDisplay( QStringLiteral( "1991-6-3" ) ).isEmpty() );
+}
+
 // --- write ------------------------------------------------------
 
 TEST( Gamelist, SetFieldsWritesOnlyTheFieldsItIsGiven )
