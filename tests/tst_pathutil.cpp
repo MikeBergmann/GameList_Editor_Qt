@@ -58,6 +58,13 @@ TEST( PathUtil, FileKeyAndSameFileFoldCaseOnlyWhenAsked )
    EXPECT_TRUE( sameFile( QStringLiteral( "/a/Sonic.zip" ), QStringLiteral( "/a/sonic.zip" ), true ) );
 }
 
+TEST( PathUtil, IsInsideDirIsTrueForDescendantsOnly )
+{
+   EXPECT_TRUE( isInsideDir( QStringLiteral( "/roms/pcenginecd" ), QStringLiteral( "/roms/pcenginecd/a/Game.cue" ) ) );
+   EXPECT_FALSE( isInsideDir( QStringLiteral( "/roms/pcenginecd" ), QStringLiteral( "/roms/Game.cue" ) ) );
+   EXPECT_FALSE( isInsideDir( QStringLiteral( "/roms/pcenginecd" ), QStringLiteral( "/roms/pcenginecd2/Game.cue" ) ) );
+}
+
 TEST( PathUtil, SameLocationSeesThroughSpellingAndIsFalseForAPathThatIsNotThere )
 {
    QTemporaryDir dir;

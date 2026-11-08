@@ -29,6 +29,9 @@ bool sameFile( const QString& aA, const QString& aB, bool aFoldsCase );
 // another name is missed. Upgrade: compare file identity per entry.
 bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase );
 
+// Whether aPath lies under aDir. Compared by path text: symlinks are not resolved.
+bool isInsideDir( const QString& aDir, const QString& aPath );
+
 // Whether both paths exist and are the same file or folder, symlinks resolved.
 bool sameLocation( const QString& aA, const QString& aB );
 
