@@ -48,7 +48,7 @@ file( WRITE "${CMAKE_BINARY_DIR}/version.txt" "${GLE_VERSION}\n" )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
 if( ANDROID )
-   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Xml Network )
+   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Xml Network Quick QuickControls2 )
 else()
    find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
 endif()

@@ -10,7 +10,10 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
+#include <QKeyEvent>
+#include <QQmlApplicationEngine>
 #include <QSslSocket>
+#include <QTimer>
 
 namespace
 {
@@ -108,20 +111,46 @@ namespace
 
       check( QDir( base ).removeRecursively(), "cleanup" );
    }
+   // Logs what the pad and keyboard really send, before QML sees it.
+   class KeyLogger : public QObject
+   {
+   public:
+      bool eventFilter( QObject*, QEvent* aEvent ) override
+      {
+         if ( aEvent->type() == QEvent::KeyPress || aEvent->type() == QEvent::KeyRelease )
+         {
+            const auto* key = static_cast<QKeyEvent*>( aEvent );
+            qInfo( "GLE input: %s key=0x%x scan=%u vk=%u text='%s'",
+                   aEvent->type() == QEvent::KeyPress ? "down" : "up  ", static_cast<unsigned>( key->key() ),
+                   key->nativeScanCode(), key->nativeVirtualKey(), qPrintable( key->text() ) );
+         }
+         return false;
+      }
+   };
 }  // namespace
 
 int main( int argc, char** argv )
 {
    QGuiApplication app( argc, argv );
+   KeyLogger keyLogger;
+   app.installEventFilter( &keyLogger );
+
+   QQmlApplicationEngine engine;
+   QObject::connect( &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+                     [] { QCoreApplication::exit( 1 ); }, Qt::QueuedConnection );
+   engine.loadFromModule( "GleMobile", "InputSpike" );
 
    qInfo( "GLE smoke: ssl=%d", QSslSocket::supportsSsl() ? 1 : 0 );
 
    // Limitation: throwaway paths (internal storage, this device's SD card).
-   readTest( QStringLiteral( "/storage/emulated/0/gle_smoke" ) );
-   readTest( QStringLiteral( "/storage/1107-2E5F/ROMs" ) );
-   writeTest( QStringLiteral( "/storage/emulated/0" ) );
-   writeTest( QStringLiteral( "/storage/1107-2E5F" ) );
-   qInfo( "GLE write: done" );
+   QTimer::singleShot( 500, &app, []
+                       {
+                          readTest( QStringLiteral( "/storage/emulated/0/gle_smoke" ) );
+                          readTest( QStringLiteral( "/storage/1107-2E5F/ROMs" ) );
+                          writeTest( QStringLiteral( "/storage/emulated/0" ) );
+                          writeTest( QStringLiteral( "/storage/1107-2E5F" ) );
+                          qInfo( "GLE write: done" );
+                       } );
 
    return app.exec();
 }
