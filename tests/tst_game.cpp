@@ -5,7 +5,6 @@
 
 #include <QDir>
 #include <QFile>
-#include <QTemporaryDir>
 
 namespace {
 
@@ -40,36 +39,6 @@ TEST( Game, GamelistFlagOnlyAcceptsTheLiteralTrue )
    EXPECT_EQ( gamelistFlag( QString() ), 0 );
 }
 
-// Uppercase hex: existing gamelists hold these already, and a
-// lowercase digest would make every scraped game look changed.
-TEST( Game, HashesAreUppercaseHex )
-{
-   QTemporaryDir dir;
-   ASSERT_TRUE( dir.isValid() );
-
-   const QString romPath = dir.filePath( QStringLiteral( "rom.bin" ) );
-   QFile rom( romPath );
-   ASSERT_TRUE( rom.open( QIODevice::WriteOnly ) );
-   ASSERT_EQ( rom.write( "abc" ), 3 );
-   rom.close();
-
-   EXPECT_EQ( fileHash( romPath, QCryptographicHash::Md5 ),
-              QStringLiteral( "900150983CD24FB0D6963F7D28E17F72" ) );
-   EXPECT_EQ( fileHash( romPath, QCryptographicHash::Sha1 ),
-              QStringLiteral( "A9993E364706816ABA3E25717850C26C9CD0D89D" ) );
-   EXPECT_EQ( fileCrc32( romPath ), QStringLiteral( "352441C2" ) );
-}
-
-// Orphan ROMs are routine here, so a missing file has to come back empty rather
-// than raise: callers test emptiness to decide whether to rescrape.
-TEST( Game, HashesAreEmptyForAnUnreadableFile )
-{
-   const QString missing = QStringLiteral( "/nonexistent/absent.bin" );
-
-   EXPECT_TRUE( fileHash( missing, QCryptographicHash::Md5 ).isEmpty() );
-   EXPECT_TRUE( fileCrc32( missing ).isEmpty() );
-}
-
 // <lastplayed> and <releasedate> are basic ISO 8601 without separators. Parsing is
 // strict, so a value that cannot be parsed has to come back invalid rather than as a
 // wrong date.
@@ -92,6 +61,14 @@ TEST( Game, RejectsUnparseableGamelistDateTimes )
 
    // Right shape, impossible day: there is no 31st of February.
    EXPECT_FALSE( gamelistDateTime( QStringLiteral( "20130231T180000" ) ).isValid() );
+}
+
+TEST( Game, FormatsGamelistDateTimesForDisplay )
+{
+   EXPECT_EQ( gamelistDateTimeToDisplay( QStringLiteral( "20130101T180530" ) ),
+              QStringLiteral( "01/01/2013 18:05:30" ) );
+   EXPECT_TRUE( gamelistDateTimeToDisplay( QString() ).isEmpty() );
+   EXPECT_TRUE( gamelistDateTimeToDisplay( QStringLiteral( "0" ) ).isEmpty() );
 }
 
 TEST( Assets, QrcIsCompiledIntoTheBinary )

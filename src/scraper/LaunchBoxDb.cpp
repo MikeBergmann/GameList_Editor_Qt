@@ -1,5 +1,6 @@
 #include "LaunchBoxDb.h"
 
+#include "Game.h"
 #include "Resources.h"
 
 #include <QFile>
@@ -468,9 +469,9 @@ ScrapedInfo LaunchBoxDb::toInfo( const Entry& aGame, const LaunchBoxQuery& aQuer
       }
    }
 
-   info.releaseDate = formatScrapedDate( aGame.releaseDate.left( 10 ) );
+   info.releaseDate = isoDateToDisplay( aGame.releaseDate.left( 10 ) );
    if ( info.releaseDate.isEmpty() )
-      info.releaseDate = formatScrapedDate( aGame.releaseYear );
+      info.releaseDate = isoDateToDisplay( aGame.releaseYear );
 
    QStringList genres;
    for ( const QString& genre : aGame.genres.split( QLatin1Char( ';' ), Qt::SkipEmptyParts ) ) {

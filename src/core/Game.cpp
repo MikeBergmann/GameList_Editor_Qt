@@ -2,14 +2,6 @@
 
 #include "Resources.h"
 
-#include <QFile>
-
-#include <zlib.h>
-
-namespace {
-constexpr int Cst_ChunkSize = 64 * 1024;
-}
-
 int gamelistFlag( const QString& aValue )
 {
    return aValue == QLatin1String( "true" ) ? 1 : 0;
@@ -34,10 +26,11 @@ QString gamelistDateToDisplay( const QString& aValue )
       return {};
 
    QString display;
-   if ( day > 0 )
-      display += aValue.mid( 6, 2 ) + QLatin1Char( '/' );
-   if ( month > 0 )
+   if ( month > 0 ) {
+      if ( day > 0 )
+         display += aValue.mid( 6, 2 ) + QLatin1Char( '/' );
       display += aValue.mid( 4, 2 ) + QLatin1Char( '/' );
+   }
    if ( year > 0 )
       display += aValue.left( 4 );
 
@@ -46,7 +39,7 @@ QString gamelistDateToDisplay( const QString& aValue )
 
 QString displayDateToGamelist( const QString& aDate )
 {
-   if ( aDate.isEmpty() || !aDate.at( 0 ).isDigit() )
+   if ( !displayDateToDate( aDate ).isValid() )
       return {};
 
    switch ( aDate.size() ) {
@@ -60,6 +53,31 @@ QString displayDateToGamelist( const QString& aDate )
                 Cst_DateSuffix;
       default: return {};
    }
+}
+
+QDate displayDateToDate( const QString& aDisplayDate )
+{
+   switch ( aDisplayDate.size() ) {
+      case 4: return QDate::fromString( aDisplayDate, QStringLiteral( "yyyy" ) );
+      case 7: return QDate::fromString( aDisplayDate, QStringLiteral( "MM/yyyy" ) );
+      case 10: return QDate::fromString( aDisplayDate, QStringLiteral( "dd/MM/yyyy" ) );
+      default: return {};
+   }
+}
+
+QString isoDateToDisplay( const QString& aIso )
+{
+   QString display;
+   switch ( aIso.size() ) {
+      case 4: display = aIso; break;
+      case 7: display = aIso.mid( 5, 2 ) + QLatin1Char( '/' ) + aIso.left( 4 ); break;
+      case 10:
+         display = aIso.mid( 8, 2 ) + QLatin1Char( '/' ) + aIso.mid( 5, 2 ) + QLatin1Char( '/' ) +
+                   aIso.left( 4 );
+         break;
+      default: break;
+   }
+   return displayDateToDate( display ).isValid() ? display : QString();
 }
 
 GameFields gameFields( const Game& aGame )
@@ -147,36 +165,8 @@ QDateTime gamelistDateTime( const QString& aValue )
    return QDateTime::fromString( aValue, QStringLiteral( "yyyyMMdd'T'HHmmss" ) );
 }
 
-QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm )
+QString gamelistDateTimeToDisplay( const QString& aValue )
 {
-   QFile file( aPath );
-   if ( !file.open( QIODevice::ReadOnly ) )
-      return {};
-
-   QCryptographicHash hash( aAlgorithm );
-   if ( !hash.addData( &file ) )
-      return {};
-
-   return QString::fromLatin1( hash.result().toHex() ).toUpper();
-}
-
-// Qt has no CRC32, so this is zlib's - already a dependency of Qt6Core.
-QString fileCrc32( const QString& aPath )
-{
-   QFile file( aPath );
-   if ( !file.open( QIODevice::ReadOnly ) )
-      return {};
-
-   uLong crc = crc32( 0, nullptr, 0 );
-   QByteArray chunk( Cst_ChunkSize, '\0' );
-   for ( qint64 read = file.read( chunk.data(), chunk.size() ); read > 0;
-         read = file.read( chunk.data(), chunk.size() ) ) {
-      crc = crc32( crc, reinterpret_cast<const Bytef*>( chunk.constData() ),
-                   static_cast<uInt>( read ) );
-   }
-
-   if ( file.error() != QFileDevice::NoError )
-      return {};
-
-   return QString::number( crc, 16 ).toUpper().rightJustified( 8, QLatin1Char( '0' ) );
+   const QDateTime parsed = gamelistDateTime( aValue );
+   return parsed.isValid() ? parsed.toString( QStringLiteral( "dd/MM/yyyy HH:mm:ss" ) ) : QString();
 }

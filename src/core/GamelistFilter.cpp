@@ -53,16 +53,6 @@ double ratingValue( const QString& aRating )
    return text.replace( QLatin1Char( ',' ), QLatin1Char( '.' ) ).toDouble();
 }
 
-QDate releaseDateValue( const QString& aDisplayDate )
-{
-   switch ( aDisplayDate.size() ) {
-      case 4: return QDate::fromString( aDisplayDate, QStringLiteral( "yyyy" ) );
-      case 7: return QDate::fromString( aDisplayDate, QStringLiteral( "MM/yyyy" ) );
-      case 10: return QDate::fromString( aDisplayDate, QStringLiteral( "dd/MM/yyyy" ) );
-      default: return {};
-   }
-}
-
 bool matchesCategory( const Gamelist& aList, const Game& aGame, const FilterSpec& aFilter )
 {
    // The "same as" categories compare against the selected game; with none selected
@@ -101,10 +91,12 @@ bool matchesCategory( const Gamelist& aList, const Game& aGame, const FilterSpec
          if ( aGame.releaseDate.isEmpty() )
             return false;
          // An unset reference date counts as today.
-         QDate referenceDate = releaseDateValue( reference.releaseDate );
+         QDate referenceDate = displayDateToDate( reference.releaseDate );
          if ( !referenceDate.isValid() )
             referenceDate = QDate::currentDate();
-         const QDate date = releaseDateValue( aGame.releaseDate );
+         const QDate date = displayDateToDate( aGame.releaseDate );
+         if ( !date.isValid() )
+            return false;
          return aFilter.category == FilterCategory::SameOrEarlierDate ? date <= referenceDate
                                                                       : date >= referenceDate;
       }

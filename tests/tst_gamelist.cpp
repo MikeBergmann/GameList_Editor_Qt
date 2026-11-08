@@ -5,6 +5,7 @@
 #include "GamelistFilter.h"
 #include "GamelistFixture.h"
 #include "MediaOps.h"
+#include "PathUtil.h"
 #include "QtPrinters.h"
 
 #include <gtest/gtest.h>
@@ -278,6 +279,10 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
    EXPECT_TRUE( gamelistDateToDisplay( QString() ).isEmpty() );
    EXPECT_TRUE( gamelistDateToDisplay( QStringLiteral( "not a date" ) ).isEmpty() );
 
+   // A day without a month would read as MM/yyyy and corrupt the date on the next save.
+   EXPECT_EQ( gamelistDateToDisplay( QStringLiteral( "19910023T000000" ) ),
+              QStringLiteral( "1991" ) );
+
    EXPECT_EQ( displayDateToGamelist( QStringLiteral( "23/06/1991" ) ),
               QStringLiteral( "19910623T000000" ) );
    EXPECT_EQ( displayDateToGamelist( QStringLiteral( "06/1991" ) ),
@@ -287,12 +292,57 @@ TEST( Gamelist, ConvertsReleaseDatesBothWays )
    EXPECT_TRUE( displayDateToGamelist( QStringLiteral( "june 1991" ) ).isEmpty() );
    EXPECT_TRUE( displayDateToGamelist( QString() ).isEmpty() );
 
+   // Right shape, impossible date: none of these may reach the XML.
+   for ( const char* bad : { "13/13/2020", "99/99/1999", "31/02/1991", "00/06/1991", "13/1991",
+                             "1x/xx/xxxx" } ) {
+      EXPECT_TRUE( displayDateToGamelist( QLatin1String( bad ) ).isEmpty() ) << bad;
+   }
+
    // What load() stores round-trips through what the save path will write.
    for ( const QString& stored :
          { QStringLiteral( "19910623T000000" ), QStringLiteral( "19910600T000000" ),
            QStringLiteral( "19910000T000000" ) } ) {
       EXPECT_EQ( displayDateToGamelist( gamelistDateToDisplay( stored ) ), stored );
    }
+}
+
+TEST( Gamelist, ParsesDisplayDatesToQDate )
+{
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "23/06/1991" ) ), QDate( 1991, 6, 23 ) );
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "06/1991" ) ), QDate( 1991, 6, 1 ) );
+   EXPECT_EQ( displayDateToDate( QStringLiteral( "1991" ) ), QDate( 1991, 1, 1 ) );
+   EXPECT_FALSE( displayDateToDate( QString() ).isValid() );
+   EXPECT_FALSE( displayDateToDate( QStringLiteral( "31/02/1991" ) ).isValid() );
+}
+
+TEST( Gamelist, ConvertsScraperIsoDatesToDisplay )
+{
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991-06-23" ) ), QStringLiteral( "23/06/1991" ) );
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991-06" ) ), QStringLiteral( "06/1991" ) );
+   EXPECT_EQ( isoDateToDisplay( QStringLiteral( "1991" ) ), QStringLiteral( "1991" ) );
+   EXPECT_TRUE( isoDateToDisplay( QString() ).isEmpty() );
+   EXPECT_TRUE( isoDateToDisplay( QStringLiteral( "1991-6-3" ) ).isEmpty() );
+   EXPECT_TRUE( isoDateToDisplay( QStringLiteral( "1992-13-45" ) ).isEmpty() );
+   EXPECT_TRUE( isoDateToDisplay( QStringLiteral( "1992-13" ) ).isEmpty() );
+}
+
+TEST( Gamelist, DateRangeFiltersSkipAnUnparseableDate )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "snes/gamelist.xml" ),
+              "<gameList>"
+              "<game><path>./a.zip</path><releasedate>19910623T000000</releasedate></game>"
+              "<game><path>./b.zip</path><releasedate>99999999T000000</releasedate></game>"
+              "</gameList>" );
+   Gamelist list;
+   ASSERT_TRUE( list.load( fixture.snes ) );
+
+   FilterSpec filter;
+   filter.reference = 0;
+   filter.category = FilterCategory::SameOrEarlierDate;
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) ) << "an invalid QDate sorts before every date";
+   filter.category = FilterCategory::SameOrLaterDate;
+   EXPECT_FALSE( filterAccepts( list, 1, filter ) );
 }
 
 // --- write ------------------------------------------------------

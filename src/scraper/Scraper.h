@@ -65,9 +65,6 @@ struct ScrapeCandidate
    QByteArray xml;
 };
 
-// ISO "yyyy-mm-dd", "yyyy-mm" or "yyyy" to dd/MM/yyyy, MM/yyyy or yyyy. Empty for anything else.
-QString formatScrapedDate( const QString& aValue );
-
 // Needs no network. An Error when the XML is invalid or holds no <jeu>.
 Result<ScrapedInfo> parseScrapeResponse( const QByteArray& aXml, const QSet<QString>& aMediaTypes,
                                         bool aWantVideo, LangName aLanguage );

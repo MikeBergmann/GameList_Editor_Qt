@@ -69,4 +69,34 @@ TEST( PathUtil, SameLocationSeesThroughSpellingAndIsFalseForAPathThatIsNotThere 
    EXPECT_FALSE( sameLocation( dir.filePath( QStringLiteral( "nope" ) ), dir.filePath( QStringLiteral( "nope" ) ) ) );
 }
 
+// Uppercase hex: existing gamelists hold these already, and a
+// lowercase digest would make every scraped game look changed.
+TEST( PathUtil, HashesAreUppercaseHex )
+{
+   QTemporaryDir dir;
+   ASSERT_TRUE( dir.isValid() );
+
+   const QString romPath = dir.filePath( QStringLiteral( "rom.bin" ) );
+   QFile rom( romPath );
+   ASSERT_TRUE( rom.open( QIODevice::WriteOnly ) );
+   ASSERT_EQ( rom.write( "abc" ), 3 );
+   rom.close();
+
+   EXPECT_EQ( fileHash( romPath, QCryptographicHash::Md5 ),
+              QStringLiteral( "900150983CD24FB0D6963F7D28E17F72" ) );
+   EXPECT_EQ( fileHash( romPath, QCryptographicHash::Sha1 ),
+              QStringLiteral( "A9993E364706816ABA3E25717850C26C9CD0D89D" ) );
+   EXPECT_EQ( fileCrc32( romPath ), QStringLiteral( "352441C2" ) );
+}
+
+// Orphan ROMs are routine here, so a missing file has to come back empty rather
+// than raise: callers test emptiness to decide whether to rescrape.
+TEST( PathUtil, HashesAreEmptyForAnUnreadableFile )
+{
+   const QString missing = QStringLiteral( "/nonexistent/absent.bin" );
+
+   EXPECT_TRUE( fileHash( missing, QCryptographicHash::Md5 ).isEmpty() );
+   EXPECT_TRUE( fileCrc32( missing ).isEmpty() );
+}
+
 }  // namespace

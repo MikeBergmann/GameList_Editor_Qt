@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QCryptographicHash>
 #include <QDateTime>
 #include <QFileInfo>
 #include <QString>
@@ -105,7 +104,11 @@ QDateTime gamelistDateTime( const QString& aValue );
 QString gamelistDateToDisplay( const QString& aValue );
 QString displayDateToGamelist( const QString& aDate );
 
-// Uppercase hex, matching the values already stored in existing gamelists.
-// Empty if the file cannot be read.
-QString fileHash( const QString& aPath, QCryptographicHash::Algorithm aAlgorithm );
-QString fileCrc32( const QString& aPath );
+// A partial display date is its first day. Invalid for empty or unparseable input.
+QDate displayDateToDate( const QString& aDisplayDate );
+
+// A scraper's ISO "yyyy-mm-dd", "yyyy-mm" or "yyyy" as the editor shows it. Empty for anything else.
+QString isoDateToDisplay( const QString& aIso );
+
+// <lastplayed> as dd/MM/yyyy HH:mm:ss. Empty for a value gamelistDateTime rejects.
+QString gamelistDateTimeToDisplay( const QString& aValue );

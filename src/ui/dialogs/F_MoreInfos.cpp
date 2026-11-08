@@ -71,10 +71,7 @@ void Frm_MoreInfos::Execute( const Game& aGame, const QString& aGamelistPath )
 
    // An unset or unparseable <lastplayed> shows as blank rather than as an
    // epoch date - plenty of gamelists in the wild hold neither.
-   const QDateTime lastPlayed = gamelistDateTime( aGame.lastplayed );
-   Edt_LastPlayed->setText( lastPlayed.isValid()
-                               ? lastPlayed.toString( QStringLiteral( "dd/MM/yyyy HH:mm:ss" ) )
-                               : QString() );
+   Edt_LastPlayed->setText( gamelistDateTimeToDisplay( aGame.lastplayed ) );
 
    Edt_Crc32->setText( aGame.crc32 );
    Edt_Md5->setText( aGame.md5 );
