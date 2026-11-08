@@ -79,6 +79,7 @@ add_library( gle_core STATIC
    src/core/PathUtil.cpp
    src/core/Resources.cpp
    src/core/RomCopy.cpp
+   src/core/RomFiles.cpp
    src/core/Sync.cpp
    src/core/Systems.cpp
 )
@@ -167,6 +168,7 @@ add_executable( tests
    tests/tst_resources.cpp
    tests/tst_result.cpp
    tests/tst_romcopy.cpp
+   tests/tst_romfiles.cpp
    tests/tst_scraper.cpp
    tests/tst_scrapepanel.cpp
    tests/tst_sync.cpp

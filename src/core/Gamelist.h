@@ -164,10 +164,6 @@ private:
    // Whether an entry other than aSkip (-1: none) has the same file in aMember.
    bool sharedFile( int aSkip, const QString& aPath, QString Game::*aMember ) const;
 
-   // The tracks of aGame's disc description that exist inside the ROM folder and that no
-   // listed game's ROM needs. Never the ROM itself.
-   QStringList exclusiveTracks( const Game& aGame ) const;
-
    Result<> removeMedia( int aIndex, bool aIsImage );
 
    // Runs aApply on the targets, then saves; if that fails, puts the targets back.

@@ -1,101 +1,19 @@
 #include "RomCopy.h"
 
 #include "PathUtil.h"
+#include "RomFiles.h"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QRegularExpression>
-#include <QSet>
 #include <QStorageInfo>
-
-namespace {
-
-// The file names a disc description refers to, relative to its own folder.
-QStringList referencedFiles( const QString& aPath )
-{
-   const QString suffix = QFileInfo( aPath ).suffix().toLower();
-   QFile file( aPath );
-   if ( !file.open( QIODevice::ReadOnly ) )
-      return {};
-
-   const QStringList lines = QString::fromUtf8( file.readAll() ).split( QLatin1Char( '\n' ) );
-   QStringList names;
-
-   // FILE "name.bin" BINARY / <track> <lba> <type> <sector> "name.bin" <offset>
-   static const QRegularExpression cue( QStringLiteral( R"re(^\s*FILE\s+(?:"([^"]+)"|(\S+)))re" ),
-                                        QRegularExpression::CaseInsensitiveOption );
-   static const QRegularExpression gdi(
-      QStringLiteral( R"re(^\s*\d+\s+\d+\s+\d+\s+\d+\s+(?:"([^"]+)"|(\S+)))re" ) );
-
-   for ( QString line : lines ) {
-      line = line.trimmed();
-      if ( line.startsWith( QChar( 0xFEFF ) ) )
-         line.remove( 0, 1 );
-      if ( line.isEmpty() )
-         continue;
-
-      if ( suffix == QLatin1String( "m3u" ) ) {
-         if ( !line.startsWith( QLatin1Char( '#' ) ) )
-            names << line;
-         continue;
-      }
-
-      const QRegularExpressionMatch match = ( suffix == QLatin1String( "cue" ) ? cue : gdi ).match( line );
-      if ( match.hasMatch() )
-         names << ( match.captured( 1 ).isEmpty() ? match.captured( 2 ) : match.captured( 1 ) );
-   }
-
-   for ( QString& name : names )
-      name.replace( QLatin1Char( '\\' ), QLatin1Char( '/' ) );
-   return names;
-}
-
-bool isDiscDescription( const QString& aPath )
-{
-   const QString suffix = QFileInfo( aPath ).suffix().toLower();
-   return suffix == QLatin1String( "cue" ) || suffix == QLatin1String( "m3u" ) || suffix == QLatin1String( "gdi" );
-}
-
-}  // namespace
-
-QStringList discTracks( const QString& aPath )
-{
-   QStringList tracks;
-   if ( !isDiscDescription( aPath ) )
-      return tracks;
-
-   const QString folder = QFileInfo( aPath ).path();
-   for ( const QString& name : referencedFiles( aPath ) )
-      tracks << physicalPath( folder, name );
-   return tracks;
-}
-
-QStringList romParts( const QString& aRomPath )
-{
-   QStringList parts{ aRomPath };
-   for ( int next = 0; next < parts.size(); ++next ) {
-      for ( const QString& track : discTracks( parts.at( next ) ) ) {
-         if ( !parts.contains( track ) )
-            parts << track;
-      }
-   }
-   return parts;
-}
 
 RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, const QString& aRomLink )
 {
    RomCopyPlan plan;
    const QDir source( aSourceDir );
-   QSet<QString> seen;
-   QStringList queue{ physicalPath( aSourceDir, aRomLink ) };
 
-   while ( !queue.isEmpty() ) {
-      const QString path = queue.takeFirst();
-      if ( seen.contains( path ) )
-         continue;
-      seen.insert( path );
-
+   for ( const QString& path : romParts( physicalPath( aSourceDir, aRomLink ) ) ) {
       const QFileInfo info( path );
       if ( !info.exists() ) {
          plan.problems << QStringLiteral( "%1 is missing." ).arg( path );
@@ -107,23 +25,16 @@ RomCopyPlan planRomCopy( const QString& aSourceDir, const QString& aTargetDir, c
          continue;
       }
 
-      // Another drive yields an absolute path, not "../".
-      const QString relative = source.relativeFilePath( path );
-      if ( relative.startsWith( QLatin1String( "../" ) ) || QDir::isAbsolutePath( relative ) ) {
+      if ( !isInsideDir( aSourceDir, path ) ) {
          plan.problems << QStringLiteral( "%1 is outside the ROM folder." ).arg( path );
          continue;
       }
 
-      const QString target = physicalPath( aTargetDir, relative );
+      const QString target = physicalPath( aTargetDir, source.relativeFilePath( path ) );
       const QFileInfo existing( target );
       if ( !existing.exists() || existing.size() != info.size() ) {
          plan.files.append( { path, target, info.size() } );
          plan.bytes += info.size();
-      }
-
-      if ( isDiscDescription( path ) ) {
-         for ( const QString& track : discTracks( path ) )
-            queue << track;
       }
    }
 

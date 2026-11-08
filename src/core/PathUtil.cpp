@@ -171,6 +171,13 @@ bool sameFileOnDisk( const QString& aA, const QString& aB, bool aFoldsCase )
    return !canonical.isEmpty() && sameFile( canonical, infoB.canonicalFilePath(), aFoldsCase );
 }
 
+bool isInsideDir( const QString& aDir, const QString& aPath )
+{
+   // Another drive yields an absolute path, not "../".
+   const QString relative = QDir( aDir ).relativeFilePath( aPath );
+   return !relative.startsWith( QLatin1String( "../" ) ) && !QDir::isAbsolutePath( relative );
+}
+
 bool sameLocation( const QString& aA, const QString& aB )
 {
    const QString a = QFileInfo( aA ).canonicalFilePath();
