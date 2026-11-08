@@ -1,5 +1,7 @@
 // Android entry point: the QML front end over the mobile controllers.
 
+#include "AndroidStorage.h"
+#include "FileBrowserController.h"
 #include "GamesController.h"
 #include "LibraryController.h"
 
@@ -20,10 +22,15 @@ int main( int argc, char** argv )
 
    LibraryController library;
    GamesController games( &library );
+   FileBrowserController browser;
+   AndroidStorage storage;
 
    QQmlApplicationEngine engine;
-   engine.rootContext()->setContextProperty( QStringLiteral( "library" ), &library );
-   engine.rootContext()->setContextProperty( QStringLiteral( "games" ), &games );
+   QQmlContext* context = engine.rootContext();
+   context->setContextProperty( QStringLiteral( "library" ), &library );
+   context->setContextProperty( QStringLiteral( "games" ), &games );
+   context->setContextProperty( QStringLiteral( "browser" ), &browser );
+   context->setContextProperty( QStringLiteral( "storage" ), &storage );
    QObject::connect( &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit( 1 ); }, Qt::QueuedConnection );
    engine.loadFromModule( "GleMobile", "Main" );

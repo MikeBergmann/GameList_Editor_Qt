@@ -1,5 +1,6 @@
 // The mobile controllers run without QML: driven the way a page would, over the shared fixture.
 
+#include "FileBrowserController.h"
 #include "GamelistFixture.h"
 #include "GamesController.h"
 #include "LibraryController.h"
@@ -121,6 +122,42 @@ TEST( GamesController, ANewSystemClearsSearchAndSelectionButKeepsTheCategory )
    writeFile( fixture.snes.gamelistPath, "<gameList><game>" );
    EXPECT_FALSE( fixture.library.selectSystem( systemIndex( fixture.library, QStringLiteral( "snes" ) ) ) );
    EXPECT_EQ( model->rowCount(), 0 );
+}
+
+QStringList names( const FileBrowserController& aBrowser )
+{
+   QStringList result;
+   for ( const QVariant& entry : aBrowser.entries() )
+      result.append( entry.toMap().value( QStringLiteral( "name" ) ).toString() );
+   return result;
+}
+
+TEST( FileBrowserController, ListsTheVolumesThenFoldersAndGoesBackUp )
+{
+   QTemporaryDir storage;
+   const QString internal = storage.filePath( QStringLiteral( "emulated/0" ) );
+   ASSERT_TRUE( QDir().mkpath( internal + QStringLiteral( "/ROMs/snes" ) ) );
+   ASSERT_TRUE( QDir().mkpath( internal + QStringLiteral( "/.hidden" ) ) );
+   ASSERT_TRUE( QDir().mkpath( storage.filePath( QStringLiteral( "1107-2E5F/Games" ) ) ) );
+   ASSERT_TRUE( QDir().mkpath( storage.filePath( QStringLiteral( "self" ) ) ) );
+
+   FileBrowserController browser( storage.path() );
+   EXPECT_TRUE( browser.atRoots() );
+   EXPECT_EQ( names( browser ), QStringList( { QStringLiteral( "Internal storage" ), QStringLiteral( "1107-2E5F" ) } ) );
+
+   browser.open( internal );
+   EXPECT_FALSE( browser.atRoots() );
+   EXPECT_EQ( names( browser ), QStringList( { QStringLiteral( ".hidden" ), QStringLiteral( "ROMs" ) } ) );
+
+   browser.open( internal + QStringLiteral( "/ROMs" ) );
+   EXPECT_EQ( names( browser ), QStringList( QStringLiteral( "snes" ) ) );
+   browser.up();
+   EXPECT_EQ( browser.path(), internal );
+   browser.up();
+   EXPECT_TRUE( browser.atRoots() );
+
+   browser.open( storage.filePath( QStringLiteral( "nowhere" ) ) );
+   EXPECT_TRUE( browser.atRoots() );
 }
 
 }  // namespace

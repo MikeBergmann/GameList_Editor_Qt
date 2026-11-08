@@ -134,6 +134,7 @@ target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
 
 # Core and Gui only, so the desktop tests can drive it; the QML front end is Android-only.
 add_library( gle_mobile_controllers STATIC
+   src/mobile/controllers/FileBrowserController.cpp
    src/mobile/controllers/GamesController.cpp
    src/mobile/controllers/LibraryController.cpp
 )

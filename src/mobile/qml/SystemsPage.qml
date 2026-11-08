@@ -4,19 +4,20 @@ import QtQuick.Layouts
 
 Page {
    id: page
-   StackView.onActivated: list.forceActiveFocus()
 
-   // Limitation: a typed path until the file browser exists (Android.md, Phase 2).
-   function openRoot() {
-      if ( library.openRoot( pathField.text ) )
-         list.forceActiveFocus()
+   function focusStart() {
+      ( library.systems.length > 0 ? list : chooseBtn ).forceActiveFocus()
    }
+
+   StackView.onActivated: focusStart()
 
    Component.onCompleted: {
       if ( library.lastFolder )
          library.openRoot( library.lastFolder )
+      focusStart()
    }
 
+   Component { id: browserPage; FileBrowserPage {} }
    Component { id: gamesPage; GamesPage {} }
 
    header: ToolBar {
@@ -35,27 +36,15 @@ Page {
       RowLayout {
          Layout.fillWidth: true
 
-         // Click focus only: the D-pad must not land here, the soft keyboard would cover the list.
-         TextField {
-            id: pathField
+         Label {
             Layout.fillWidth: true
-            focusPolicy: Qt.ClickFocus
-            text: library.rootPath || library.lastFolder || "/storage/emulated/0"
-            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
-            onAccepted: page.openRoot()
+            text: library.rootPath || "No folder chosen"
+            elide: Text.ElideMiddle
          }
          Button {
-            id: editBtn
-            text: "Edit"
-            onClicked: pathField.forceActiveFocus()
-            KeyNavigation.right: openBtn
-            KeyNavigation.down: list
-         }
-         Button {
-            id: openBtn
-            text: "Open"
-            onClicked: page.openRoot()
-            KeyNavigation.left: editBtn
+            id: chooseBtn
+            text: "Choose folder"
+            onClicked: page.StackView.view.push( browserPage )
             KeyNavigation.down: list
          }
       }
@@ -71,7 +60,7 @@ Page {
       Label {
          Layout.fillWidth: true
          visible: library.systems.length === 0 && library.error.length === 0
-         text: "Enter the folder that holds your ROM systems, then press Open."
+         text: "Choose the folder that holds your ROM systems."
          wrapMode: Text.Wrap
       }
 
@@ -81,7 +70,7 @@ Page {
          Layout.fillHeight: true
          clip: true
          model: library.systems
-         KeyNavigation.up: openBtn
+         KeyNavigation.up: chooseBtn
 
          delegate: ItemDelegate {
             width: ListView.view.width
