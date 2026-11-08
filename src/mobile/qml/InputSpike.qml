@@ -1,5 +1,4 @@
-// Phase 4 input spike: does D-pad / A / B navigate and activate with plain Qt Quick focus?
-// The raw keys are logged by the C++ event filter in main_android.cpp (adb logcat | findstr GLE).
+// Qt drops gamepad buttons (they reach QML as Key_unknown), so re-send them as keys it maps.
 
 import QtQuick
 import QtQuick.Controls
@@ -10,32 +9,44 @@ ApplicationWindow {
    title: "GLE input spike"
 
    property int clicks: 0
+   property string lastKey: "-"
 
-   Column {
-      anchors.centerIn: parent
-      spacing: 12
+   FocusScope {
+      anchors.fill: parent
+      focus: true
+      Keys.onPressed: ( event ) => win.lastKey = "0x" + event.key.toString( 16 ) + " '" + event.text + "'"
 
-      Label { text: "D-pad, A, B, touch; keys go to logcat" }
-      Label { text: "clicks: " + win.clicks + "  size: " + win.width + "x" + win.height }
+      // Buttons ignore Enter/Return (they only click on Space), so A has to click the focused item.
+      Keys.onReturnPressed: ( event ) => { if ( win.activeFocusItem && win.activeFocusItem.click ) win.activeFocusItem.click() }
+      Keys.onEnterPressed: ( event ) => { if ( win.activeFocusItem && win.activeFocusItem.click ) win.activeFocusItem.click() }
 
-      Button {
-         id: first
-         text: "One"
-         focus: true
-         onClicked: win.clicks++
-         KeyNavigation.down: second
-      }
-      Button {
-         id: second
-         text: "Two"
-         onClicked: win.clicks++
-         KeyNavigation.up: first
-         KeyNavigation.down: field
-      }
-      TextField {
-         id: field
-         placeholderText: "text field (keyboard test)"
-         KeyNavigation.up: second
+      Column {
+         anchors.centerIn: parent
+         spacing: 12
+
+         Label { text: "last key: " + win.lastKey }
+         Label { text: "focus: " + win.activeFocusItem + "  clicks: " + win.clicks }
+         Label { text: "size: " + win.width + "x" + win.height }
+
+         Button {
+            id: first
+            text: "One"
+            focus: true
+            onClicked: win.clicks++
+            KeyNavigation.down: second
+         }
+         Button {
+            id: second
+            text: "Two"
+            onClicked: win.clicks++
+            KeyNavigation.up: first
+            KeyNavigation.down: field
+         }
+         TextField {
+            id: field
+            placeholderText: "text field (keyboard test)"
+            KeyNavigation.up: second
+         }
       }
    }
 }
