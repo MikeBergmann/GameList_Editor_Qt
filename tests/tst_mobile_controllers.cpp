@@ -1,6 +1,7 @@
 // The mobile controllers run without QML: driven the way a page would, over the shared fixture.
 
 #include "FileBrowserController.h"
+#include "GameEditController.h"
 #include "GamelistFixture.h"
 #include "GamesController.h"
 #include "LibraryController.h"
@@ -23,6 +24,7 @@ struct MobileFixture : Fixture
 {
    LibraryController library;
    GamesController games{ &library };
+   GameEditController edit{ &library, &games };
 
    MobileFixture()
    {
@@ -158,6 +160,68 @@ TEST( FileBrowserController, ListsTheVolumesThenFoldersAndGoesBackUp )
 
    browser.open( storage.filePath( QStringLiteral( "nowhere" ) ) );
    EXPECT_TRUE( browser.atRoots() );
+}
+
+TEST( GameEditController, TracksTypedValuesAndSavesThem )
+{
+   MobileFixture fixture;
+   auto& edit = fixture.edit;
+   fixture.games.select( 2 );  // "Vanished", the last row
+
+   EXPECT_EQ( edit.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Vanished" ) );
+   EXPECT_EQ( edit.values().value( QStringLiteral( "romPath" ) ).toString(), QStringLiteral( "./Vanished.zip" ) );
+   EXPECT_FALSE( edit.isDirty() );
+
+   edit.setField( QStringLiteral( "name" ), QStringLiteral( "Renamed" ) );
+   edit.setField( QStringLiteral( "favorite" ), 1 );
+   edit.setField( QStringLiteral( "nonsense" ), 1 );
+   EXPECT_TRUE( edit.isDirty() );
+   edit.revert();
+   EXPECT_FALSE( edit.isDirty() );
+   EXPECT_EQ( edit.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Vanished" ) );
+
+   edit.setField( QStringLiteral( "name" ), QStringLiteral( "Renamed" ) );
+   edit.setField( QStringLiteral( "favorite" ), 1 );
+   ASSERT_TRUE( edit.save() );
+   EXPECT_FALSE( edit.isDirty() );
+
+   const Gamelist again = reload( fixture );
+   EXPECT_EQ( again.at( 2 ).name, QStringLiteral( "Renamed" ) );
+   EXPECT_EQ( again.at( 2 ).favorite, 1 );
+   fixture.games.setSearch( QStringLiteral( "renamed" ) );
+   EXPECT_EQ( qobject_cast<QAbstractItemModel*>( fixture.games.model() )->rowCount(), 1 );
+}
+
+TEST( GameEditController, KeepsTheTypedValuesWhenTheSaveFails )
+{
+   MobileFixture fixture;
+   fixture.games.select( 2 );
+   breakSave( fixture, *fixture.library.gamelist() );
+
+   fixture.edit.setField( QStringLiteral( "name" ), QStringLiteral( "Renamed" ) );
+   EXPECT_FALSE( fixture.edit.save() );
+   EXPECT_FALSE( fixture.edit.error().isEmpty() );
+   EXPECT_TRUE( fixture.edit.isDirty() );
+   EXPECT_EQ( fixture.edit.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Renamed" ) );
+}
+
+TEST( GameEditController, RemovesMediaWithoutLosingTypedValues )
+{
+   MobileFixture fixture;
+   auto& edit = fixture.edit;
+   fixture.games.select( 0 );  // the first Sonic, which has a picture and a video
+   ASSERT_FALSE( edit.imageSource().isEmpty() );
+   ASSERT_TRUE( edit.hasVideo() );
+
+   edit.setField( QStringLiteral( "genre" ), QStringLiteral( "Racing" ) );
+   EXPECT_TRUE( edit.removeImage() );
+   EXPECT_TRUE( edit.removeVideo() );
+   EXPECT_TRUE( edit.imageSource().isEmpty() );
+   EXPECT_FALSE( edit.hasVideo() );
+   EXPECT_TRUE( edit.isDirty() );
+
+   fixture.library.selectSystem( fixture.library.current() );
+   EXPECT_TRUE( edit.values().isEmpty() );
 }
 
 }  // namespace

@@ -5,8 +5,8 @@ import QtQuick.Layouts
 Page {
    id: page
 
-   Component.onCompleted: grant.forceActiveFocus()
-   onVisibleChanged: if ( visible ) grant.forceActiveFocus()
+   Component.onCompleted: grant.forceActiveFocus( Qt.TabFocusReason )
+   onVisibleChanged: if ( visible ) grant.forceActiveFocus( Qt.TabFocusReason )
 
    header: ToolBar {
       Label {

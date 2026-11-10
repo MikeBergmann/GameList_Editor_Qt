@@ -42,6 +42,8 @@ public:
    Q_INVOKABLE int sourceRow( int aProxyRow ) const;
    // Makes the row the selected game; the "same as" categories follow it.
    Q_INVOKABLE void select( int aProxyRow );
+   // The games changed under the list (an edit can rename a row or move it out of the filter).
+   void refresh() { FModel.refresh(); }
 
 signals:
    void filterChanged();

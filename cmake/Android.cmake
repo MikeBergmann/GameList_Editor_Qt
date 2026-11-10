@@ -9,6 +9,9 @@ qt_add_qml_module( gle_smoke
    URI GleMobile
    VERSION 1.0
    QML_FILES
+      src/mobile/qml/AskDialog.qml
+      src/mobile/qml/EditPage.qml
+      src/mobile/qml/FieldDialog.qml
       src/mobile/qml/FileBrowserPage.qml
       src/mobile/qml/GamesPage.qml
       src/mobile/qml/Main.qml

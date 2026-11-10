@@ -4,7 +4,10 @@ import QtQuick.Layouts
 
 Page {
    id: page
+   readonly property bool wide: width > height
    StackView.onActivated: list.forceActiveFocus()
+
+   Component { id: editPage; EditPage {} }
 
    header: ToolBar {
       RowLayout {
@@ -33,63 +36,91 @@ Page {
       }
    }
 
-   ColumnLayout {
+   // Portrait stacks filters, list and count; landscape puts the filters left of a full-height list.
+   Item {
+      id: body
       anchors.fill: parent
       anchors.margins: 8
-      spacing: 4
 
-      // Click focus only: the D-pad must not land here, the soft keyboard would cover the list.
-      TextField {
-         id: searchField
-         Layout.fillWidth: true
-         focusPolicy: Qt.ClickFocus
-         placeholderText: "Search"
-         text: games.search
-         onTextEdited: games.search = text
-         KeyNavigation.down: categoryBox
-      }
+      ColumnLayout {
+         id: filters
+         width: page.wide ? body.width / 3 : body.width
+         spacing: 4
 
-      ComboBox {
-         id: categoryBox
-         Layout.fillWidth: true
-         model: games.categoryNames
-         currentIndex: games.category
-         onActivated: ( aIndex ) => games.category = aIndex
-         KeyNavigation.up: searchBtn
-         KeyNavigation.down: romCheck
-      }
-
-      RowLayout {
-         Layout.fillWidth: true
-
-         CheckBox {
-            id: romCheck
-            text: "List by ROM"
-            checked: games.listByRom
-            onToggled: games.listByRom = checked
-            KeyNavigation.up: categoryBox
-            KeyNavigation.down: list
-            KeyNavigation.right: fullCheck
+         // Click focus only: the D-pad must not land here, the soft keyboard would cover the list.
+         TextField {
+            id: searchField
+            Layout.fillWidth: true
+            focusPolicy: Qt.ClickFocus
+            placeholderText: "Search"
+            text: games.search
+            onTextEdited: games.search = text
+            KeyNavigation.down: categoryBox
          }
-         CheckBox {
-            id: fullCheck
-            text: "Full ROM name"
-            enabled: games.listByRom
-            checked: games.fullRomName
-            onToggled: games.fullRomName = checked
-            KeyNavigation.up: categoryBox
-            KeyNavigation.down: list
-            KeyNavigation.left: romCheck
+
+         ComboBox {
+            id: categoryBox
+            Layout.fillWidth: true
+            model: games.categoryNames
+            currentIndex: games.category
+            onActivated: ( aIndex ) => games.category = aIndex
+            KeyNavigation.right: page.wide ? list : null
+
+            // A on the pad is Enter, which a stock ItemDelegate ignores.
+            delegate: ItemDelegate {
+               required property string modelData
+               required property int index
+               width: categoryBox.width
+               text: modelData
+               highlighted: categoryBox.highlightedIndex === index
+               Keys.onReturnPressed: click()
+               Keys.onEnterPressed: click()
+            }
+            // Closed, the combo would eat Up/Down and step through the categories; open, it needs them.
+            Keys.onReturnPressed: popup.open()
+            Keys.onEnterPressed: popup.open()
+            Keys.onUpPressed: ( aEvent ) => { if ( popup.visible ) aEvent.accepted = false; else searchBtn.forceActiveFocus( Qt.TabFocusReason ) }
+            Keys.onDownPressed: ( aEvent ) => { if ( popup.visible ) aEvent.accepted = false; else romCheck.forceActiveFocus( Qt.TabFocusReason ) }
+         }
+
+         GridLayout {
+            Layout.fillWidth: true
+            columns: page.wide ? 1 : 2
+            rowSpacing: 0
+
+            CheckBox {
+               id: romCheck
+               text: "List by ROM"
+               checked: games.listByRom
+               onToggled: games.listByRom = checked
+               KeyNavigation.up: categoryBox
+               KeyNavigation.down: page.wide ? fullCheck : list
+               KeyNavigation.right: page.wide ? list : fullCheck
+            }
+            CheckBox {
+               id: fullCheck
+               text: "Full ROM name"
+               enabled: games.listByRom
+               checked: games.fullRomName
+               onToggled: games.fullRomName = checked
+               KeyNavigation.up: page.wide ? romCheck : categoryBox
+               KeyNavigation.down: list
+               KeyNavigation.left: page.wide ? null : romCheck
+               KeyNavigation.right: page.wide ? list : null
+            }
          }
       }
 
       ListView {
          id: list
-         Layout.fillWidth: true
-         Layout.fillHeight: true
+         x: page.wide ? filters.width + 8 : 0
+         y: page.wide ? 0 : filters.height + 4
+         width: body.width - x
+         height: page.wide ? body.height : body.height - y - countLabel.height - 4
          clip: true
          model: games.model
-         KeyNavigation.up: romCheck
+         KeyNavigation.up: page.wide ? searchBtn : romCheck
+         KeyNavigation.left: page.wide ? categoryBox : null
 
          delegate: ItemDelegate {
             width: ListView.view.width
@@ -98,12 +129,15 @@ Page {
             onClicked: {
                list.currentIndex = index
                games.select( index )
+               page.StackView.view.push( editPage )
             }
          }
       }
 
       Label {
-         Layout.fillWidth: true
+         id: countLabel
+         y: body.height - height
+         width: page.wide ? filters.width : body.width
          text: games.countText
       }
    }

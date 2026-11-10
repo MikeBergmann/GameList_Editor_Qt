@@ -6,15 +6,24 @@ Page {
    id: page
 
    function focusStart() {
-      ( library.systems.length > 0 ? list : chooseBtn ).forceActiveFocus()
+      if ( list.activeFocus || chooseBtn.activeFocus || page.StackView.status !== StackView.Active )
+         return
+      ( library.systems.length > 0 ? list : chooseBtn ).forceActiveFocus( Qt.TabFocusReason )
    }
 
    StackView.onActivated: focusStart()
 
+   // At startup the page is built before the window is shown or active, and focus set then is lost.
+   Window.onWindowChanged: Qt.callLater( focusStart )
+   Connections {
+      target: page.Window.window
+      function onActiveChanged() { if ( page.Window.window.active ) focusStart() }
+   }
+
    Component.onCompleted: {
       if ( library.lastFolder )
          library.openRoot( library.lastFolder )
-      focusStart()
+      Qt.callLater( focusStart )
    }
 
    Component { id: browserPage; FileBrowserPage {} }
