@@ -5,6 +5,9 @@
 #include "GameEditController.h"
 #include "GamesController.h"
 #include "LibraryController.h"
+#include "ScrapeController.h"
+#include "ScrapeImageProvider.h"
+#include "SettingsController.h"
 
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -24,14 +27,19 @@ int main( int argc, char** argv )
    LibraryController library;
    GamesController games( &library );
    GameEditController edit( &library, &games );
+   ScrapeController scrape( &library, &games );
+   SettingsController settings;
    FileBrowserController browser;
    AndroidStorage storage;
 
    QQmlApplicationEngine engine;
+   engine.addImageProvider( QStringLiteral( "scrape" ), new ScrapeImageProvider( &scrape ) );
    QQmlContext* context = engine.rootContext();
    context->setContextProperty( QStringLiteral( "library" ), &library );
    context->setContextProperty( QStringLiteral( "games" ), &games );
    context->setContextProperty( QStringLiteral( "edit" ), &edit );
+   context->setContextProperty( QStringLiteral( "scrape" ), &scrape );
+   context->setContextProperty( QStringLiteral( "settings" ), &settings );
    context->setContextProperty( QStringLiteral( "browser" ), &browser );
    context->setContextProperty( QStringLiteral( "storage" ), &storage );
    QObject::connect( &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

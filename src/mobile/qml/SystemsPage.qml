@@ -28,12 +28,21 @@ Page {
 
    Component { id: browserPage; FileBrowserPage {} }
    Component { id: gamesPage; GamesPage {} }
+   Component { id: settingsPage; SettingsPage {} }
 
    header: ToolBar {
       Label {
          anchors.centerIn: parent
          text: "GameList Editor"
          font.pixelSize: 20
+      }
+      ToolButton {
+         id: settingsBtn
+         anchors.right: parent.right
+         anchors.verticalCenter: parent.verticalCenter
+         text: "Settings"
+         onClicked: page.StackView.view.push( settingsPage )
+         KeyNavigation.down: chooseBtn
       }
    }
 
@@ -54,6 +63,7 @@ Page {
             id: chooseBtn
             text: "Choose folder"
             onClicked: page.StackView.view.push( browserPage )
+            KeyNavigation.up: settingsBtn
             KeyNavigation.down: list
          }
       }

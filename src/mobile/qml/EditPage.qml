@@ -64,6 +64,8 @@ Page {
       onClosed: list.forceActiveFocus()
    }
 
+   Component { id: scrapePage; ScrapePage {} }
+
    AskDialog {
       id: deleteDialog
       property string what
@@ -102,7 +104,7 @@ Page {
             id: backBtn
             text: "Back"
             onClicked: page.requestClose()
-            KeyNavigation.right: saveBtn
+            KeyNavigation.right: scrapeBtn
             KeyNavigation.down: list
          }
          Label {
@@ -111,12 +113,22 @@ Page {
             font.pixelSize: 20
             elide: Text.ElideRight
          }
+         // Limitation: a scrape save reloads the fields, so typed edits are saved or reverted first.
+         ToolButton {
+            id: scrapeBtn
+            text: "Scrape"
+            enabled: !edit.dirty && scrape.canScrape
+            onClicked: page.StackView.view.push( scrapePage )
+            KeyNavigation.left: backBtn
+            KeyNavigation.right: saveBtn
+            KeyNavigation.down: list
+         }
          ToolButton {
             id: saveBtn
             text: "Save"
             enabled: edit.dirty
             onClicked: edit.save()
-            KeyNavigation.left: backBtn
+            KeyNavigation.left: scrapeBtn
             KeyNavigation.down: list
          }
       }

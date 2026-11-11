@@ -6,8 +6,14 @@
 #include "GamesController.h"
 #include "LibraryController.h"
 #include "QtPrinters.h"
+#include "ScrapeController.h"
+#include "SettingsController.h"
 
 #include <gtest/gtest.h>
+
+#include <QCoreApplication>
+#include <QImage>
+#include <QSettings>
 
 namespace {
 
@@ -222,6 +228,231 @@ TEST( GameEditController, RemovesMediaWithoutLosingTypedValues )
 
    fixture.library.selectSystem( fixture.library.current() );
    EXPECT_TRUE( edit.values().isEmpty() );
+}
+
+TEST( SettingsController, WritesEveryChangeToQSettingsAndNormalisesThem )
+{
+   SettingsController settings;
+   int changes = 0;
+   QObject::connect( &settings, &SettingsController::valuesChanged, [&] { ++changes; } );
+
+   settings.setValue( QStringLiteral( "ssUser" ), QStringLiteral( "mike" ) );
+   settings.setValue( QStringLiteral( "proxyUse" ), true );
+   settings.setValue( QStringLiteral( "proxyPort" ), QStringLiteral( "99999" ) );
+   settings.setValue( QStringLiteral( "language" ), 99 );
+   settings.setValue( QStringLiteral( "nonsense" ), 1 );
+   EXPECT_EQ( changes, 4 );
+
+   const QVariantMap values = settings.values();
+   EXPECT_EQ( values.value( QStringLiteral( "ssUser" ) ).toString(), QStringLiteral( "mike" ) );
+   EXPECT_TRUE( values.value( QStringLiteral( "proxyUse" ) ).toBool() );
+   EXPECT_EQ( values.value( QStringLiteral( "proxyPort" ) ).toString(), QStringLiteral( "65535" ) );
+   EXPECT_EQ( values.value( QStringLiteral( "language" ) ).toInt(), static_cast<int>( Cst_IniLanguageDefault ) )
+      << "an out-of-range language falls back to the default";
+
+   QSettings stored;
+   stored.beginGroup( Cst_IniOptions );
+   EXPECT_EQ( stored.value( Cst_IniSSUser ).toString(), QStringLiteral( "mike" ) );
+
+   settings.setValue( QStringLiteral( "ssUser" ), QString() );
+   settings.setValue( QStringLiteral( "proxyUse" ), false );
+   settings.setValue( QStringLiteral( "proxyPort" ), QString() );
+   EXPECT_EQ( settings.values().value( QStringLiteral( "proxyPort" ) ).toString(), QString() );
+}
+
+ScrapedInfo sampleInfo()
+{
+   ScrapedInfo info;
+   info.name = QStringLiteral( "Sonic the Hedgehog 2" );
+   info.genre = QStringLiteral( "Platform" );
+   info.publisher = QStringLiteral( "Sega" );
+   return info;
+}
+
+QImage redSquare()
+{
+   QImage image( 4, 4, QImage::Format_RGB32 );
+   image.fill( Qt::red );
+   return image;
+}
+
+// The write is deferred one event-loop turn; the signal count says whether it succeeded.
+int saveAndCount( ScrapeController& aScrape )
+{
+   int saved = 0;
+   QObject::connect( &aScrape, &ScrapeController::saved, [&] { ++saved; } );
+   aScrape.save();
+   QCoreApplication::processEvents();
+   return saved;
+}
+
+TEST( ScrapeController, OnlyAGameWithItsRomCanBeScraped )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   EXPECT_FALSE( scrape.canScrape() );
+
+   fixture.games.select( 0 );
+   EXPECT_TRUE( scrape.canScrape() );
+
+   fixture.games.select( 2 );  // Vanished.zip: nothing to hash
+   EXPECT_FALSE( scrape.canScrape() );
+   scrape.scrape();
+   EXPECT_FALSE( scrape.isBusy() );
+}
+
+TEST( ScrapeController, ASuccessfulReplyFillsTheFieldsAndArmsSaveWhenTheMediaIsDone )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+
+   // No pictures: the empty batch ends at once, inside the gameInfoReady handler.
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   EXPECT_EQ( scrape.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Sonic the Hedgehog 2" ) );
+   EXPECT_TRUE( scrape.hasResult() );
+   EXPECT_TRUE( scrape.canSave() );
+
+   scrape.setSaveInfos( false );
+   EXPECT_FALSE( scrape.canSave() );
+
+   scrape.setSavePicture( true );
+   EXPECT_FALSE( scrape.savePicture() ) << "no picture is selected yet";
+   scrape.setSaveVideo( true );
+   EXPECT_FALSE( scrape.saveVideo() ) << "the reply offered no video";
+
+   emit scrape.scraper().mediaReady( 0, redSquare() );
+   EXPECT_EQ( scrape.pictureCount(), 1 );
+   EXPECT_EQ( scrape.selectedPicture(), -1 );
+   scrape.selectPicture( 5 );
+   EXPECT_EQ( scrape.selectedPicture(), -1 );
+   scrape.selectPicture( 0 );
+   EXPECT_TRUE( scrape.savePicture() );
+   EXPECT_TRUE( scrape.canSave() );
+}
+
+TEST( ScrapeController, SaveWritesTheEditedFieldsAndTheSelectedPicture )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   emit scrape.scraper().mediaReady( 0, redSquare() );
+   scrape.selectPicture( 0 );
+   scrape.setField( QStringLiteral( "genre" ), QStringLiteral( "Racing" ) );
+
+   EXPECT_EQ( saveAndCount( scrape ), 1 );
+   EXPECT_FALSE( scrape.isBusy() );
+   EXPECT_TRUE( scrape.error().isEmpty() );
+
+   const Gamelist again = reload( fixture );
+   EXPECT_EQ( again.at( 0 ).name, QStringLiteral( "Sonic the Hedgehog 2" ) );
+   EXPECT_EQ( again.at( 0 ).genre, QStringLiteral( "Racing" ) );
+   EXPECT_EQ( QImage( again.at( 0 ).physicalImagePath ).size(), QSize( 4, 4 ) );
+}
+
+TEST( ScrapeController, UntickedPartsAreLeftAlone )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   emit scrape.scraper().mediaReady( 0, redSquare() );
+   scrape.setSaveInfos( false );
+   scrape.selectPicture( 0 );
+   scrape.setSavePicture( false );
+   EXPECT_FALSE( scrape.canSave() );
+
+   EXPECT_EQ( saveAndCount( scrape ), 0 );
+   EXPECT_EQ( reload( fixture ).at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+}
+
+TEST( ScrapeController, AFailedSaveKeepsTheResultAndReportsTheError )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   breakSave( fixture, *fixture.library.gamelist() );
+
+   EXPECT_EQ( saveAndCount( scrape ), 0 );
+   EXPECT_FALSE( scrape.error().isEmpty() );
+   EXPECT_TRUE( scrape.hasResult() );
+   EXPECT_FALSE( scrape.isBusy() );
+   EXPECT_EQ( fixture.library.gamelist()->at( 0 ).name, QStringLiteral( "Sonic The Hedgehog" ) );
+}
+
+TEST( ScrapeController, AFailureReportsItsMessageAndAnotherGameStartsClean )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   emit scrape.scraper().gameInfoFailed( QStringLiteral( "Server busy" ) );
+   EXPECT_EQ( scrape.error(), QStringLiteral( "Server busy" ) );
+   EXPECT_FALSE( scrape.isBusy() );
+
+   const int before = scrape.generation();
+   fixture.games.select( 1 );
+   EXPECT_FALSE( scrape.hasResult() );
+   EXPECT_TRUE( scrape.error().isEmpty() );
+   EXPECT_EQ( scrape.pictureCount(), 0 );
+   EXPECT_NE( scrape.generation(), before );
+}
+
+TEST( ScrapeController, GameNotFoundGoesToANameSearch )
+{
+   if ( devCredentialsConfigured() )
+      GTEST_SKIP() << "would query the real server";
+
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+
+   // Without credentials the search fails on the spot, which shows the search was attempted.
+   emit scrape.scraper().gameInfoFailed( QString( Cst_GameNotFound ) );
+   EXPECT_NE( scrape.error(), QString( Cst_GameNotFound ) );
+   EXPECT_EQ( scrape.searchText(), QStringLiteral( "Sonic The Hedgehog" ) );
+   EXPECT_FALSE( scrape.isPicking() );
+}
+
+TEST( ScrapeController, ASearchReplyNobodyAskedForIsIgnored )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+
+   emit scrape.scraper().searchReady( { ScrapeCandidate{ QStringLiteral( "Sonic" ), {}, {} } } );
+   EXPECT_FALSE( scrape.isPicking() );
+   EXPECT_TRUE( scrape.candidates().isEmpty() );
+}
+
+TEST( ScrapeController, AManualCrcSkipsTheHashingAndAsksAtOnce )
+{
+   if ( devCredentialsConfigured() )
+      GTEST_SKIP() << "would query the real server";
+
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   fixture.games.select( 0 );
+   scrape.setManualCrc( QStringLiteral( " DEADBEEF " ) );
+   EXPECT_EQ( scrape.manualCrc(), QStringLiteral( "DEADBEEF" ) );
+
+   scrape.scrape();
+   EXPECT_FALSE( scrape.isBusy() ) << "the missing credentials fail the request immediately";
+   EXPECT_FALSE( scrape.error().isEmpty() );
+}
+
+TEST( ScrapeController, MediaChoicesFeedTheRequestByKey )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   EXPECT_TRUE( scrape.media().value( QStringLiteral( "video" ) ).toBool() );
+
+   scrape.setMedia( QStringLiteral( "wheel" ), false );
+   scrape.setMedia( QStringLiteral( "nonsense" ), true );
+   EXPECT_FALSE( scrape.media().value( QStringLiteral( "wheel" ) ).toBool() );
+   EXPECT_FALSE( scrape.media().contains( QStringLiteral( "nonsense" ) ) );
 }
 
 }  // namespace

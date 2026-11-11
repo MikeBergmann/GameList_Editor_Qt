@@ -3,7 +3,8 @@
 
 qt_policy( SET QTP0001 NEW )
 qt_policy( SET QTP0002 NEW )
-qt_add_executable( gle_smoke src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp Resources/assets.qrc )
+qt_add_executable( gle_smoke src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp
+   src/mobile/ScrapeImageProvider.cpp Resources/assets.qrc )
 target_link_libraries( gle_smoke PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 )
 qt_add_qml_module( gle_smoke
    URI GleMobile
@@ -16,6 +17,8 @@ qt_add_qml_module( gle_smoke
       src/mobile/qml/GamesPage.qml
       src/mobile/qml/Main.qml
       src/mobile/qml/PermissionPage.qml
+      src/mobile/qml/ScrapePage.qml
+      src/mobile/qml/SettingsPage.qml
       src/mobile/qml/SystemsPage.qml
 )
 

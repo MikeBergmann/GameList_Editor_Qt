@@ -138,9 +138,11 @@ add_library( gle_mobile_controllers STATIC
    src/mobile/controllers/GameEditController.cpp
    src/mobile/controllers/GamesController.cpp
    src/mobile/controllers/LibraryController.cpp
+   src/mobile/controllers/ScrapeController.cpp
+   src/mobile/controllers/SettingsController.cpp
 )
 target_include_directories( gle_mobile_controllers PUBLIC src/mobile/controllers )
-target_link_libraries( gle_mobile_controllers PUBLIC Qt6::Core Qt6::Gui gle_core )
+target_link_libraries( gle_mobile_controllers PUBLIC Qt6::Core Qt6::Gui gle_core gle_scraper )
 
 if( ANDROID )
    include( cmake/Android.cmake )
