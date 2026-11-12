@@ -7,6 +7,15 @@ Page {
    readonly property bool wide: width > height
    StackView.onActivated: list.forceActiveFocus()
 
+   // The edit page can move to another game; the highlighted row follows.
+   Connections {
+      target: games
+      function onCurrentChanged() {
+         list.currentIndex = games.currentRow()
+         list.positionViewAtIndex( list.currentIndex, ListView.Contain )
+      }
+   }
+
    Component { id: editPage; EditPage {} }
 
    header: ToolBar {

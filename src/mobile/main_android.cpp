@@ -30,6 +30,7 @@ int main( int argc, char** argv )
    ScrapeController scrape( &library, &games );
    SettingsController settings;
    FileBrowserController browser;
+   browser.setVolumeSource( &AndroidStorage::externalVolumes );
    AndroidStorage storage;
 
    QQmlApplicationEngine engine;

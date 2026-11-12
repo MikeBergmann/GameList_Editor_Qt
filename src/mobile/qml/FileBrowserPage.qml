@@ -5,8 +5,14 @@ import QtQuick.Layouts
 Page {
    id: page
 
+   // File mode: a suffix list (without dots) makes files pickable and hides "Select this folder".
+   property var suffixes: []
+   readonly property bool fileMode: suffixes.length > 0
+   signal picked( string aPath )
+
    Component.onCompleted: {
-      browser.open( library.rootPath )
+      browser.setSuffixes( suffixes )
+      browser.open( fileMode && browser.path !== "" ? browser.path : library.rootPath )
       list.forceActiveFocus()
    }
    StackView.onActivated: list.forceActiveFocus()
@@ -50,24 +56,30 @@ Page {
 
       delegate: ItemDelegate {
          width: ListView.view.width
-         text: modelData.name
+         text: page.fileMode && modelData.isDir ? modelData.name + "/" : modelData.name
          highlighted: ListView.isCurrentItem
          onClicked: {
             list.currentIndex = index
-            browser.open( modelData.path )
+            if ( modelData.isDir ) {
+               browser.open( modelData.path )
+            } else {
+               page.picked( modelData.path )
+               page.StackView.view.pop()
+            }
          }
       }
 
       Label {
          anchors.centerIn: parent
          visible: list.count === 0
-         text: "No subfolders"
+         text: page.fileMode ? "No folders or matching files" : "No subfolders"
       }
    }
 
    footer: Button {
       id: selectBtn
       text: "Select this folder"
+      visible: !page.fileMode
       enabled: !browser.atRoots
       onClicked: {
          library.openRoot( browser.path )

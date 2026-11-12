@@ -12,8 +12,11 @@
 #include <gtest/gtest.h>
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QEventLoop>
 #include <QImage>
 #include <QSettings>
+#include <QTimer>
 
 namespace {
 
@@ -100,6 +103,30 @@ TEST( GamesController, FiltersAndCountsLikeTheDesktopList )
    EXPECT_EQ( fixture.games.category(), static_cast<int>( FilterCategory::Favorite ) );
 }
 
+TEST( GamesController, StepsToTheNeighbourInTheFilteredListAndStopsAtTheEnds )
+{
+   MobileFixture fixture;
+   auto& games = fixture.games;
+   EXPECT_FALSE( games.step( 1 ) ) << "nothing selected";
+
+   games.select( 0 );
+   EXPECT_EQ( games.currentRow(), 0 );
+   EXPECT_FALSE( games.step( -1 ) );
+   EXPECT_TRUE( games.step( 1 ) );
+   EXPECT_EQ( games.currentRow(), 1 );
+   EXPECT_EQ( games.current(), games.sourceRow( 1 ) );
+   EXPECT_TRUE( games.step( 1 ) );
+   EXPECT_FALSE( games.step( 1 ) );
+   EXPECT_EQ( games.currentRow(), 2 );
+
+   games.setSearch( QStringLiteral( "vanish" ) );
+   EXPECT_EQ( games.currentRow(), 0 ) << "the row is in the filtered list";
+   EXPECT_FALSE( games.step( 1 ) );
+   games.setSearch( QStringLiteral( "sonic" ) );
+   EXPECT_EQ( games.currentRow(), -1 ) << "filtered out";
+   EXPECT_FALSE( games.step( 1 ) );
+}
+
 TEST( GamesController, SameAsFollowsTheSelectedGame )
 {
    MobileFixture fixture;
@@ -168,6 +195,23 @@ TEST( FileBrowserController, ListsTheVolumesThenFoldersAndGoesBackUp )
    EXPECT_TRUE( browser.atRoots() );
 }
 
+TEST( FileBrowserController, ListsAVolumeTheSystemReportsOnceEvenWhenStorageCannotBeListed )
+{
+   QTemporaryDir storage;
+   QTemporaryDir card;
+   ASSERT_TRUE( QDir().mkpath( storage.filePath( QStringLiteral( "emulated/0" ) ) ) );
+   const QString listed = storage.filePath( QStringLiteral( "1107-2E5F" ) );
+   ASSERT_TRUE( QDir().mkpath( listed ) );
+
+   FileBrowserController browser( storage.path() );
+   browser.setVolumeSource( [&] {
+      return QStringList( { card.path(), listed, storage.filePath( QStringLiteral( "gone" ) ) } );
+   } );
+   EXPECT_EQ( names( browser ),
+              QStringList( { QStringLiteral( "Internal storage" ), QStringLiteral( "1107-2E5F" ),
+                             QFileInfo( card.path() ).fileName() } ) );
+}
+
 TEST( GameEditController, TracksTypedValuesAndSavesThem )
 {
    MobileFixture fixture;
@@ -209,6 +253,87 @@ TEST( GameEditController, KeepsTheTypedValuesWhenTheSaveFails )
    EXPECT_FALSE( fixture.edit.error().isEmpty() );
    EXPECT_TRUE( fixture.edit.isDirty() );
    EXPECT_EQ( fixture.edit.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Renamed" ) );
+}
+
+TEST( FileBrowserController, ListsFilesWithTheChosenSuffixesAfterTheFolders )
+{
+   QTemporaryDir storage;
+   const QString internal = storage.filePath( QStringLiteral( "emulated/0" ) );
+   ASSERT_TRUE( QDir().mkpath( internal + QStringLiteral( "/Pics" ) ) );
+   writeFile( internal + QStringLiteral( "/b.PNG" ), "x" );
+   writeFile( internal + QStringLiteral( "/a.jpg" ), "x" );
+   writeFile( internal + QStringLiteral( "/notes.txt" ), "x" );
+
+   FileBrowserController browser( storage.path() );
+   browser.open( internal );
+   EXPECT_EQ( names( browser ), QStringList( QStringLiteral( "Pics" ) ) );
+
+   browser.setSuffixes( { QStringLiteral( "png" ), QStringLiteral( "jpg" ) } );
+   EXPECT_EQ( browser.path(), internal );
+   EXPECT_EQ( names( browser ), QStringList( { QStringLiteral( "Pics" ), QStringLiteral( "a.jpg" ), QStringLiteral( "b.PNG" ) } ) );
+   EXPECT_FALSE( browser.entries().at( 1 ).toMap().value( QStringLiteral( "isDir" ) ).toBool() );
+}
+
+TEST( GameEditController, ChangesMediaWithoutLosingTypedValues )
+{
+   MobileFixture fixture;
+   auto& edit = fixture.edit;
+   fixture.games.select( 2 );  // Vanished: no media yet
+   ASSERT_TRUE( edit.imageSource().isEmpty() );
+   ASSERT_FALSE( edit.hasVideo() );
+
+   const QString picture = fixture.dir.filePath( QStringLiteral( "new.png" ) );
+   QImage image( 4, 4, QImage::Format_RGB32 );
+   image.fill( Qt::blue );
+   ASSERT_TRUE( image.save( picture ) );
+   const QString video = fixture.dir.filePath( QStringLiteral( "new.mp4" ) );
+   writeFile( video, "mp4" );
+
+   edit.setField( QStringLiteral( "genre" ), QStringLiteral( "Racing" ) );
+   ASSERT_TRUE( edit.changeImage( picture ) ) << edit.error().toStdString();
+   ASSERT_TRUE( edit.changeVideo( video ) ) << edit.error().toStdString();
+   EXPECT_FALSE( edit.imageSource().isEmpty() );
+   EXPECT_TRUE( edit.hasVideo() );
+   EXPECT_TRUE( edit.isDirty() );
+
+   const Gamelist again = reload( fixture );
+   EXPECT_FALSE( again.at( 2 ).missingImage );
+   EXPECT_FALSE( again.at( 2 ).missingVideo );
+
+   const QString before = edit.imageSource();
+   ASSERT_TRUE( edit.changeImage( picture ) );
+   EXPECT_NE( edit.imageSource(), before ) << "same path must still reload in the Image";
+
+   EXPECT_FALSE( edit.changeImage( fixture.dir.filePath( QStringLiteral( "missing.png" ) ) ) );
+   EXPECT_FALSE( edit.error().isEmpty() );
+}
+
+TEST( GameEditController, ShowsTheDetailsAndHashesTheRomOffTheUiThread )
+{
+   MobileFixture fixture;
+   auto& edit = fixture.edit;
+
+   fixture.games.select( 2 );  // Vanished.zip is not on disk
+   EXPECT_TRUE( edit.info().value( QStringLiteral( "rom" ) ).toString().endsWith( QStringLiteral( " (missing)" ) ) );
+   edit.computeHashes();
+   EXPECT_FALSE( edit.isHashing() ) << "nothing to hash";
+
+   fixture.games.select( 0 );
+   EXPECT_TRUE( edit.info().value( QStringLiteral( "gamelist" ) ).toString().endsWith( QStringLiteral( "gamelist.xml" ) ) );
+   ASSERT_TRUE( edit.info().value( QStringLiteral( "md5" ) ).toString().isEmpty() );
+
+   QEventLoop loop;
+   QTimer::singleShot( 10000, &loop, &QEventLoop::quit );
+   QObject::connect( &edit, &GameEditController::infoChanged, &loop, [&] { if ( !edit.isHashing() ) loop.quit(); } );
+   edit.computeHashes();
+   EXPECT_TRUE( edit.isHashing() );
+   loop.exec();
+
+   ASSERT_FALSE( edit.isHashing() );
+   const QString md5 = QString::fromLatin1( QCryptographicHash::hash( "rom", QCryptographicHash::Md5 ).toHex().toUpper() );
+   EXPECT_EQ( edit.info().value( QStringLiteral( "md5" ) ).toString(), md5 );
+   EXPECT_FALSE( edit.info().value( QStringLiteral( "crc32" ) ).toString().isEmpty() );
+   EXPECT_FALSE( edit.info().value( QStringLiteral( "sha1" ) ).toString().isEmpty() );
 }
 
 TEST( GameEditController, RemovesMediaWithoutLosingTypedValues )

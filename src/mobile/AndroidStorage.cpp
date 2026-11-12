@@ -25,6 +25,29 @@ void AndroidStorage::refresh()
    emit hasAccessChanged();
 }
 
+QStringList AndroidStorage::externalVolumes()
+{
+   QStringList result;
+   const QJniObject context = QNativeInterface::QAndroidApplication::context();
+   const QJniObject manager = context.callObjectMethod(
+      "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;",
+      QJniObject::fromString( QStringLiteral( "storage" ) ).object<jstring>() );
+   const QJniObject volumes = manager.callObjectMethod( "getStorageVolumes", "()Ljava/util/List;" );
+   const jint count = volumes.isValid() ? volumes.callMethod<jint>( "size" ) : 0;
+   for ( jint i = 0; i < count; ++i ) {
+      const QJniObject volume = volumes.callObjectMethod( "get", "(I)Ljava/lang/Object;", i );
+      if ( volume.callMethod<jboolean>( "isPrimary" ) )
+         continue;
+      // Limitation: StorageVolume.getDirectory needs API 30; older devices get no extra volumes.
+      const QJniObject dir = volume.callObjectMethod( "getDirectory", "()Ljava/io/File;" );
+      if ( dir.isValid() )
+         result.append( dir.callObjectMethod<jstring>( "getAbsolutePath" ).toString() );
+   }
+
+   QJniEnvironment().checkAndClearExceptions();
+   return result;
+}
+
 void AndroidStorage::request()
 {
    const QJniObject context = QNativeInterface::QAndroidApplication::context();

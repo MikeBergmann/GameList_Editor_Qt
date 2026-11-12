@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QStringList>
 
 // All-files access: the one permission the app cannot work without (Android.md, Phase 2).
 class AndroidStorage : public QObject
@@ -15,6 +16,9 @@ public:
 
    // Opens the system page for this app; hasAccess follows when the user comes back.
    Q_INVOKABLE void request();
+
+   // Roots of the mounted non-primary volumes (SD card, USB drive), e.g. /storage/1107-2E5F.
+   static QStringList externalVolumes();
 
 signals:
    void hasAccessChanged();

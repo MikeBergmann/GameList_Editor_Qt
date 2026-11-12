@@ -21,11 +21,15 @@ Page {
       { key: "kidGame", label: "Kid game", type: "flag" },
       { key: "hidden", label: "Hidden", type: "flag" },
       { key: "favorite", label: "Favorite", type: "flag" },
+      { key: "", label: "Change picture", type: "changeImage" },
+      { key: "", label: "Change video", type: "changeVideo" },
       { key: "", label: "Remove picture", type: "removeImage" },
-      { key: "", label: "Remove video", type: "removeVideo" }
+      { key: "", label: "Remove video", type: "removeVideo" },
+      { key: "", label: "More info", type: "moreInfo" }
    ]
 
    function requestClose() {
+      leaveDialog.pendingStep = 0
       if ( edit.dirty )
          leaveDialog.open()
       else
@@ -34,17 +38,43 @@ Page {
 
    // Dirty edits ask first; otherwise the window's handler pops the page.
    function guardClose( aEvent ) {
-      if ( edit.dirty )
+      if ( edit.dirty ) {
+         leaveDialog.pendingStep = 0
          leaveDialog.open()
-      else
+      } else {
          aEvent.accepted = false
+      }
    }
    Keys.onEscapePressed: ( aEvent ) => guardClose( aEvent )
    Keys.onBackPressed: ( aEvent ) => guardClose( aEvent )
 
+   // Previous / next game of the filtered list. Unsaved edits ask first, as when leaving.
+   function goTo( aDelta ) {
+      if ( edit.dirty ) {
+         leaveDialog.pendingStep = aDelta
+         leaveDialog.open()
+      } else {
+         games.step( aDelta )
+      }
+   }
+   // L1 / R1; the D-pad does the same in the field list, where Left / Right are free.
+   Keys.onPressed: ( aEvent ) => {
+      if ( aEvent.key === Qt.Key_PageUp || aEvent.key === Qt.Key_PageDown ) {
+         aEvent.accepted = true
+         page.goTo( aEvent.key === Qt.Key_PageUp ? -1 : 1 )
+      }
+   }
+
    function activateRow( aRow ) {
       if ( aRow.type === "flag" ) {
          edit.setField( aRow.key, edit.values[ aRow.key ] ? 0 : 1 )
+      } else if ( aRow.type === "moreInfo" ) {
+         infoDialog.open()
+      } else if ( aRow.type === "changeImage" || aRow.type === "changeVideo" ) {
+         const isImage = aRow.type === "changeImage"
+         const picker = page.StackView.view.push( browserPage,
+            { suffixes: isImage ? [ "png", "jpg", "jpeg", "webp" ] : [ "mp4" ] } )
+         picker.picked.connect( ( aPath ) => isImage ? edit.changeImage( aPath ) : edit.changeVideo( aPath ) )
       } else if ( aRow.type === "removeImage" || aRow.type === "removeVideo" ) {
          deleteDialog.what = aRow.type
          deleteDialog.open()
@@ -65,6 +95,12 @@ Page {
    }
 
    Component { id: scrapePage; ScrapePage {} }
+   Component { id: browserPage; FileBrowserPage {} }
+
+   InfoDialog {
+      id: infoDialog
+      onClosed: list.forceActiveFocus()
+   }
 
    AskDialog {
       id: deleteDialog
@@ -81,18 +117,25 @@ Page {
 
    AskDialog {
       id: leaveDialog
+      // 0: leave the page; otherwise the step to take afterwards.
+      property int pendingStep: 0
       message: "Save the changes to this game?"
       choices: [ "Save", "Discard", "Cancel" ]
+      function proceed() {
+         if ( pendingStep === 0 )
+            page.StackView.view.pop()
+         else
+            games.step( pendingStep )
+      }
       onChosen: ( aChoice ) => {
          if ( aChoice === 0 ) {
             if ( edit.save() )
-               page.StackView.view.pop()
+               proceed()
          } else if ( aChoice === 1 ) {
             edit.revert()
-            page.StackView.view.pop()
-         } else {
-            list.forceActiveFocus()
+            proceed()
          }
+         list.forceActiveFocus()
       }
    }
 
@@ -204,6 +247,8 @@ Page {
             model: page.rows
             KeyNavigation.up: backBtn
             header: page.wide ? null : pictureHeader
+            Keys.onLeftPressed: page.goTo( -1 )
+            Keys.onRightPressed: page.goTo( 1 )
 
             delegate: ItemDelegate {
                id: row

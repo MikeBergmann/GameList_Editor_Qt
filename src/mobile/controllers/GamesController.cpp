@@ -92,6 +92,25 @@ void GamesController::select( int aProxyRow )
    emit currentChanged();
 }
 
+int GamesController::currentRow() const
+{
+   if ( FCurrent < 0 )
+      return -1;
+   const QModelIndex proxy = FProxy.mapFromSource( FModel.index( FCurrent, 0 ) );
+   return proxy.isValid() ? proxy.row() : -1;
+}
+
+bool GamesController::step( int aDelta )
+{
+   const int row = currentRow();
+   const int target = row + aDelta;
+   if ( row < 0 || target < 0 || target >= FProxy.rowCount() )
+      return false;
+
+   select( target );
+   return true;
+}
+
 void GamesController::apply()
 {
    FModel.setFilter( FFilter );

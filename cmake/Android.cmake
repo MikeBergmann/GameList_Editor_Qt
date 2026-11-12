@@ -3,10 +3,10 @@
 
 qt_policy( SET QTP0001 NEW )
 qt_policy( SET QTP0002 NEW )
-qt_add_executable( gle_smoke src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp
+qt_add_executable( GameListEditor src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp
    src/mobile/ScrapeImageProvider.cpp Resources/assets.qrc )
-target_link_libraries( gle_smoke PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 )
-qt_add_qml_module( gle_smoke
+target_link_libraries( GameListEditor PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 )
+qt_add_qml_module( GameListEditor
    URI GleMobile
    VERSION 1.0
    QML_FILES
@@ -15,6 +15,7 @@ qt_add_qml_module( gle_smoke
       src/mobile/qml/FieldDialog.qml
       src/mobile/qml/FileBrowserPage.qml
       src/mobile/qml/GamesPage.qml
+      src/mobile/qml/InfoDialog.qml
       src/mobile/qml/Main.qml
       src/mobile/qml/PermissionPage.qml
       src/mobile/qml/ScrapePage.qml
@@ -24,10 +25,12 @@ qt_add_qml_module( gle_smoke
 
 # Qt's TLS backend on Android is OpenSSL, and the device does not provide a usable one.
 include( "${ANDROID_SDK_ROOT}/android_openssl/android_openssl.cmake" )
-add_android_openssl_libraries( gle_smoke )
+add_android_openssl_libraries( GameListEditor )
 
-set_target_properties( gle_smoke PROPERTIES
+set_target_properties( GameListEditor PROPERTIES
    QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/android"
    QT_ANDROID_PACKAGE_NAME "de.mdb977.gamelisteditor"
    QT_ANDROID_MIN_SDK_VERSION 33
+   QT_ANDROID_APP_NAME "GameList Editor"
+   QT_ANDROID_APP_ICON "@mipmap/ic_launcher"
 )
