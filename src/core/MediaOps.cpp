@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QMimeDatabase>
 #include <QSet>
+#include <QtEndian>
 
 namespace {
 
@@ -318,3 +319,51 @@ QVector<OversizedImage> oversizedImages( const Gamelist& aList, qint64 aMaxBytes
    return found;
 }
 
+
+QString videoCodecName( const QString& aPath )
+{
+   struct Codec
+   {
+      const char* fourcc;
+      const char* name;
+   };
+   static const Codec codecs[] = { { "av01", "AV1" },  { "hvc1", "H.265" }, { "hev1", "H.265" },
+                                   { "avc1", "H.264" }, { "avc3", "H.264" }, { "vp09", "VP9" } };
+   constexpr qint64 Cst_MaxMoov = 16 * 1024 * 1024;
+
+   QFile file( aPath );
+   if ( !file.open( QIODevice::ReadOnly ) )
+      return {};
+
+   // Limitation: MP4 / MOV only, and the sample-entry name only, not profile or level.
+   while ( !file.atEnd() ) {
+      const qint64 start = file.pos();
+      const QByteArray head = file.read( 16 );
+      if ( head.size() < 8 )
+         break;
+
+      qint64 size = qFromBigEndian<quint32>( head.constData() );
+      qint64 headerLength = 8;
+      if ( size == 1 && head.size() == 16 ) {
+         size = static_cast<qint64>( qFromBigEndian<quint64>( head.constData() + 8 ) );
+         headerLength = 16;
+      } else if ( size == 0 ) {
+         size = file.size() - start;
+      }
+      if ( size < headerLength )
+         break;
+
+      if ( head.mid( 4, 4 ) == "moov" ) {
+         if ( size - headerLength > Cst_MaxMoov || !file.seek( start + headerLength ) )
+            break;
+         const QByteArray moov = file.read( size - headerLength );
+         for ( const Codec& codec : codecs )
+            if ( moov.contains( codec.fourcc ) )
+               return QString::fromLatin1( codec.name );
+         break;
+      }
+      if ( !file.seek( start + size ) )
+         break;
+   }
+   return {};
+}

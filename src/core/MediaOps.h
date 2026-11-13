@@ -37,3 +37,7 @@ Result<int> deleteOldBackups( const Gamelist& aList, int aKeep );
 
 // Linked pictures larger than aMaxBytes, each file once even when shared.
 QVector<OversizedImage> oversizedImages( const Gamelist& aList, qint64 aMaxBytes );
+
+// "AV1", "H.265", "H.264" or "VP9" for the video track of an MP4 / MOV file; empty when it is
+// another format or unreadable.
+QString videoCodecName( const QString& aPath );

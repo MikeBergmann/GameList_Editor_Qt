@@ -9,6 +9,7 @@ AGENTS.md
 Android.md
 build.sh
 build_win.btm
+build_android.btm
 dist/
 dist_setup/
 installer.iss
