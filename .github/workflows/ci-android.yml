@@ -26,23 +26,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Qt for Android cross-builds with the host Qt's tools (moc, rcc, qmlcachegen).
-      - name: Install Qt (host)
+      # Qt 6.7+ Android packages are listed under aqt's "all_os" host, which the action picks
+      # when `host` is omitted. It also installs the desktop Qt needed for moc, rcc and qmlcachegen.
+      - name: Install Qt (Android arm64-v8a + host tools)
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          host: linux
-          target: desktop
-          arch: linux_gcc_64
-          modules: qtmultimedia
-          dir: ${{ runner.temp }}
-          cache: true
-
-      - name: Install Qt (Android arm64-v8a)
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          host: linux
           target: android
           arch: android_arm64_v8a
           modules: qtmultimedia
