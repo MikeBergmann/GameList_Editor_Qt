@@ -98,7 +98,7 @@ Pitfalls:
 
 ### Android
 
-A touch and gamepad front end for phones and handhelds. It runs on a Retroid Pocket 5 (Android 13); a real-phone check is still open. It is an early version: there is no release APK and no Android CI yet, so you have to build it yourself.
+A touch and gamepad front end for phones and handhelds. It runs on a Retroid Pocket 5 (Android 13); a real-phone check is still open. It is an early version. CI only checks that it builds and keeps a debug APK as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
 
 <p>
   <img src="./Screenshot_Android_P.jpg" alt="Android, portrait: editing a game" height="600">
@@ -112,6 +112,8 @@ A touch and gamepad front end for phones and handhelds. It runs on a Retroid Poc
 - **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
 - **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
 - **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.
+- **Install:** download the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
+- **Release signing (maintainers):** build with `-DCMAKE_BUILD_TYPE=Release` and set `QT_ANDROID_KEYSTORE_PATH`, `QT_ANDROID_KEYSTORE_ALIAS`, `QT_ANDROID_KEYSTORE_STORE_PASS` and `QT_ANDROID_KEYSTORE_KEY_PASS` in the environment. The keystore stays out of the repo; lose it and nobody can update in place. The version code is `X*10000 + Y*100 + Z` of a `vX.Y.Z` tag; untagged builds get 1.
 - Stop EmulationStation (or ES-DE) first, it rewrites its gamelists on exit.
 
 ### Features to add
@@ -121,7 +123,7 @@ A touch and gamepad front end for phones and handhelds. It runs on a Retroid Poc
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
 - [ ] Sync folder ROMs (ScummVM, etc.); adding them under Add missing ROMs works
-- [ ] Android: the remaining Actions, LaunchBox, release APK and CI
+- [ ] Android: the remaining Actions and LaunchBox
 
 ## screenscraper.fr credentials
 

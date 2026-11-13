@@ -1,0 +1,66 @@
+name: CI Android
+
+# Build check only: a debug APK (debug-signed, installable) as a workflow artifact. No secrets,
+# so scraping reports "no developer credentials". Release signing is done locally.
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+  # The NDK Qt 6.8 is built against.
+  NDK_VERSION: 26.1.10909125
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history + tags, for the version from git describe
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Qt 6.7+ Android packages are listed under aqt's "all_os" host, which the action picks
+      # when `host` is omitted. It also installs the desktop Qt needed for moc, rcc and qmlcachegen.
+      - name: Install Qt (Android arm64-v8a + host tools)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: android
+          arch: android_arm64_v8a
+          modules: qtmultimedia
+          dir: ${{ runner.temp }}
+          cache: true
+
+      - name: Install NDK and android_openssl
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION"
+          # Qt's TLS backend is OpenSSL and the device has no usable one; cmake/Android.cmake
+          # includes this package from the SDK root.
+          git clone --depth 1 https://github.com/KDAB/android_openssl.git "$ANDROID_SDK_ROOT/android_openssl"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-android -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_TOOLCHAIN_FILE="$RUNNER_TEMP/Qt/$QT_VERSION/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake"
+          -DQT_HOST_PATH="$RUNNER_TEMP/Qt/$QT_VERSION/gcc_64"
+          -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          -DANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
+
+      - name: Build
+        run: |
+          cmake --build build-android
+          find build-android -name '*.apk'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameListEditor-apk
+          path: build-android/android-build/GameListEditor.apk
+          if-no-files-found: error
