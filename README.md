@@ -59,6 +59,7 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - [x] Actions → Selection: add to or remove from Favorites and Hidden, and the Advanced name editor (trim, case, prefix/suffix on every selected game)
 - [x] ES-DE folders (see below)
 - [x] Sync to another folder, ES-DE or legacy in either direction (see below)
+- [x] Android version, early (see below)
 
 ### ES-DE
 
@@ -95,6 +96,24 @@ Pitfalls:
 - Android over MTP is not a file path on Windows: use a card reader, a share, or a local copy. ES-DE on Android often keeps app data in internal storage and ROMs on the SD card; both must be reachable from the PC.
 - Screenshots, marquees, and other ES-DE media types aren't synced yet.
 
+### Android
+
+A touch and gamepad front end for phones and handhelds. It runs on a Retroid Pocket 5 (Android 13); a real-phone check is still open. It is an early version: there is no release APK and no Android CI yet, so you have to build it yourself.
+
+<p>
+  <img src="./Screenshot_Android_P.jpg" alt="Android, portrait: editing a game" height="600">
+  <img src="./Screenshot_Android_L.jpg" alt="Android, landscape: editing a game" width="600">
+</p>
+
+
+- **Same core:** it uses the same `gle_core` and `gle_scraper` as the desktop app, with a new Qt Quick (QML) front end on top. The Widgets UI is not built on Android.
+- **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr, and add missing ROMs.
+- **Not yet:** the other Actions, LaunchBox scraping, About / Help.
+- **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
+- **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
+- **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.
+- Stop EmulationStation (or ES-DE) first, it rewrites its gamelists on exit.
+
 ### Features to add
 
 - [ ] Scrape every picture type into its own ES-DE media folder
@@ -102,7 +121,7 @@ Pitfalls:
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
 - [ ] Sync folder ROMs (ScummVM, etc.); adding them under Add missing ROMs works
-- [ ] Android version
+- [ ] Android: the remaining Actions, LaunchBox, release APK and CI
 
 ## screenscraper.fr credentials
 
