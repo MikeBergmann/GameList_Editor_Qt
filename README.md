@@ -3,12 +3,18 @@
 [![CI (Linux)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci.yml)
 [![CI (Windows)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-windows.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-windows.yml)
 [![CI (macOS)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-macos.yml)
+[![CI Android](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-android.yml/badge.svg)](https://github.com/MikeBergmann/GameList_Editor_Qt/actions/workflows/ci-android.yml)
 
 **Qt6 Port of GameList Editor Delphi**
 
 <a href="./screenshot.png">
   <img src="./screenshot.png" alt="Screenshot of GameList_Editor_Qt" width="800">
 </a>
+
+<p>
+  <img src="./Screenshot_Android_P.jpg" alt="Android, portrait: editing a game" height="600">
+  <img src="./Screenshot_Android_L.jpg" alt="Android, landscape: editing a game" width="600">
+</p>
 
 (Cover of Yokai Ninja is AI generated)
 
@@ -100,20 +106,13 @@ Pitfalls:
 
 A touch and gamepad front end for phones and handhelds. It runs on a Retroid Pocket 5 (Android 13); a real-phone check is still open. It is an early version. CI only checks that it builds and keeps a debug APK as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
 
-<p>
-  <img src="./Screenshot_Android_P.jpg" alt="Android, portrait: editing a game" height="600">
-  <img src="./Screenshot_Android_L.jpg" alt="Android, landscape: editing a game" width="600">
-</p>
-
-
 - **Same core:** it uses the same `gle_core` and `gle_scraper` as the desktop app, with a new Qt Quick (QML) front end on top. The Widgets UI is not built on Android.
 - **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr, and add missing ROMs.
 - **Not yet:** the other Actions, LaunchBox scraping, About / Help.
 - **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
 - **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
 - **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.
-- **Install:** download the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
-- **Release signing (maintainers):** build with `-DCMAKE_BUILD_TYPE=Release` and set `QT_ANDROID_KEYSTORE_PATH`, `QT_ANDROID_KEYSTORE_ALIAS`, `QT_ANDROID_KEYSTORE_STORE_PASS` and `QT_ANDROID_KEYSTORE_KEY_PASS` in the environment. The keystore stays out of the repo; lose it and nobody can update in place. The version code is `X*10000 + Y*100 + Z` of a `vX.Y.Z` tag; untagged builds get 1.
+- **Install:** build the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
 - Stop EmulationStation (or ES-DE) first, it rewrites its gamelists on exit.
 
 ### Features to add
