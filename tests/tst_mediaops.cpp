@@ -300,4 +300,32 @@ TEST( MediaOps, RenameMediaThatFailsMidwayPutsTheEarlierRenamesBack )
    expectLinksAre( list, 2, before, image, video );
 }
 
+TEST( MediaOps, VideoCodecNameReadsTheSampleEntryOfAnMp4WhateverTheBoxOrder )
+{
+   Fixture fixture;
+   const auto box = []( const QByteArray& aType, const QByteArray& aBody ) {
+      const quint32 size = 8 + static_cast<quint32>( aBody.size() );
+      QByteArray head( 4, 0 );
+      head[0] = static_cast<char>( size >> 24 );
+      head[1] = static_cast<char>( size >> 16 );
+      head[2] = static_cast<char>( size >> 8 );
+      head[3] = static_cast<char>( size );
+      return head + aType + aBody;
+   };
+   const QByteArray audio = box( "stsd", "mp4a" );
+   const QString av1 = fixture.path( "av1.mp4" );
+   writeFile( av1, box( "ftyp", "isom" ) + box( "mdat", QByteArray( 100, 'x' ) ) +
+                      box( "moov", box( "trak", audio ) + box( "trak", box( "stsd", "av01" ) ) ) );
+   EXPECT_EQ( videoCodecName( av1 ), QStringLiteral( "AV1" ) );
+
+   const QString avc = fixture.path( "avc.mp4" );
+   writeFile( avc, box( "moov", box( "stsd", "avc1" ) ) );
+   EXPECT_EQ( videoCodecName( avc ), QStringLiteral( "H.264" ) );
+
+   const QString other = fixture.path( "other.mp4" );
+   writeFile( other, "not a video" );
+   EXPECT_TRUE( videoCodecName( other ).isEmpty() );
+   EXPECT_TRUE( videoCodecName( fixture.path( "missing.mp4" ) ).isEmpty() );
+}
+
 }  // namespace

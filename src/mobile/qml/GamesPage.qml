@@ -17,12 +17,13 @@ Page {
    }
 
    Component { id: editPage; EditPage {} }
+   Component { id: actionsPage; ActionsPage {} }
 
    header: ToolBar {
       RowLayout {
          anchors.fill: parent
 
-         ToolButton {
+         BarButton {
             id: backBtn
             text: "Back"
             onClicked: page.StackView.view.pop()
@@ -35,11 +36,19 @@ Page {
             font.pixelSize: 20
             elide: Text.ElideRight
          }
-         ToolButton {
+         BarButton {
             id: searchBtn
             text: "Search"
             onClicked: searchField.forceActiveFocus()
             KeyNavigation.left: backBtn
+            KeyNavigation.right: actionsBtn
+            KeyNavigation.down: categoryBox
+         }
+         BarButton {
+            id: actionsBtn
+            text: "Actions"
+            onClicked: page.StackView.view.push( actionsPage )
+            KeyNavigation.left: searchBtn
             KeyNavigation.down: categoryBox
          }
       }
@@ -133,7 +142,8 @@ Page {
 
          delegate: ItemDelegate {
             width: ListView.view.width
-            text: model.display
+            // A button's text reads & as a mnemonic marker, so a literal one is doubled.
+            text: model.display.replace( /&/g, "&&" )
             highlighted: ListView.isCurrentItem
             onClicked: {
                list.currentIndex = index

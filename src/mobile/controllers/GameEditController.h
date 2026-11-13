@@ -3,8 +3,10 @@
 #include "Game.h"
 #include "Result.h"
 
+#include <functional>
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QVariantMap>
 
 class GamesController;
@@ -21,6 +23,7 @@ class GameEditController : public QObject
    Q_PROPERTY( QString error READ error NOTIFY errorChanged )
    Q_PROPERTY( QString imageSource READ imageSource NOTIFY mediaChanged )
    Q_PROPERTY( bool hasVideo READ hasVideo NOTIFY mediaChanged )
+   Q_PROPERTY( QUrl videoSource READ videoSource NOTIFY mediaChanged )
    Q_PROPERTY( QVariantMap info READ info NOTIFY infoChanged )
    Q_PROPERTY( bool hashing READ isHashing NOTIFY infoChanged )
 
@@ -37,6 +40,8 @@ public:
    // Image showing the same path reloads.
    QString imageSource() const;
    bool hasVideo() const;
+   // File URL of the video, empty when there is none.
+   QUrl videoSource() const;
    // Read-only details as display text by key: gamelist, rom, image, video (a missing file says so),
    // playcount, lastPlayed, crc32, md5, sha1. Hashes are empty until computeHashes().
    QVariantMap info() const;
@@ -57,6 +62,12 @@ public:
    // Copy a file in (a picture is re-encoded to PNG). Same failure rules as the removals.
    Q_INVOKABLE bool changeImage( const QString& aPath );
    Q_INVOKABLE bool changeVideo( const QString& aPath );
+   // Codec name ("AV1", "H.264", ...) of the video, empty when unknown.
+   Q_INVOKABLE QString videoCodec() const;
+   // Hands the video to the system's player; false when nothing took it.
+   Q_INVOKABLE bool openVideoExternally() const;
+   // Replaces the default (QDesktopServices) for opening a file, e.g. where file:// is not allowed.
+   void setOpener( std::function<bool( const QString& )> aOpener ) { FOpener = std::move( aOpener ); }
 
 signals:
    void valuesChanged();
@@ -78,4 +89,5 @@ private:
    QString FError;
    int FMediaVersion = 0;
    QThread* FHashThread = nullptr;
+   std::function<bool( const QString& )> FOpener;
 };

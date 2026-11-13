@@ -227,7 +227,7 @@ Page {
       RowLayout {
          anchors.fill: parent
 
-         ToolButton {
+         BarButton {
             id: backBtn
             text: "Back"
             enabled: !scrape.busy
@@ -241,7 +241,7 @@ Page {
             font.pixelSize: 20
             elide: Text.ElideRight
          }
-         ToolButton {
+         BarButton {
             id: saveBtn
             text: "Save"
             enabled: scrape.canSave

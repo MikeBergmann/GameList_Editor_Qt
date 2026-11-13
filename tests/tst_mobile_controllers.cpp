@@ -1,5 +1,6 @@
 // The mobile controllers run without QML: driven the way a page would, over the shared fixture.
 
+#include "ActionsController.h"
 #include "FileBrowserController.h"
 #include "GameEditController.h"
 #include "GamelistFixture.h"
@@ -81,6 +82,72 @@ TEST( LibraryController, ReportsAGamelistThatDoesNotLoadAndDetachesTheOldOne )
    EXPECT_EQ( library.current(), -1 );
    EXPECT_FALSE( library.error().isEmpty() );
    EXPECT_FALSE( library.selectSystem( 99 ) );
+}
+
+TEST( LibraryController, MapsAnUnknownFolderToASystemTypeAndForgetsItAgain )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "amiga500/gamelist.xml" ), Cst_Gamelist );
+   LibraryController library;
+   ASSERT_TRUE( library.openRoot( fixture.dir.path() ) );
+   const int amiga = systemIndex( library, QStringLiteral( "amiga500" ) );
+   const int snes = systemIndex( library, QStringLiteral( "snes" ) );
+   EXPECT_TRUE( library.canSetKind( amiga ) );
+   EXPECT_FALSE( library.canSetKind( snes ) ) << "a known folder would ignore the mapping";
+   EXPECT_EQ( library.kindChoice( amiga ), 0 );
+
+   const SystemInfo& info = systemInfo( skAM );
+   const int choice = static_cast<int>( library.kindLabels().indexOf(
+      QStringLiteral( "%1 (%2)" ).arg( QLatin1String( info.name ), QLatin1String( info.folder ) ) ) );
+   ASSERT_GT( choice, 0 );
+
+   library.setKind( snes, choice );
+   EXPECT_FALSE( library.systems().at( snes ).toMap().value( QStringLiteral( "name" ) ).toString()
+                    .contains( QLatin1String( info.name ) ) ) << "the known folder is untouched";
+
+   library.setKind( amiga, choice );
+   EXPECT_EQ( library.kindChoice( amiga ), choice );
+   EXPECT_TRUE( library.systems().at( amiga ).toMap().value( QStringLiteral( "name" ) ).toString()
+                   .contains( QLatin1String( info.name ) ) );
+
+   LibraryController again;
+   ASSERT_TRUE( again.openRoot( fixture.dir.path() ) );
+   EXPECT_EQ( again.kindChoice( systemIndex( again, QStringLiteral( "amiga500" ) ) ), choice ) << "stored";
+
+   library.setKind( amiga, 0 );
+   EXPECT_EQ( library.kindChoice( amiga ), 0 );
+   QSettings().remove( Cst_IniSystemMap );
+}
+
+TEST( ActionsController, AddsTheChosenMissingRomsAndResetsTheGamesList )
+{
+   MobileFixture fixture;
+   writeFile( fixture.path( "snes/Streets.zip" ), "rom" );
+   writeFile( fixture.path( "snes/sub/Zelda.sfc" ), "rom" );
+   auto* model = qobject_cast<QAbstractItemModel*>( fixture.games.model() );
+   ASSERT_EQ( model->rowCount(), 3 );
+
+   ActionsController actions( &fixture.library );
+   ASSERT_TRUE( actions.findMissingRoms() );
+   EXPECT_EQ( actions.roms(), QStringList( { QStringLiteral( "Streets.zip" ), QStringLiteral( "sub/Zelda.sfc" ) } ) );
+
+   ASSERT_TRUE( actions.addRoms( { 1, 99 } ) ) << "an unknown row is ignored";
+   EXPECT_EQ( actions.added(), 1 );
+   EXPECT_EQ( model->rowCount(), 4 );
+   EXPECT_TRUE( fixture.library.isLoaded() );
+
+   ASSERT_TRUE( actions.findMissingRoms() );
+   EXPECT_EQ( actions.roms(), QStringList( QStringLiteral( "Streets.zip" ) ) );
+}
+
+TEST( ActionsController, FailsWithoutALoadedSystem )
+{
+   LibraryController library;
+   ActionsController actions( &library );
+
+   EXPECT_FALSE( actions.findMissingRoms() );
+   EXPECT_FALSE( actions.error().isEmpty() );
+   EXPECT_FALSE( actions.addRoms( { 0 } ) );
 }
 
 TEST( GamesController, FiltersAndCountsLikeTheDesktopList )
@@ -281,6 +348,7 @@ TEST( GameEditController, ChangesMediaWithoutLosingTypedValues )
    fixture.games.select( 2 );  // Vanished: no media yet
    ASSERT_TRUE( edit.imageSource().isEmpty() );
    ASSERT_FALSE( edit.hasVideo() );
+   EXPECT_TRUE( edit.videoSource().isEmpty() );
 
    const QString picture = fixture.dir.filePath( QStringLiteral( "new.png" ) );
    QImage image( 4, 4, QImage::Format_RGB32 );
@@ -294,6 +362,7 @@ TEST( GameEditController, ChangesMediaWithoutLosingTypedValues )
    ASSERT_TRUE( edit.changeVideo( video ) ) << edit.error().toStdString();
    EXPECT_FALSE( edit.imageSource().isEmpty() );
    EXPECT_TRUE( edit.hasVideo() );
+   EXPECT_EQ( edit.videoSource().toLocalFile().section( '/', -1 ), QStringLiteral( "Vanished.mp4" ) );
    EXPECT_TRUE( edit.isDirty() );
 
    const Gamelist again = reload( fixture );
@@ -334,6 +403,28 @@ TEST( GameEditController, ShowsTheDetailsAndHashesTheRomOffTheUiThread )
    EXPECT_EQ( edit.info().value( QStringLiteral( "md5" ) ).toString(), md5 );
    EXPECT_FALSE( edit.info().value( QStringLiteral( "crc32" ) ).toString().isEmpty() );
    EXPECT_FALSE( edit.info().value( QStringLiteral( "sha1" ) ).toString().isEmpty() );
+}
+
+TEST( GameEditController, OpensTheVideoThroughTheInjectedOpener )
+{
+   MobileFixture fixture;
+   auto& edit = fixture.edit;
+   QString opened;
+   bool answer = true;
+   edit.setOpener( [&]( const QString& aPath ) {
+      opened = aPath;
+      return answer;
+   } );
+
+   fixture.games.select( 2 );  // Vanished: no video
+   EXPECT_FALSE( edit.openVideoExternally() );
+   EXPECT_TRUE( opened.isEmpty() );
+
+   fixture.games.select( 0 );
+   EXPECT_TRUE( edit.openVideoExternally() );
+   EXPECT_EQ( opened, edit.videoSource().toLocalFile() );
+   answer = false;
+   EXPECT_FALSE( edit.openVideoExternally() );
 }
 
 TEST( GameEditController, RemovesMediaWithoutLosingTypedValues )

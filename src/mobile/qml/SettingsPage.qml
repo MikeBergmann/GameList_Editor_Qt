@@ -43,7 +43,7 @@ Page {
       RowLayout {
          anchors.fill: parent
 
-         ToolButton {
+         BarButton {
             id: backBtn
             text: "Back"
             onClicked: page.StackView.view.pop()

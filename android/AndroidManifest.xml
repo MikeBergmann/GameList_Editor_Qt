@@ -8,6 +8,13 @@
     <!-- %%INSERT_FEATURES -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Lets openFile see which apps can play a video, to grant them the file. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
+    </queries>
     <supports-screens
         android:anyDensity="true"
         android:largeScreens="true"
@@ -48,6 +55,16 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/qtprovider_paths"/>
+        </provider>
+
+        <provider
+            android:name="de.mdb977.gamelisteditor.GleFileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/gle_file_paths"/>
         </provider>
     </application>
 </manifest>

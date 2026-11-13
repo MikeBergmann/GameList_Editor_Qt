@@ -4,6 +4,7 @@
 #include <QGuiApplication>
 #include <QJniEnvironment>
 #include <QJniObject>
+#include <QMimeDatabase>
 
 AndroidStorage::AndroidStorage( QObject* aParent ) : QObject( aParent )
 {
@@ -65,4 +66,55 @@ void AndroidStorage::request()
 
    // Limitation: no fallback to the generic all-files page on a device without the per-app one.
    QJniEnvironment().checkAndClearExceptions();
+}
+
+bool AndroidStorage::openFile( const QString& aPath )
+{
+   QJniEnvironment env;
+   const QJniObject context = QNativeInterface::QAndroidApplication::context();
+   const QString authority =
+      context.callObjectMethod<jstring>( "getPackageName" ).toString() + QStringLiteral( ".fileprovider" );
+   const QJniObject file( "java/io/File", "(Ljava/lang/String;)V", QJniObject::fromString( aPath ).object<jstring>() );
+   const QJniObject uri = QJniObject::callStaticObjectMethod(
+      "androidx/core/content/FileProvider", "getUriForFile",
+      "(Landroid/content/Context;Ljava/lang/String;Ljava/io/File;)Landroid/net/Uri;", context.object(),
+      QJniObject::fromString( authority ).object<jstring>(), file.object() );
+   if ( env.checkAndClearExceptions() || !uri.isValid() )
+      return false;
+
+   const QString mime = QMimeDatabase().mimeTypeForFile( aPath, QMimeDatabase::MatchExtension ).name();
+   const QJniObject intent( "android/content/Intent", "(Ljava/lang/String;)V",
+                            QJniObject::fromString( QStringLiteral( "android.intent.action.VIEW" ) ).object<jstring>() );
+   intent.callObjectMethod( "setDataAndType", "(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;",
+                            uri.object(), QJniObject::fromString( mime ).object<jstring>() );
+   const QJniObject clip = QJniObject::callStaticObjectMethod(
+      "android/content/ClipData", "newRawUri",
+      "(Ljava/lang/CharSequence;Landroid/net/Uri;)Landroid/content/ClipData;",
+      QJniObject::fromString( QStringLiteral( "video" ) ).object<jstring>(), uri.object() );
+   intent.callMethod<void>( "setClipData", "(Landroid/content/ClipData;)V", clip.object() );
+
+   // FLAG_GRANT_READ_URI_PERMISSION, and an explicit grant to every viewer: the chooser alone does not
+   // reach every player.
+   intent.callObjectMethod( "addFlags", "(I)Landroid/content/Intent;", 0x00000001 );
+   const QJniObject manager = context.callObjectMethod( "getPackageManager", "()Landroid/content/pm/PackageManager;" );
+   const QJniObject viewers = manager.callObjectMethod(
+      "queryIntentActivities", "(Landroid/content/Intent;I)Ljava/util/List;", intent.object(), jint( 0 ) );
+   const jint count = viewers.isValid() ? viewers.callMethod<jint>( "size" ) : 0;
+   for ( jint i = 0; i < count; ++i ) {
+      const QJniObject info = viewers.callObjectMethod( "get", "(I)Ljava/lang/Object;", i );
+      const QJniObject activity = info.getObjectField( "activityInfo", "Landroid/content/pm/ActivityInfo;" );
+      const QJniObject package = activity.getObjectField<jstring>( "packageName" );
+      context.callMethod<void>( "grantUriPermission", "(Ljava/lang/String;Landroid/net/Uri;I)V",
+                                package.object<jstring>(), uri.object(), jint( 1 ) );
+   }
+   env.checkAndClearExceptions();
+
+   const QJniObject chooser = QJniObject::callStaticObjectMethod(
+      "android/content/Intent", "createChooser",
+      "(Landroid/content/Intent;Ljava/lang/CharSequence;)Landroid/content/Intent;", intent.object(),
+      QJniObject::fromString( QStringLiteral( "Open video with" ) ).object<jstring>() );
+   // FLAG_ACTIVITY_NEW_TASK: needed when the context is not an activity.
+   chooser.callObjectMethod( "addFlags", "(I)Landroid/content/Intent;", 0x10000000 );
+   context.callMethod<void>( "startActivity", "(Landroid/content/Intent;)V", chooser.object() );
+   return !env.checkAndClearExceptions();
 }

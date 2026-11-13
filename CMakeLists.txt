@@ -48,7 +48,7 @@ file( WRITE "${CMAKE_BINARY_DIR}/version.txt" "${GLE_VERSION}\n" )
 
 # 6.4 is what Ubuntu 24.04 / Mint 22 ships; nothing here needs more.
 if( ANDROID )
-   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Xml Network Quick QuickControls2 )
+   find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Xml Network Quick QuickControls2 Multimedia )
 else()
    find_package( Qt6 6.4 REQUIRED COMPONENTS Core Gui Widgets Xml Network Multimedia MultimediaWidgets )
 endif()
@@ -134,6 +134,7 @@ target_link_libraries( gle_scraper PUBLIC Qt6::Core Qt6::Network gle_core )
 
 # Core and Gui only, so the desktop tests can drive it; the QML front end is Android-only.
 add_library( gle_mobile_controllers STATIC
+   src/mobile/controllers/ActionsController.cpp
    src/mobile/controllers/FileBrowserController.cpp
    src/mobile/controllers/GameEditController.cpp
    src/mobile/controllers/GamesController.cpp

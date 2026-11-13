@@ -31,7 +31,7 @@ Page {
       RowLayout {
          anchors.fill: parent
 
-         ToolButton {
+         BarButton {
             id: upBtn
             text: "Up"
             enabled: !browser.atRoots
@@ -56,7 +56,7 @@ Page {
 
       delegate: ItemDelegate {
          width: ListView.view.width
-         text: page.fileMode && modelData.isDir ? modelData.name + "/" : modelData.name
+         text: ( page.fileMode && modelData.isDir ? modelData.name + "/" : modelData.name ).replace( /&/g, "&&" )
          highlighted: ListView.isCurrentItem
          onClicked: {
             list.currentIndex = index

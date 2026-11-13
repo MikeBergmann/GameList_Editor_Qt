@@ -23,6 +23,7 @@ Page {
       { key: "favorite", label: "Favorite", type: "flag" },
       { key: "", label: "Change picture", type: "changeImage" },
       { key: "", label: "Change video", type: "changeVideo" },
+
       { key: "", label: "Remove picture", type: "removeImage" },
       { key: "", label: "Remove video", type: "removeVideo" },
       { key: "", label: "More info", type: "moreInfo" }
@@ -70,6 +71,7 @@ Page {
          edit.setField( aRow.key, edit.values[ aRow.key ] ? 0 : 1 )
       } else if ( aRow.type === "moreInfo" ) {
          infoDialog.open()
+
       } else if ( aRow.type === "changeImage" || aRow.type === "changeVideo" ) {
          const isImage = aRow.type === "changeImage"
          const picker = page.StackView.view.push( browserPage,
@@ -99,6 +101,11 @@ Page {
 
    InfoDialog {
       id: infoDialog
+      onClosed: list.forceActiveFocus()
+   }
+
+   VideoDialog {
+      id: videoDialog
       onClosed: list.forceActiveFocus()
    }
 
@@ -143,11 +150,11 @@ Page {
       RowLayout {
          anchors.fill: parent
 
-         ToolButton {
+         BarButton {
             id: backBtn
             text: "Back"
             onClicked: page.requestClose()
-            KeyNavigation.right: scrapeBtn
+            KeyNavigation.right: playBtn
             KeyNavigation.down: list
          }
          Label {
@@ -156,17 +163,26 @@ Page {
             font.pixelSize: 20
             elide: Text.ElideRight
          }
+         BarButton {
+            id: playBtn
+            text: "Play"
+            enabled: edit.hasVideo
+            onClicked: videoDialog.open()
+            KeyNavigation.left: backBtn
+            KeyNavigation.right: scrapeBtn
+            KeyNavigation.down: list
+         }
          // Limitation: a scrape save reloads the fields, so typed edits are saved or reverted first.
-         ToolButton {
+         BarButton {
             id: scrapeBtn
             text: "Scrape"
             enabled: !edit.dirty && scrape.canScrape
             onClicked: page.StackView.view.push( scrapePage )
-            KeyNavigation.left: backBtn
+            KeyNavigation.left: playBtn
             KeyNavigation.right: saveBtn
             KeyNavigation.down: list
          }
-         ToolButton {
+         BarButton {
             id: saveBtn
             text: "Save"
             enabled: edit.dirty
@@ -181,19 +197,88 @@ Page {
       id: picture
 
       Item {
-         Image {
-            anchors.fill: parent
-            anchors.margins: 8
-            source: edit.imageSource
-            fillMode: Image.PreserveAspectFit
-            sourceSize.height: 800
-            asynchronous: true
-            cache: false
+         id: pic
+         clip: true
+         property real offset: 0
+         property int slideDir: 0
+         property bool switched: false
+
+         NumberAnimation {
+            id: settle
+            target: pic
+            property: "offset"
+            to: 0
+            duration: 200
+            easing.type: Easing.OutCubic
          }
-         Label {
-            anchors.centerIn: parent
-            visible: edit.imageSource === ""
-            text: "No picture"
+
+         // The new game slides in from the side the swipe came from.
+         Connections {
+            target: games
+            function onCurrentChanged() {
+               pic.switched = true
+               if ( pic.slideDir !== 0 ) {
+                  pic.offset = pic.slideDir * pic.width
+                  settle.restart()
+               }
+            }
+         }
+
+         // Swipe left: next game, right: previous. Horizontal only; a vertical drag goes to the list.
+         MouseArea {
+            anchors.fill: parent
+            property real pressX: 0
+            property real pressY: 0
+            onPressed: ( aMouse ) => {
+               settle.stop()
+               pressX = aMouse.x
+               pressY = aMouse.y
+            }
+            // Once the drag is mostly horizontal, keep it: the list would otherwise steal it on any vertical drift.
+            onPositionChanged: ( aMouse ) => {
+               const dx = aMouse.x - pressX
+               if ( Math.abs( dx ) > 4 && Math.abs( dx ) > Math.abs( aMouse.y - pressY ) )
+                  preventStealing = true
+               pic.offset = dx
+            }
+            onCanceled: {
+               preventStealing = false
+               settle.restart()
+            }
+            onReleased: ( aMouse ) => {
+               preventStealing = false
+               const dx = aMouse.x - pressX
+               pic.switched = false
+               if ( Math.abs( dx ) > 80 ) {
+                  pic.slideDir = dx < 0 ? 1 : -1
+                  page.goTo( pic.slideDir )
+                  pic.slideDir = 0
+               }
+               // Too short, at either end, or waiting on the save dialog: snap back.
+               if ( !pic.switched )
+                  settle.restart()
+            }
+         }
+
+         Item {
+            x: pic.offset
+            width: pic.width
+            height: pic.height
+
+            Image {
+               anchors.fill: parent
+               anchors.margins: 8
+               source: edit.imageSource
+               fillMode: Image.PreserveAspectFit
+               sourceSize.height: 800
+               asynchronous: true
+               cache: false
+            }
+            Label {
+               anchors.centerIn: parent
+               visible: edit.imageSource === ""
+               text: "No picture"
+            }
          }
       }
    }

@@ -2,7 +2,9 @@
 
 #include "GamesController.h"
 #include "LibraryController.h"
+#include "MediaOps.h"
 
+#include <QDesktopServices>
 #include <QThread>
 #include <QUrl>
 
@@ -79,6 +81,26 @@ bool GameEditController::hasVideo() const
 {
    const Game* current = game();
    return current && !current->missingVideo;
+}
+
+QUrl GameEditController::videoSource() const
+{
+   const Game* current = game();
+   return current && !current->missingVideo ? QUrl::fromLocalFile( current->physicalVideoPath ) : QUrl();
+}
+
+QString GameEditController::videoCodec() const
+{
+   const Game* current = game();
+   return current && !current->missingVideo ? videoCodecName( current->physicalVideoPath ) : QString();
+}
+
+bool GameEditController::openVideoExternally() const
+{
+   const QUrl url = videoSource();
+   if ( url.isEmpty() )
+      return false;
+   return FOpener ? FOpener( url.toLocalFile() ) : QDesktopServices::openUrl( url );
 }
 
 GameEditController::~GameEditController()

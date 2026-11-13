@@ -5,22 +5,27 @@ qt_policy( SET QTP0001 NEW )
 qt_policy( SET QTP0002 NEW )
 qt_add_executable( GameListEditor src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp
    src/mobile/ScrapeImageProvider.cpp Resources/assets.qrc )
-target_link_libraries( GameListEditor PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 )
+target_link_libraries( GameListEditor PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 Qt6::Multimedia )
 qt_add_qml_module( GameListEditor
    URI GleMobile
    VERSION 1.0
    QML_FILES
+      src/mobile/qml/ActionsPage.qml
+      src/mobile/qml/AddRomsPage.qml
       src/mobile/qml/AskDialog.qml
+      src/mobile/qml/BarButton.qml
       src/mobile/qml/EditPage.qml
       src/mobile/qml/FieldDialog.qml
       src/mobile/qml/FileBrowserPage.qml
       src/mobile/qml/GamesPage.qml
       src/mobile/qml/InfoDialog.qml
+      src/mobile/qml/KindDialog.qml
       src/mobile/qml/Main.qml
       src/mobile/qml/PermissionPage.qml
       src/mobile/qml/ScrapePage.qml
       src/mobile/qml/SettingsPage.qml
       src/mobile/qml/SystemsPage.qml
+      src/mobile/qml/VideoDialog.qml
 )
 
 # Qt's TLS backend on Android is OpenSSL, and the device does not provide a usable one.

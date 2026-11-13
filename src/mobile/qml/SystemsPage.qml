@@ -30,13 +30,43 @@ Page {
    Component { id: gamesPage; GamesPage {} }
    Component { id: settingsPage; SettingsPage {} }
 
+   // Only a folder the app does not know can be mapped to a system type.
+   function askKind( aIndex ) {
+      if ( !library.canSetKind( aIndex ) ) {
+         notice.message = "This folder name is already a known system."
+         notice.open()
+         return
+      }
+      kindDialog.system = aIndex
+      kindDialog.folder = library.systems[ aIndex ].folder
+      kindDialog.current = library.kindChoice( aIndex )
+      kindDialog.open()
+   }
+
+   AskDialog {
+      id: notice
+      choices: [ "OK" ]
+      onClosed: list.forceActiveFocus( Qt.TabFocusReason )
+   }
+
+   KindDialog {
+      id: kindDialog
+      property int system: -1
+      onPicked: ( aChoice ) => {
+         library.setKind( system, aChoice )
+         // The model was replaced, which resets the highlighted row.
+         list.currentIndex = system
+      }
+      onClosed: list.forceActiveFocus( Qt.TabFocusReason )
+   }
+
    header: ToolBar {
       Label {
          anchors.centerIn: parent
          text: "GameList Editor"
          font.pixelSize: 20
       }
-      ToolButton {
+      BarButton {
          id: settingsBtn
          anchors.right: parent.right
          anchors.verticalCenter: parent.verticalCenter
@@ -90,6 +120,8 @@ Page {
          clip: true
          model: library.systems
          KeyNavigation.up: chooseBtn
+         // Start on the pad is Menu; a touch screen holds the row instead.
+         Keys.onMenuPressed: if ( currentIndex >= 0 ) page.askKind( currentIndex )
 
          delegate: ItemDelegate {
             width: ListView.view.width
@@ -112,12 +144,25 @@ Page {
                }
             }
 
+            onPressAndHold: {
+               list.currentIndex = index
+               page.askKind( index )
+            }
             onClicked: {
                list.currentIndex = index
                if ( library.selectSystem( index ) )
                   page.StackView.view.push( gamesPage )
             }
          }
+      }
+
+      Label {
+         Layout.fillWidth: true
+         visible: library.systems.length > 0
+         text: "Hold a system (Start on a gamepad) to set its type."
+         font.pixelSize: 12
+         opacity: 0.7
+         wrapMode: Text.Wrap
       }
    }
 }

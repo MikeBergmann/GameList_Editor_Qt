@@ -1,5 +1,6 @@
 // Android entry point: the QML front end over the mobile controllers.
 
+#include "ActionsController.h"
 #include "AndroidStorage.h"
 #include "FileBrowserController.h"
 #include "GameEditController.h"
@@ -25,18 +26,21 @@ int main( int argc, char** argv )
    QSettings::setDefaultFormat( QSettings::IniFormat );
 
    LibraryController library;
+   ActionsController actions( &library );
    GamesController games( &library );
    GameEditController edit( &library, &games );
    ScrapeController scrape( &library, &games );
    SettingsController settings;
    FileBrowserController browser;
    browser.setVolumeSource( &AndroidStorage::externalVolumes );
+   edit.setOpener( &AndroidStorage::openFile );
    AndroidStorage storage;
 
    QQmlApplicationEngine engine;
    engine.addImageProvider( QStringLiteral( "scrape" ), new ScrapeImageProvider( &scrape ) );
    QQmlContext* context = engine.rootContext();
    context->setContextProperty( QStringLiteral( "library" ), &library );
+   context->setContextProperty( QStringLiteral( "actions" ), &actions );
    context->setContextProperty( QStringLiteral( "games" ), &games );
    context->setContextProperty( QStringLiteral( "edit" ), &edit );
    context->setContextProperty( QStringLiteral( "scrape" ), &scrape );
