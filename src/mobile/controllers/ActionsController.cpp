@@ -3,12 +3,16 @@
 #include "GamesController.h"
 #include "LibraryController.h"
 #include "MediaOps.h"
+#include "PathUtil.h"
+#include "Resources.h"
 
+#include <QAbstractItemModel>
 #include <QDir>
 #include <QFileInfo>
 #include <QLocale>
 #include <QThread>
 
+#include <algorithm>
 #include <memory>
 
 namespace {
@@ -133,6 +137,11 @@ void ActionsController::fillItems()
                                  .arg( list.at( image.index ).romName(), relative( image.path ),
                                        sizeText( image.size ) ) ) );
       break;
+   case CleanBackups:
+      FPaths = gamelistBackups( list ).mid( FKeep );
+      for ( const QString& path : std::as_const( FPaths ) )
+         FItems.append( item( QFileInfo( path ).fileName() ) );
+      break;
    case DeleteOrphans:
    case DeleteDuplicates:
       FIndexes = FAction == DeleteOrphans ? orphanIndexes( list ) : duplicateIndexes( list );
@@ -143,7 +152,7 @@ void ActionsController::fillItems()
    emit itemsChanged();
 }
 
-bool ActionsController::find( int aAction, double aMegabytes )
+bool ActionsController::find( int aAction, double aValue )
 {
    if ( FBusy )
       return false;
@@ -158,7 +167,7 @@ bool ActionsController::find( int aAction, double aMegabytes )
       fail( QStringLiteral( "No system is loaded." ) );
       return false;
    }
-   if ( aAction < AddRoms || aAction > DeleteDuplicates ) {
+   if ( aAction < AddRoms || aAction > CleanBackups ) {
       clearItems();
       fail( QStringLiteral( "Unknown action." ) );
       return false;
@@ -198,13 +207,20 @@ bool ActionsController::find( int aAction, double aMegabytes )
          FChoiceLabel = QStringLiteral( "Also rename files ending in -image or -video (x-image.png %1 x.png)" ).arg( arrow() );
       break;
    case ShrinkImages:
-      FMaxBytes = qRound64( aMegabytes * 1024 * 1024 );
+      FMaxBytes = qRound64( aValue * 1024 * 1024 );
       FTitle = QStringLiteral( "Shrink large pictures" );
       FIntro = QStringLiteral( "Pictures over %1. They are re-encoded in place, in the same format, "
                               "to just under that size. The originals are overwritten. Untick what "
                               "you want left alone." ).arg( sizeText( FMaxBytes ) );
       FApplyLabel = QStringLiteral( "Shrink" );
       FEmptyText = QStringLiteral( "No picture is over that size." );
+      break;
+   case CleanBackups:
+      FKeep = std::max( 0, qRound( aValue ) );
+      FTitle = QStringLiteral( "Clean up backups" );
+      FIntro = QStringLiteral( "Older gamelist backups, newest %1 kept. Untick what you want to keep." ).arg( FKeep );
+      FApplyLabel = QStringLiteral( "Delete" );
+      FEmptyText = QStringLiteral( "There are no gamelist backups beyond the newest %1." ).arg( FKeep );
       break;
    case DeleteOrphans:
       FTitle = QStringLiteral( "Delete orphans" );
@@ -317,6 +333,23 @@ void ActionsController::apply( const QVariantList& aRows )
       applyShrink( chosen );
       return;
    }
+   case CleanBackups: {
+      int removed = 0;
+      QStringList stuck;
+      for ( const int at : rows ) {
+         if ( discardFile( FPaths.at( at ) ) )
+            ++removed;
+         else
+            stuck << FPaths.at( at );
+      }
+      if ( !stuck.isEmpty() ) {
+         done( false, QStringLiteral( "%1 backup(s) deleted. Could not delete:\n%2" )
+                         .arg( removed ).arg( stuck.join( QLatin1Char( '\n' ) ) ) );
+         return;
+      }
+      done( true, QStringLiteral( "%1 backup(s) deleted." ).arg( removed ) );
+      return;
+   }
    case DeleteOrphans:
    case DeleteDuplicates: {
       QVector<int> chosen;
@@ -334,6 +367,28 @@ void ActionsController::apply( const QVariantList& aRows )
       return;
    }
    }
+}
+
+bool ActionsController::exportList()
+{
+   const Gamelist* list = FLibrary->gamelist();
+   const auto* model = FGames ? qobject_cast<QAbstractItemModel*>( FGames->model() ) : nullptr;
+   if ( !list || !model ) {
+      fail( QStringLiteral( "No system is loaded." ) );
+      return false;
+   }
+
+   QByteArray content;
+   for ( int row = 0; row < model->rowCount(); ++row )
+      content += model->index( row, 0 ).data().toString().toUtf8() + '\n';
+
+   const QString path = QDir( list->romDir() ).filePath( list->system().folderName + Cst_TxtExtension );
+   if ( const Result<> written = writeFileAtomically( path, content ); !written ) {
+      fail( written.error() );
+      return false;
+   }
+   succeed( QStringLiteral( "%1 game(s) exported to %2." ).arg( model->rowCount() ).arg( path ) );
+   return true;
 }
 
 // shrinkImages only touches picture files, never the Gamelist, so it can run on a worker.

@@ -176,6 +176,14 @@ Page {
             width: ListView.view.width
             text: label.replace( /&/g, "&&" )
             enabled: usable
+            // Wraps, so a long row keeps its trailing "(not renamed: ...)" reason visible.
+            contentItem: Label {
+               rightPadding: parent.indicator.width + parent.spacing
+               text: parent.text
+               wrapMode: Text.Wrap
+               verticalAlignment: Text.AlignVCenter
+               color: parent.palette.text
+            }
             highlighted: ListView.isCurrentItem
             // Not checkable: a click would break the binding, and "All" / "None" must still reach the box.
             checkable: false
