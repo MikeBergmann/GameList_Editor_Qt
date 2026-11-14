@@ -262,6 +262,49 @@ TEST( ActionsController, RenamesALinkedFileAfterItsRomAndOffersTheStrictChoiceOn
    EXPECT_TRUE( actions.choiceLabel().isEmpty() );
 }
 
+TEST( ActionsController, CleanBackupsListsTheOlderOnesAndDeletesOnlyTheTicked )
+{
+   MobileFixture fixture;
+   for ( const char* stamp : { "20200101-000000", "20210101-000000", "20220101-000000" } )
+      writeFile( fixture.path( "snes/gamelist.xml." ) + QLatin1String( stamp ) + ".bak", "x" );
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.find( ActionsController::CleanBackups, 1 ) );
+   ASSERT_EQ( actions.items().size(), 2 ) << "the newest one is kept";
+   EXPECT_TRUE( itemTexts( actions ).front().contains( QStringLiteral( "2021" ) ) ) << "newest first";
+
+   actions.apply( { 1 } );
+   EXPECT_EQ( actions.report(), QStringLiteral( "1 backup(s) deleted." ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/gamelist.xml.20200101-000000.bak" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/gamelist.xml.20210101-000000.bak" ) ) );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/gamelist.xml.20220101-000000.bak" ) ) );
+
+   ASSERT_TRUE( actions.find( ActionsController::CleanBackups, 5 ) );
+   EXPECT_TRUE( actions.items().isEmpty() );
+   EXPECT_FALSE( actions.emptyText().isEmpty() );
+}
+
+TEST( ActionsController, ExportsTheNamesTheListShowsToATextFileInTheSystemFolder )
+{
+   MobileFixture fixture;
+   auto* model = qobject_cast<QAbstractItemModel*>( fixture.games.model() );
+   fixture.games.setSearch( QStringLiteral( "Sonic" ) );
+   ASSERT_GT( model->rowCount(), 0 );
+   ASSERT_LT( model->rowCount(), 3 ) << "the search must narrow the list";
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.exportList() ) << actions.error().toStdString();
+   QFile file( fixture.path( "snes/snes.txt" ) );
+   ASSERT_TRUE( file.open( QIODevice::ReadOnly ) );
+   const QStringList lines = QString::fromUtf8( file.readAll() ).split( QLatin1Char( '\n' ), Qt::SkipEmptyParts );
+   ASSERT_EQ( lines.size(), model->rowCount() );
+   EXPECT_EQ( lines.front(), model->index( 0, 0 ).data().toString() );
+   EXPECT_TRUE( actions.report().startsWith( QStringLiteral( "%1 game(s) exported" ).arg( lines.size() ) ) );
+
+   ActionsController without( &fixture.library );
+   EXPECT_FALSE( without.exportList() ) << "no games list, nothing to export";
+}
+
 TEST( ActionsController, LinkingAndRenamingDoNothingUnderEsde )
 {
    Fixture fixture;
@@ -620,6 +663,17 @@ QImage redSquare()
    QImage image( 4, 4, QImage::Format_RGB32 );
    image.fill( Qt::red );
    return image;
+}
+
+TEST( ScrapeController, KeepsAHugePictureAtMostAsLargeAsTheCap )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   emit scrape.scraper().mediaReady( 0, QImage( 4096, 1024, QImage::Format_RGB32 ) );
+   emit scrape.scraper().mediaReady( 1, redSquare() );
+
+   EXPECT_EQ( scrape.picture( 0 ).size(), QSize( 2048, 512 ) ) << "scaled, aspect kept";
+   EXPECT_EQ( scrape.picture( 1 ).size(), QSize( 4, 4 ) ) << "a small one is left as it is";
 }
 
 // The write is deferred one event-loop turn; the signal count says whether it succeeded.

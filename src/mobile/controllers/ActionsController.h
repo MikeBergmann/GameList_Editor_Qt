@@ -33,7 +33,7 @@ class ActionsController : public QObject
    Q_PROPERTY( int total READ total NOTIFY busyChanged )
 
 public:
-   enum Action { AddRoms, LinkMedia, RenameMedia, ShrinkImages, DeleteOrphans, DeleteDuplicates };
+   enum Action { AddRoms, LinkMedia, RenameMedia, ShrinkImages, DeleteOrphans, DeleteDuplicates, CleanBackups };
    Q_ENUM( Action )
 
    // aGames, when given, is told to redraw after changes that keep the game list as it is.
@@ -62,15 +62,18 @@ public:
 
    // Fills items(). False (with error()) when no system is loaded or the action has no use here
    // (linking and renaming under ES-DE); an empty list is a success. aMegabytes is the size limit
-   // of ShrinkImages and is ignored by the others.
+   // of ShrinkImages, and how many of the newest backups CleanBackups keeps; the others ignore it.
    // Limitation: scans on the UI thread. Upgrade: a worker plus a busy flag.
-   Q_INVOKABLE bool find( int aAction, double aMegabytes = 1.0 );
+   Q_INVOKABLE bool find( int aAction, double aValue = 1.0 );
    // Writes the candidates at aRows (indices into items()), then updates the games list.
    // finished() follows, at once except for ShrinkImages, which runs on a worker.
    // Limitation: only the shrink is off the UI thread; renaming many files on a slow card blocks.
    Q_INVOKABLE void apply( const QVariantList& aRows );
    // Stops ShrinkImages before the next picture.
    Q_INVOKABLE void cancel() { FCancel = true; }
+   // Writes the games the list shows now, one name per line, to <ROM folder>/<system>.txt.
+   // The outcome is in report() or error(); needs the GamesController given to the constructor.
+   Q_INVOKABLE bool exportList();
 
 signals:
    void itemsChanged();
@@ -104,6 +107,7 @@ private:
    QVector<OversizedImage> FImages;
    QVector<int> FIndexes;
    qint64 FMaxBytes = 0;
+   int FKeep = 0;
 
    QThread* FThread = nullptr;
    std::atomic<bool> FCancel{ false };

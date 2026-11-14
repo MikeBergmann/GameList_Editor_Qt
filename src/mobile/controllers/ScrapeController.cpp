@@ -11,6 +11,8 @@
 #include <QThread>
 #include <QTimer>
 
+#include <algorithm>
+
 namespace {
 
 struct MediaKey
@@ -27,6 +29,9 @@ const MediaKey Cst_MediaKeys[] = {
 };
 
 constexpr const char* Cst_VideoKey = "video";
+
+// Longest side a kept picture may have: ten 4k scrapes would otherwise hold ~600 MB on a phone.
+constexpr int Cst_MaxPictureSide = 2048;
 
 struct TextField
 {
@@ -602,7 +607,10 @@ void ScrapeController::handleGameInfo( const ScrapedInfo& aInfo )
 
 void ScrapeController::handleMediaReady( const QImage& aImage )
 {
-   FPictures.append( aImage );
+   const bool tooBig = std::max( aImage.width(), aImage.height() ) > Cst_MaxPictureSide;
+   FPictures.append( tooBig ? aImage.scaled( Cst_MaxPictureSide, Cst_MaxPictureSide, Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation )
+                            : aImage );
    emit picturesChanged();
 }
 
