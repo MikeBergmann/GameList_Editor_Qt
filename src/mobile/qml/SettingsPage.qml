@@ -15,12 +15,15 @@ Page {
       { key: "proxyServer", label: "Proxy server", type: "text" },
       { key: "proxyPort", label: "Proxy port", type: "text" },
       { key: "proxyUser", label: "Proxy username", type: "text" },
-      { key: "proxyPwd", label: "Proxy password", type: "secret" }
+      { key: "proxyPwd", label: "Proxy password", type: "secret" },
+      { key: "", label: "About", type: "about" }
    ]
 
    function activateRow( aRow ) {
       const current = settings.values[ aRow.key ]
-      if ( aRow.type === "flag" ) {
+      if ( aRow.type === "about" ) {
+         page.StackView.view.push( aboutPage )
+      } else if ( aRow.type === "flag" ) {
          settings.setValue( aRow.key, !current )
       } else if ( aRow.type === "language" ) {
          settings.setValue( aRow.key, ( current + 1 ) % settings.languageNames.length )
@@ -31,6 +34,8 @@ Page {
          fieldDialog.open()
       }
    }
+
+   Component { id: aboutPage; AboutPage {} }
 
    FieldDialog {
       id: fieldDialog
@@ -69,6 +74,7 @@ Page {
          width: ListView.view.width
          highlighted: ListView.isCurrentItem
 
+         readonly property bool isValue: modelData.type !== "about"
          readonly property var raw: settings.values[ modelData.key ]
          readonly property string shown: modelData.type === "flag" ? ( raw ? "Yes" : "No" )
                                          : modelData.type === "language" ? settings.languageNames[ raw ]
@@ -81,11 +87,12 @@ Page {
             Label {
                Layout.fillWidth: true
                text: modelData.label
-               font.pixelSize: 12
-               opacity: 0.7
+               font.pixelSize: row.isValue ? 12 : 16
+               opacity: row.isValue ? 0.7 : 1
             }
             Label {
                Layout.fillWidth: true
+               visible: row.isValue
                text: row.shown.length > 0 ? row.shown : "-"
                elide: Text.ElideRight
             }

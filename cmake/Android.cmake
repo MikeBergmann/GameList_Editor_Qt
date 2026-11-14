@@ -19,11 +19,13 @@ if( DEFINED ENV{QT_ANDROID_KEYSTORE_PATH} )
 endif()
 qt_add_executable( GameListEditor src/mobile/main_android.cpp src/mobile/AndroidStorage.cpp
    src/mobile/ScrapeImageProvider.cpp Resources/assets.qrc )
+target_compile_definitions( GameListEditor PRIVATE GLE_VERSION="${GLE_VERSION}" )
 target_link_libraries( GameListEditor PRIVATE gle_mobile_controllers gle_scraper Qt6::Quick Qt6::QuickControls2 Qt6::Multimedia )
 qt_add_qml_module( GameListEditor
    URI GleMobile
    VERSION 1.0
    QML_FILES
+      src/mobile/qml/AboutPage.qml
       src/mobile/qml/ActionsPage.qml
       src/mobile/qml/AddRomsPage.qml
       src/mobile/qml/AskDialog.qml
@@ -32,6 +34,7 @@ qt_add_qml_module( GameListEditor
       src/mobile/qml/FieldDialog.qml
       src/mobile/qml/FileBrowserPage.qml
       src/mobile/qml/GamesPage.qml
+      src/mobile/qml/HelpPage.qml
       src/mobile/qml/InfoDialog.qml
       src/mobile/qml/KindDialog.qml
       src/mobile/qml/Main.qml
@@ -39,6 +42,7 @@ qt_add_qml_module( GameListEditor
       src/mobile/qml/ScrapePage.qml
       src/mobile/qml/SettingsPage.qml
       src/mobile/qml/SystemsPage.qml
+      src/mobile/qml/TextPage.qml
       src/mobile/qml/VideoDialog.qml
 )
 
