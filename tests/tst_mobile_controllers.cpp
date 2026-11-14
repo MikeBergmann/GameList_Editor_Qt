@@ -665,6 +665,17 @@ QImage redSquare()
    return image;
 }
 
+TEST( ScrapeController, KeepsAHugePictureAtMostAsLargeAsTheCap )
+{
+   MobileFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games );
+   emit scrape.scraper().mediaReady( 0, QImage( 4096, 1024, QImage::Format_RGB32 ) );
+   emit scrape.scraper().mediaReady( 1, redSquare() );
+
+   EXPECT_EQ( scrape.picture( 0 ).size(), QSize( 2048, 512 ) ) << "scaled, aspect kept";
+   EXPECT_EQ( scrape.picture( 1 ).size(), QSize( 4, 4 ) ) << "a small one is left as it is";
+}
+
 // The write is deferred one event-loop turn; the signal count says whether it succeeded.
 int saveAndCount( ScrapeController& aScrape )
 {
