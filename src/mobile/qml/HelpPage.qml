@@ -24,8 +24,10 @@ a gamepad) to tell the app which system it is.</p>
 picture, video or other fields, favorites, duplicates, or games like the one last opened.</li>
 <li><b>List by ROM</b> shows the ROM file names instead of the game names. <b>Full ROM name</b>
 keeps the extension.</li>
-<li><b>Actions, Add missing ROMs</b> lists the ROMs of the folder that the gamelist lacks. All
-are ticked; <b>Add</b> writes the ticked ones.</li>
+<li><b>Actions</b> (Add missing ROMs, Link existing media, Rename media, Shrink large pictures,
+Delete orphans, Delete duplicates) first list what they would touch. All is ticked; untick what
+to skip, then press the button at the top. Deleting only removes games from the gamelist, never
+files. Shrinking overwrites the pictures. Linking and renaming do nothing for ES-DE folders.</li>
 </ul>
 
 <h3>Editing a game</h3>

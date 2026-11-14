@@ -121,6 +121,14 @@ TEST( LibraryController, MapsAnUnknownFolderToASystemTypeAndForgetsItAgain )
    QSettings().remove( Cst_IniSystemMap );
 }
 
+QStringList itemTexts( const ActionsController& aActions )
+{
+   QStringList texts;
+   for ( const QVariant& row : aActions.items() )
+      texts << row.toMap().value( QStringLiteral( "text" ) ).toString();
+   return texts;
+}
+
 TEST( ActionsController, AddsTheChosenMissingRomsAndResetsTheGamesList )
 {
    MobileFixture fixture;
@@ -129,27 +137,147 @@ TEST( ActionsController, AddsTheChosenMissingRomsAndResetsTheGamesList )
    auto* model = qobject_cast<QAbstractItemModel*>( fixture.games.model() );
    ASSERT_EQ( model->rowCount(), 3 );
 
-   ActionsController actions( &fixture.library );
-   ASSERT_TRUE( actions.findMissingRoms() );
-   EXPECT_EQ( actions.roms(), QStringList( { QStringLiteral( "Streets.zip" ), QStringLiteral( "sub/Zelda.sfc" ) } ) );
+   ActionsController actions( &fixture.library, &fixture.games );
+   int finished = 0;
+   QObject::connect( &actions, &ActionsController::finished, [&]( bool aOk ) { finished += aOk ? 1 : 100; } );
+   ASSERT_TRUE( actions.find( ActionsController::AddRoms ) );
+   EXPECT_EQ( itemTexts( actions ), QStringList( { QStringLiteral( "Streets.zip" ), QStringLiteral( "sub/Zelda.sfc" ) } ) );
 
-   ASSERT_TRUE( actions.addRoms( { 1, 99 } ) ) << "an unknown row is ignored";
-   EXPECT_EQ( actions.added(), 1 );
+   actions.apply( { 1, 99 } );
+   EXPECT_EQ( finished, 1 ) << actions.error().toStdString();
+   EXPECT_EQ( actions.report(), QStringLiteral( "1 game(s) added." ) );
    EXPECT_EQ( model->rowCount(), 4 );
    EXPECT_TRUE( fixture.library.isLoaded() );
 
-   ASSERT_TRUE( actions.findMissingRoms() );
-   EXPECT_EQ( actions.roms(), QStringList( QStringLiteral( "Streets.zip" ) ) );
+   ASSERT_TRUE( actions.find( ActionsController::AddRoms ) );
+   EXPECT_EQ( itemTexts( actions ), QStringList( QStringLiteral( "Streets.zip" ) ) );
 }
 
 TEST( ActionsController, FailsWithoutALoadedSystem )
 {
    LibraryController library;
    ActionsController actions( &library );
+   bool ok = true;
+   QObject::connect( &actions, &ActionsController::finished, [&]( bool aOk ) { ok = aOk; } );
 
-   EXPECT_FALSE( actions.findMissingRoms() );
+   EXPECT_FALSE( actions.find( ActionsController::AddRoms ) );
    EXPECT_FALSE( actions.error().isEmpty() );
-   EXPECT_FALSE( actions.addRoms( { 0 } ) );
+   actions.apply( { 0 } );
+   EXPECT_FALSE( ok );
+}
+
+TEST( ActionsController, RejectsAnUnknownAction )
+{
+   MobileFixture fixture;
+   ActionsController actions( &fixture.library );
+
+   EXPECT_FALSE( actions.find( 42 ) );
+   EXPECT_FALSE( actions.error().isEmpty() );
+}
+
+TEST( ActionsController, DeletesTheOrphansFromTheGamelistOnly )
+{
+   MobileFixture fixture;
+   auto* model = qobject_cast<QAbstractItemModel*>( fixture.games.model() );
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.find( ActionsController::DeleteOrphans ) );
+   ASSERT_EQ( actions.items().size(), 1 );
+   EXPECT_TRUE( itemTexts( actions ).front().contains( QStringLiteral( "Vanished" ) ) );
+
+   actions.apply( { 0 } );
+   EXPECT_EQ( actions.report(), QStringLiteral( "1 game(s) removed from the gamelist." ) );
+   EXPECT_EQ( model->rowCount(), 2 );
+   EXPECT_EQ( reload( fixture ).count(), 2 );
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/Sonic.zip" ) ) );
+
+   ASSERT_TRUE( actions.find( ActionsController::DeleteDuplicates ) );
+   EXPECT_TRUE( actions.items().isEmpty() );
+   EXPECT_FALSE( actions.emptyText().isEmpty() );
+}
+
+TEST( ActionsController, DeletesTheLaterEntryOfADuplicatedRom )
+{
+   MobileFixture fixture;
+   writeFile( fixture.snes.gamelistPath,
+              "<gameList><game><path>./Sonic.zip</path><name>A</name></game>"
+              "<game><path>./Sonic.zip</path><name>B</name></game></gameList>" );
+   ASSERT_TRUE( fixture.library.selectSystem( fixture.library.current() ) );
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.find( ActionsController::DeleteDuplicates ) );
+   ASSERT_EQ( actions.items().size(), 1 );
+   actions.apply( { 0 } );
+
+   const Gamelist again = reload( fixture );
+   ASSERT_EQ( again.count(), 1 );
+   EXPECT_EQ( again.at( 0 ).name, QStringLiteral( "A" ) );
+}
+
+TEST( ActionsController, LinksTheMediaFoundByTheRomName )
+{
+   MobileFixture fixture;
+   QImage image( 4, 4, QImage::Format_RGB32 );
+   image.fill( Qt::red );
+   ASSERT_TRUE( image.save( fixture.path( "snes/media/images/Vanished.png" ), "PNG" ) );
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.find( ActionsController::LinkMedia ) );
+   const QStringList texts = itemTexts( actions );
+   const auto vanished = std::find_if( texts.cbegin(), texts.cend(), []( const QString& aText ) {
+      return aText.startsWith( QStringLiteral( "Vanished.zip: image" ) );
+   } );
+   ASSERT_NE( vanished, texts.cend() ) << texts.join( QLatin1Char( '|' ) ).toStdString();
+
+   QVariantList all;
+   for ( int i = 0; i < texts.size(); ++i )
+      all << i;
+   actions.apply( all );
+   EXPECT_TRUE( actions.error().isEmpty() ) << actions.error().toStdString();
+   EXPECT_FALSE( reload( fixture ).at( 2 ).imagePath.isEmpty() );
+}
+
+TEST( ActionsController, RenamesALinkedFileAfterItsRomAndOffersTheStrictChoiceOnlyWhenUseful )
+{
+   MobileFixture fixture;
+   writeFile( fixture.snes.gamelistPath,
+              "<gameList><game><path>./Vanished.zip</path><name>V</name>"
+              "<image>./media/images/other.png</image></game></gameList>" );
+   writeFile( fixture.path( "snes/media/images/other.png" ), "png" );
+   ASSERT_TRUE( fixture.library.selectSystem( fixture.library.current() ) );
+   ActionsController actions( &fixture.library, &fixture.games );
+
+   ASSERT_TRUE( actions.find( ActionsController::RenameMedia ) );
+   ASSERT_EQ( actions.items().size(), 1 );
+   EXPECT_FALSE( actions.choiceLabel().isEmpty() );
+
+   actions.apply( { 0 } );
+   EXPECT_TRUE( actions.error().isEmpty() ) << actions.error().toStdString();
+   EXPECT_TRUE( QFileInfo::exists( fixture.path( "snes/media/images/Vanished.png" ) ) );
+   EXPECT_FALSE( QFileInfo::exists( fixture.path( "snes/media/images/other.png" ) ) );
+   EXPECT_EQ( reload( fixture ).at( 0 ).imagePath, QStringLiteral( "./media/images/Vanished.png" ) );
+
+   ASSERT_TRUE( actions.find( ActionsController::RenameMedia ) );
+   EXPECT_TRUE( actions.items().isEmpty() );
+   EXPECT_TRUE( actions.choiceLabel().isEmpty() );
+}
+
+TEST( ActionsController, LinkingAndRenamingDoNothingUnderEsde )
+{
+   Fixture fixture;
+   writeFile( fixture.path( "ES-DE/settings/es_settings.xml" ), "<bool name=\"DebugMode\" value=\"false\" />\n" );
+   writeFile( fixture.path( "ES-DE/gamelists/snes/gamelist.xml" ), Cst_Gamelist );
+   writeFile( fixture.path( "ES-DE/ROMs/snes/Sonic.zip" ), "rom" );
+   LibraryController library;
+   ASSERT_TRUE( library.openRoot( fixture.path( "ES-DE" ) ) );
+   ASSERT_TRUE( library.selectSystem( 0 ) );
+   ASSERT_TRUE( library.gamelist()->conventionalMedia() );
+   ActionsController actions( &library );
+
+   EXPECT_FALSE( actions.find( ActionsController::LinkMedia ) );
+   EXPECT_FALSE( actions.error().isEmpty() );
+   EXPECT_FALSE( actions.find( ActionsController::RenameMedia ) );
+   EXPECT_TRUE( actions.find( ActionsController::DeleteOrphans ) );
 }
 
 TEST( GamesController, FiltersAndCountsLikeTheDesktopList )
@@ -802,6 +930,37 @@ TEST( ScrapeController, TheSourceIsRememberedAndChangingItDropsTheResult )
 
    ScrapeController again( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
    EXPECT_EQ( again.source(), static_cast<int>( ScrapeController::LaunchBox ) );
+}
+
+TEST( ActionsController, ShrinksOversizedPicturesOnAWorkerAndReports )
+{
+   MobileFixture fixture;
+   QImage noise( 400, 400, QImage::Format_RGB32 );
+   quint32 seed = 12345;
+   for ( int y = 0; y < noise.height(); ++y )
+      for ( int x = 0; x < noise.width(); ++x ) {
+         seed = seed * 1664525u + 1013904223u;
+         noise.setPixel( x, y, seed | 0xFF000000u );
+      }
+   const QString picture = fixture.path( "snes/media/images/sonic.PNG" );
+   ASSERT_TRUE( noise.save( picture, "PNG" ) );
+   const qint64 before = QFileInfo( picture ).size();
+   ASSERT_GT( before, 100 * 1024 );
+
+   ActionsController actions( &fixture.library, &fixture.games );
+   bool finished = false;
+   QObject::connect( &actions, &ActionsController::finished, [&]( bool ) { finished = true; } );
+   ASSERT_TRUE( actions.find( ActionsController::ShrinkImages, 0.1 ) );
+   ASSERT_EQ( actions.items().size(), 1 );
+
+   actions.apply( { 0 } );
+   EXPECT_TRUE( actions.isBusy() );
+   waitFor( [&] { return finished; } );
+
+   EXPECT_TRUE( finished );
+   EXPECT_FALSE( actions.isBusy() );
+   EXPECT_TRUE( actions.report().startsWith( QStringLiteral( "1 picture(s) shrunk" ) ) ) << actions.report().toStdString();
+   EXPECT_LT( QFileInfo( picture ).size(), 100 * 1024 );
 }
 
 }  // namespace

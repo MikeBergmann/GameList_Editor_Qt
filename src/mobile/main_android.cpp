@@ -27,8 +27,8 @@ int main( int argc, char** argv )
    QSettings::setDefaultFormat( QSettings::IniFormat );
 
    LibraryController library;
-   ActionsController actions( &library );
    GamesController games( &library );
+   ActionsController actions( &library, &games );
    GameEditController edit( &library, &games );
    ScrapeController scrape( &library, &games );
    SettingsController settings;
