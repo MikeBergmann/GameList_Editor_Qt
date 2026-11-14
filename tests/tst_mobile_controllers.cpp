@@ -19,6 +19,8 @@
 #include <QSettings>
 #include <QTimer>
 
+#include <functional>
+
 namespace {
 
 int systemIndex( const LibraryController& aLibrary, const QString& aFolder )
@@ -669,6 +671,137 @@ TEST( ScrapeController, MediaChoicesFeedTheRequestByKey )
    scrape.setMedia( QStringLiteral( "nonsense" ), true );
    EXPECT_FALSE( scrape.media().value( QStringLiteral( "wheel" ) ).toBool() );
    EXPECT_FALSE( scrape.media().contains( QStringLiteral( "nonsense" ) ) );
+}
+
+const QByteArray Cst_LbMetadata = R"xml(<LaunchBox>
+  <Game>
+    <DatabaseID>1</DatabaseID>
+    <Name>Sonic the Hedgehog</Name>
+    <Platform>Super Nintendo Entertainment System</Platform>
+    <ReleaseDate>1991-06-23</ReleaseDate>
+    <Developer>Sega</Developer>
+    <Overview>Fast.</Overview>
+  </Game>
+  <Game>
+    <DatabaseID>2</DatabaseID>
+    <Name>Sonic Spinball</Name>
+    <Platform>Super Nintendo Entertainment System</Platform>
+  </Game>
+</LaunchBox>
+)xml";
+
+void waitFor( const std::function<bool()>& aDone )
+{
+   QEventLoop loop;
+   QTimer poll;
+   QObject::connect( &poll, &QTimer::timeout, [&] {
+      if ( aDone() )
+         loop.quit();
+   } );
+   poll.start( 20 );
+   QTimer::singleShot( 10000, &loop, &QEventLoop::quit );
+   if ( !aDone() )
+      loop.exec();
+}
+
+// The source is stored in QSettings, which every other scrape test would read.
+struct LaunchBoxFixture : MobileFixture
+{
+   QTemporaryDir dump;
+
+   LaunchBoxFixture() { forgetSource(); }
+   ~LaunchBoxFixture() { forgetSource(); }
+
+   static void forgetSource()
+   {
+      QSettings settings;
+      settings.beginGroup( Cst_IniOptions );
+      settings.remove( QString( Cst_IniScrapeSource ) );
+   }
+
+   void cacheDump( const QByteArray& aMetadata = Cst_LbMetadata )
+   {
+      writeFile( dump.filePath( QStringLiteral( "Metadata.xml" ) ), aMetadata );
+      writeFile( dump.filePath( QStringLiteral( "Files.xml" ) ), "<LaunchBox/>" );
+      writeFile( dump.filePath( QStringLiteral( "Mame.xml" ) ), "<LaunchBox/>" );
+   }
+};
+
+TEST( ScrapeController, LaunchBoxFillsTheFieldsFromTheLocalDump )
+{
+   LaunchBoxFixture fixture;
+   fixture.cacheDump();
+   ScrapeController scrape( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
+   scrape.setSource( ScrapeController::LaunchBox );
+   fixture.games.select( 0 );
+
+   scrape.scrape();
+   EXPECT_TRUE( scrape.isBusy() ) << "the index is built on a worker";
+   waitFor( [&] { return !scrape.isBusy(); } );
+
+   EXPECT_TRUE( scrape.error().isEmpty() ) << scrape.error().toStdString();
+   EXPECT_TRUE( scrape.hasResult() );
+   EXPECT_EQ( scrape.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Sonic the Hedgehog" ) );
+   EXPECT_EQ( scrape.values().value( QStringLiteral( "developer" ) ).toString(), QStringLiteral( "Sega" ) );
+   EXPECT_FALSE( scrape.hasVideo() );
+}
+
+TEST( ScrapeController, LaunchBoxNeedsTheDumpAndAPlatform )
+{
+   LaunchBoxFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
+   scrape.setSource( ScrapeController::LaunchBox );
+   fixture.games.select( 0 );
+   EXPECT_FALSE( scrape.launchBoxReady() );
+
+   scrape.scrape();
+   EXPECT_FALSE( scrape.isBusy() );
+   EXPECT_NE( scrape.error().indexOf( QStringLiteral( "not downloaded" ) ), -1 );
+
+   fixture.cacheDump();
+   EXPECT_TRUE( scrape.launchBoxReady() );
+}
+
+TEST( ScrapeController, LaunchBoxOffersSimilarNamesWhenNoneMatchesExactly )
+{
+   LaunchBoxFixture fixture;
+   fixture.cacheDump( R"xml(<LaunchBox><Game><DatabaseID>2</DatabaseID><Name>Sonic Spinball</Name>
+<Platform>Super Nintendo Entertainment System</Platform></Game></LaunchBox>)xml" );
+   ScrapeController scrape( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
+   scrape.setSource( ScrapeController::LaunchBox );
+   fixture.games.select( 0 );
+
+   scrape.scrape();
+   waitFor( [&] { return scrape.isPicking() || !scrape.isBusy(); } );
+   ASSERT_TRUE( scrape.isPicking() ) << scrape.error().toStdString();
+   EXPECT_EQ( scrape.searchText(), QStringLiteral( "Sonic The Hedgehog" ) );
+
+   scrape.searchCandidates( QStringLiteral( "Sonic Spin" ) );
+   ASSERT_FALSE( scrape.candidates().isEmpty() );
+   EXPECT_EQ( scrape.candidates().first(), QStringLiteral( "Sonic Spinball" ) );
+
+   scrape.pickCandidate( 0 );
+   EXPECT_FALSE( scrape.isPicking() );
+   waitFor( [&] { return !scrape.isBusy(); } );
+   EXPECT_TRUE( scrape.hasResult() );
+   EXPECT_EQ( scrape.values().value( QStringLiteral( "name" ) ).toString(), QStringLiteral( "Sonic Spinball" ) );
+}
+
+TEST( ScrapeController, TheSourceIsRememberedAndChangingItDropsTheResult )
+{
+   LaunchBoxFixture fixture;
+   ScrapeController scrape( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
+   EXPECT_EQ( scrape.source(), static_cast<int>( ScrapeController::ScreenScraper ) );
+
+   fixture.games.select( 0 );
+   emit scrape.scraper().gameInfoReady( sampleInfo() );
+   ASSERT_TRUE( scrape.hasResult() );
+
+   scrape.setSource( ScrapeController::LaunchBox );
+   EXPECT_FALSE( scrape.hasResult() );
+
+   ScrapeController again( &fixture.library, &fixture.games, nullptr, fixture.dump.path() );
+   EXPECT_EQ( again.source(), static_cast<int>( ScrapeController::LaunchBox ) );
 }
 
 }  // namespace
