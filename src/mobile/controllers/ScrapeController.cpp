@@ -49,12 +49,53 @@ QString candidateRow( const ScrapeCandidate& aCandidate )
              : QStringLiteral( "%1 (%2)" ).arg( aCandidate.name, aCandidate.releaseDate );
 }
 
+QString candidateRow( const LaunchBoxCandidate& aCandidate )
+{
+   QString text = aCandidate.name;
+   if ( !aCandidate.year.isEmpty() )
+      text += QStringLiteral( " (%1)" ).arg( aCandidate.year );
+   if ( !aCandidate.altName.isEmpty() )
+      text += QStringLiteral( " \u2013 also known as %1" ).arg( aCandidate.altName );
+   return text;
+}
+
 }  // namespace
 
 ScrapeController::ScrapeController( LibraryController* aLibrary, GamesController* aGames,
-                                    QObject* aParent )
-   : QObject( aParent ), FLibrary( aLibrary ), FGames( aGames )
+                                    QObject* aParent, const QString& aLaunchBoxDir )
+   : QObject( aParent ), FLibrary( aLibrary ), FGames( aGames ), FDump( aLaunchBoxDir )
 {
+   {
+      QSettings settings;
+      settings.beginGroup( Cst_IniOptions );
+      FSource = settings.value( Cst_IniScrapeSource, ScreenScraper ).toInt() == LaunchBox
+                   ? LaunchBox
+                   : ScreenScraper;
+   }
+
+   connect( &FDump, &LaunchBoxDump::downloadProgress, this, [this]( qint64 aReceived, qint64 aTotal ) {
+      FDumpProgress = aTotal > 0 ? static_cast<int>( aReceived * 100 / aTotal ) : -1;
+      emit dumpChanged();
+   } );
+   connect( &FDump, &LaunchBoxDump::unpacking, this, [this] {
+      FDumpProgress = -1;
+      emit dumpChanged();
+   } );
+   connect( &FDump, &LaunchBoxDump::finished, this, [this]( bool aUpdated ) {
+      if ( aUpdated )
+         FLbIndex.reset();
+      FDumpProgress = -1;
+      FNote = aUpdated ? QStringLiteral( "LaunchBox DB updated." )
+                       : QStringLiteral( "LaunchBox DB is already up to date." );
+      setBusy( false );
+      emit resultChanged();
+      emit dumpChanged();
+   } );
+   connect( &FDump, &LaunchBoxDump::failed, this, [this]( const QString& aMessage ) {
+      FDumpProgress = -1;
+      fail( aMessage );
+      emit dumpChanged();
+   } );
    for ( const MediaKey& key : Cst_MediaKeys )
       FMedia.insert( QLatin1String( key.key ), true );
    FMedia.insert( QLatin1String( Cst_VideoKey ), true );
@@ -94,6 +135,8 @@ ScrapeController::~ScrapeController()
 {
    if ( FHashThread )
       FHashThread->wait();
+   if ( FIndexThread )
+      FIndexThread->wait();
 }
 
 const Game* ScrapeController::game() const
@@ -166,6 +209,35 @@ void ScrapeController::setSaveInfos( bool aOn )
    emit saveChoiceChanged();
 }
 
+void ScrapeController::setSource( int aSource )
+{
+   const int source = aSource == LaunchBox ? LaunchBox : ScreenScraper;
+   if ( source == FSource )
+      return;
+   FSource = source;
+
+   QSettings settings;
+   settings.beginGroup( Cst_IniOptions );
+   settings.setValue( Cst_IniScrapeSource, FSource );
+
+   // The old result came from the other source.
+   reset();
+   emit sourceChanged();
+}
+
+void ScrapeController::refreshLaunchBox()
+{
+   if ( FBusy )
+      return;
+   applyNetworkSettings();
+   FError.clear();
+   FNote.clear();
+   FDumpProgress = -1;
+   setBusy( true );
+   emit resultChanged();
+   FDump.refresh();
+}
+
 void ScrapeController::setField( const QString& aKey, const QVariant& aValue )
 {
    for ( const TextField& field : Cst_TextFields ) {
@@ -209,6 +281,9 @@ void ScrapeController::reset()
    FAwaitingVideo = false;
    FAwaitingSearch = false;
    FPicking = false;
+   FLbPicking = false;
+   FLbCandidates.clear();
+   FNote.clear();
    FCandidates.clear();
    FCandidateRows.clear();
    FBusy = false;
@@ -239,6 +314,7 @@ void ScrapeController::fail( const QString& aMessage )
 {
    FError = aMessage;
    FPicking = false;
+   FLbPicking = false;
    setBusy( false );
    emit resultChanged();
    emit pickingChanged();
@@ -285,6 +361,11 @@ void ScrapeController::scrape()
    applyNetworkSettings();
    setBusy( true );
 
+   if ( FSource == LaunchBox ) {
+      requestLaunchBox();
+      return;
+   }
+
    if ( !FManualCrc.isEmpty() ) {
       sendRequest();
       return;
@@ -301,6 +382,95 @@ void ScrapeController::scrape()
       sendRequest();
    } );
    FHashThread->start();
+}
+
+void ScrapeController::requestLaunchBox()
+{
+   const Gamelist* list = FLibrary->gamelist();
+   const QString platform =
+      list ? QLatin1String( systemInfo( list->system().kind ).lbName ) : QString();
+   if ( platform.isEmpty() ) {
+      fail( QStringLiteral( "LaunchBox has no platform for this system." ) );
+      return;
+   }
+   if ( !FDump.isCached() ) {
+      fail( QStringLiteral( "The LaunchBox DB is not downloaded yet. Use \"Refresh LaunchBox "
+                            "DB\" first." ) );
+      return;
+   }
+
+   if ( FLbIndex && FLbPlatform == platform )
+      lookupLaunchBox();
+   else
+      buildLaunchBoxIndex( platform );
+}
+
+// Reading Metadata.xml takes tens of seconds, so it runs on a worker; the controller stays busy.
+void ScrapeController::buildLaunchBoxIndex( const QString& aPlatform )
+{
+   const QString metadata = FDump.filePath( QStringLiteral( "Metadata.xml" ) );
+   const QString files = FDump.filePath( QStringLiteral( "Files.xml" ) );
+   const QString mame = FDump.filePath( QStringLiteral( "Mame.xml" ) );
+   const auto db = std::make_shared<LaunchBoxDb>();
+   const auto result = std::make_shared<Result<>>();
+
+   FIndexThread = QThread::create( [=] { *result = db->loadDump( metadata, files, mame, aPlatform ); } );
+   FIndexThread->setParent( this );
+   connect( FIndexThread, &QThread::finished, this, [this, db, result, aPlatform] {
+      FIndexThread->deleteLater();
+      FIndexThread = nullptr;
+      if ( !FBusy )
+         return;
+      if ( !*result ) {
+         fail( result->error() );
+         return;
+      }
+      FLbIndex = db;
+      FLbPlatform = aPlatform;
+      lookupLaunchBox();
+   } );
+   FIndexThread->start();
+}
+
+void ScrapeController::lookupLaunchBox()
+{
+   const Game* current = game();
+   if ( !current ) {
+      fail( QStringLiteral( "The game is no longer available." ) );
+      return;
+   }
+
+   FLbQuery = LaunchBoxQuery();
+   FLbQuery.romName = current->romNameWoExt();
+   FLbQuery.gameName = current->name;
+   FLbQuery.region = current->region;
+   FLbQuery.mediaTypes = mediaTypes();
+
+   const Result<LaunchBoxMatch> match = FLbIndex->find( FLbQuery );
+   if ( match ) {
+      if ( match.value().ambiguous )
+         FNote = QStringLiteral( "Several LaunchBox games share this name; the first was taken." );
+      handleGameInfo( match.value().info );
+      return;
+   }
+   if ( FLbIndex->gameCount() == 0 ) {
+      fail( QString( Cst_GameNotFound ) );
+      return;
+   }
+
+   FLbPicking = true;
+   showLaunchBoxCandidates( FLbQuery.gameName.isEmpty() ? FLbQuery.romName : FLbQuery.gameName );
+   setPicking( true );
+}
+
+void ScrapeController::showLaunchBoxCandidates( const QString& aText )
+{
+   FSearchText = aText;
+   FLbCandidates = FLbIndex->similar( aText );
+   FCandidateRows.clear();
+   for ( const LaunchBoxCandidate& candidate : std::as_const( FLbCandidates ) )
+      FCandidateRows << candidateRow( candidate );
+   emit pickingChanged();
 }
 
 void ScrapeController::sendRequest()
@@ -343,6 +513,11 @@ void ScrapeController::searchCandidates( const QString& aText )
    if ( aText.trimmed().isEmpty() )
       return;
 
+   if ( FLbPicking ) {
+      showLaunchBoxCandidates( aText );
+      return;
+   }
+
    FSearchText = aText;
    FAwaitingSearch = true;
    FError.clear();
@@ -373,6 +548,16 @@ void ScrapeController::handleSearchReady( const QVector<ScrapeCandidate>& aCandi
 
 void ScrapeController::pickCandidate( int aRow )
 {
+   if ( FLbPicking ) {
+      if ( aRow < 0 || aRow >= FLbCandidates.size() )
+         return;
+      const ScrapedInfo info = FLbIndex->infoAt( FLbCandidates.at( aRow ).index, FLbQuery );
+      FLbPicking = false;
+      FLbCandidates.clear();
+      setPicking( false );
+      handleGameInfo( info );
+      return;
+   }
    if ( !FPicking || aRow < 0 || aRow >= FCandidates.size() )
       return;
 
@@ -389,6 +574,8 @@ void ScrapeController::pickCandidate( int aRow )
 void ScrapeController::cancelPick()
 {
    FAwaitingSearch = false;
+   FLbPicking = false;
+   FLbCandidates.clear();
    setPicking( false );
    setBusy( false );
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Game.h"
+#include "LaunchBoxDb.h"
+#include "LaunchBoxDump.h"
 #include "Scraper.h"
 
 #include <QImage>
@@ -8,12 +10,15 @@
 #include <QStringList>
 #include <QVariantMap>
 
+#include <memory>
+
 class GamesController;
 class LibraryController;
 class QThread;
 
-// Scrapes the game selected in GamesController from screenscraper.fr: the nine text fields, the
-// pictures, the video, and the save of whatever the user ticked. Owns its Scraper.
+// Scrapes the game selected in GamesController from screenscraper.fr or from the local LaunchBox
+// dump: the nine text fields, the pictures, the video (ScreenScraper only), and the save of
+// whatever the user ticked. Owns its Scraper and its LaunchBoxDump.
 class ScrapeController : public QObject
 {
    Q_OBJECT
@@ -35,10 +40,18 @@ class ScrapeController : public QObject
    Q_PROPERTY( bool picking READ isPicking NOTIFY pickingChanged )
    Q_PROPERTY( QStringList candidates READ candidates NOTIFY pickingChanged )
    Q_PROPERTY( QString searchText READ searchText NOTIFY pickingChanged )
+   Q_PROPERTY( int source READ source WRITE setSource NOTIFY sourceChanged )
+   Q_PROPERTY( bool launchBoxReady READ launchBoxReady NOTIFY dumpChanged )
+   Q_PROPERTY( int dumpProgress READ dumpProgress NOTIFY dumpChanged )
+   Q_PROPERTY( QString note READ note NOTIFY resultChanged )
 
 public:
+   enum Source { ScreenScraper = 0, LaunchBox = 1 };
+   Q_ENUM( Source )
+
    ScrapeController( LibraryController* aLibrary, GamesController* aGames,
-                     QObject* aParent = nullptr );
+                     QObject* aParent = nullptr,
+                     const QString& aLaunchBoxDir = LaunchBoxDump::defaultCacheDir() );
    ~ScrapeController() override;
 
    bool isBusy() const { return FBusy; }
@@ -67,6 +80,14 @@ public:
    bool isPicking() const { return FPicking; }
    const QStringList& candidates() const { return FCandidateRows; }
    const QString& searchText() const { return FSearchText; }
+   // Where results come from; kept in QSettings. Anything but LaunchBox reads as ScreenScraper.
+   int source() const { return FSource; }
+   // The dump is unpacked and a scrape can read it.
+   bool launchBoxReady() const { return FDump.isCached(); }
+   // Percent of the dump download, -1 while the size is unknown or the dump is unpacking.
+   int dumpProgress() const { return FDumpProgress; }
+   // A remark about the last result, e.g. an ambiguous LaunchBox name.
+   const QString& note() const { return FNote; }
 
    // Null for an index out of range. Read by the image provider on the GUI thread.
    QImage picture( int aIndex ) const;
@@ -75,6 +96,10 @@ public:
    void setSavePicture( bool aOn );
    void setSaveVideo( bool aOn );
    void setSaveInfos( bool aOn );
+   void setSource( int aSource );
+
+   // Downloads the LaunchBox dump, or checks that it is current. Busy until it is done.
+   Q_INVOKABLE void refreshLaunchBox();
 
    // Reads the login, language and proxy from QSettings, hashes the ROM, then asks.
    Q_INVOKABLE void scrape();
@@ -87,7 +112,7 @@ public:
    // Drops the result and every picture.
    Q_INVOKABLE void reset();
 
-   // The name search of the picker. A reply replaces candidates.
+   // The name search of the picker. A reply replaces candidates (at once for LaunchBox).
    Q_INVOKABLE void searchCandidates( const QString& aText );
    Q_INVOKABLE void pickCandidate( int aRow );
    Q_INVOKABLE void cancelPick();
@@ -102,11 +127,17 @@ signals:
    void picturesChanged();
    void saveChoiceChanged();
    void pickingChanged();
+   void sourceChanged();
+   void dumpChanged();
    // The Gamelist changed under the edit page.
    void saved();
 
 private:
    void sendRequest();
+   void requestLaunchBox();
+   void buildLaunchBoxIndex( const QString& aPlatform );
+   void lookupLaunchBox();
+   void showLaunchBoxCandidates( const QString& aText );
    void fail( const QString& aMessage );
    void setBusy( bool aBusy );
    void setPicking( bool aPicking );
@@ -126,6 +157,7 @@ private:
    Scraper FScraper;
 
    QThread* FHashThread = nullptr;
+   QThread* FIndexThread = nullptr;
    bool FBusy = false;
    bool FHasResult = false;
    QString FError;
@@ -154,4 +186,14 @@ private:
    QStringList FCandidateRows;
 
    bool FAwaitingVideo = false;
+
+   int FSource = ScreenScraper;
+   QString FNote;
+   LaunchBoxDump FDump;
+   int FDumpProgress = -1;
+   std::shared_ptr<LaunchBoxDb> FLbIndex;
+   QString FLbPlatform;
+   LaunchBoxQuery FLbQuery;
+   QVector<LaunchBoxCandidate> FLbCandidates;
+   bool FLbPicking = false;
 };
