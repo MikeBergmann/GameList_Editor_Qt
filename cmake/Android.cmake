@@ -27,7 +27,7 @@ qt_add_qml_module( GameListEditor
    QML_FILES
       src/mobile/qml/AboutPage.qml
       src/mobile/qml/ActionsPage.qml
-      src/mobile/qml/AddRomsPage.qml
+      src/mobile/qml/ReviewPage.qml
       src/mobile/qml/AskDialog.qml
       src/mobile/qml/BarButton.qml
       src/mobile/qml/EditPage.qml
