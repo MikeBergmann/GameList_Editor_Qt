@@ -108,7 +108,8 @@ A touch and gamepad front end for phones and handhelds. It runs on a Retroid Poc
 
 - **Same core:** it uses the same `gle_core` and `gle_scraper` as the desktop app, with a new Qt Quick (QML) front end on top. The Widgets UI is not built on Android.
 - **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr, and add missing ROMs.
-- **Not yet:** the other Actions, LaunchBox scraping, About / Help.
+- **Help and About:** Help is on the systems page, About at the end of Settings.
+- **Not yet:** the other Actions, LaunchBox scraping.
 - **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
 - **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
 - **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.

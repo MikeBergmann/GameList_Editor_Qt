@@ -29,6 +29,7 @@ Page {
    Component { id: browserPage; FileBrowserPage {} }
    Component { id: gamesPage; GamesPage {} }
    Component { id: settingsPage; SettingsPage {} }
+   Component { id: helpPage; HelpPage {} }
 
    // Only a folder the app does not know can be mapped to a system type.
    function askKind( aIndex ) {
@@ -67,11 +68,21 @@ Page {
          font.pixelSize: 20
       }
       BarButton {
+         id: helpBtn
+         anchors.left: parent.left
+         anchors.verticalCenter: parent.verticalCenter
+         text: "Help"
+         onClicked: page.StackView.view.push( helpPage )
+         KeyNavigation.right: settingsBtn
+         KeyNavigation.down: chooseBtn
+      }
+      BarButton {
          id: settingsBtn
          anchors.right: parent.right
          anchors.verticalCenter: parent.verticalCenter
          text: "Settings"
          onClicked: page.StackView.view.push( settingsPage )
+         KeyNavigation.left: helpBtn
          KeyNavigation.down: chooseBtn
       }
    }

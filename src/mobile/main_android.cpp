@@ -23,6 +23,7 @@ int main( int argc, char** argv )
    // Same names as the desktop app, so the settings keys mean the same thing.
    QCoreApplication::setOrganizationName( QStringLiteral( "GameListEditorQt" ) );
    QCoreApplication::setApplicationName( QStringLiteral( "GameListEditorQt" ) );
+   QCoreApplication::setApplicationVersion( QStringLiteral( GLE_VERSION ) );
    QSettings::setDefaultFormat( QSettings::IniFormat );
 
    LibraryController library;
