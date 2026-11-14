@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Scrapes the selected game from ScreenScraper. Rows work like the edit page's: A (or a tap)
-// changes one, the thumbnails pick the picture to keep, and Save writes what is ticked.
+// Scrapes the selected game from ScreenScraper or the local LaunchBox dump. Rows work like the
+// edit page's: A (or a tap) changes one, the thumbnails pick the picture to keep, and Save writes
+// what is ticked.
 Page {
    id: page
    readonly property bool wide: width > height
@@ -19,18 +20,28 @@ Page {
    Keys.onEscapePressed: ( aEvent ) => swallowWhileBusy( aEvent )
    Keys.onBackPressed: ( aEvent ) => swallowWhileBusy( aEvent )
 
+   // The third entry marks what LaunchBox cannot give.
    readonly property var mediaChoices: [
-      [ "box2d", "Box 2D" ], [ "box3d", "Box 3D" ], [ "mix1", "Mix 1" ],
-      [ "mix2", "Mix 2" ], [ "screenshot", "Screenshot" ], [ "title", "Title" ],
-      [ "arcadeBox", "Arcade box" ], [ "wheel", "Wheel" ], [ "video", "Video" ]
+      [ "box2d", "Box 2D" ], [ "box3d", "Box 3D" ], [ "mix1", "Mix 1", true ],
+      [ "mix2", "Mix 2", true ], [ "screenshot", "Screenshot" ], [ "title", "Title" ],
+      [ "arcadeBox", "Arcade box", true ], [ "wheel", "Wheel" ], [ "video", "Video", true ]
    ]
+   readonly property bool launchBox: scrape.source === 1
+
+   function fetchCount() {
+      return mediaChoices.filter( ( aChoice ) => scrape.media[ aChoice[ 0 ] ] && !( launchBox && aChoice[ 2 ] ) ).length
+   }
 
    readonly property var rows: {
       const base = [
          { type: "scrape", label: "Scrape now" },
-         { type: "media", label: "Fetch" },
-         { type: "crc", label: "CRC32 (empty: hash the ROM)" }
+         { type: "source", label: "Source" },
+         { type: "media", label: "Fetch" }
       ]
+      if ( launchBox )
+         base.push( { type: "refresh", label: "Refresh LaunchBox DB" } )
+      else
+         base.push( { type: "crc", label: "CRC32 (empty: hash the ROM)" } )
       if ( !scrape.hasResult )
          return base
 
@@ -50,6 +61,13 @@ Page {
    function activateRow( aRow ) {
       if ( aRow.type === "scrape" ) {
          scrape.scrape()
+      } else if ( aRow.type === "source" ) {
+         // A new source rebuilds the rows, which resets the highlight.
+         const keep = list.currentIndex
+         scrape.source = launchBox ? 0 : 1
+         list.currentIndex = keep
+      } else if ( aRow.type === "refresh" ) {
+         scrape.refreshLaunchBox()
       } else if ( aRow.type === "media" ) {
          mediaDialog.open()
       } else if ( aRow.type === "save" ) {
@@ -120,6 +138,7 @@ Page {
                CheckBox {
                   id: box
                   text: modelData[ 1 ]
+                  enabled: !( page.launchBox && modelData[ 2 ] )
                   checked: scrape.media[ modelData[ 0 ] ]
                   onToggled: scrape.setMedia( modelData[ 0 ], checked )
                   Keys.onReturnPressed: click()
@@ -143,7 +162,7 @@ Page {
 
    FieldDialog {
       id: searchDialog
-      title: "Search ScreenScraper"
+      title: "Search " + ( page.launchBox ? "LaunchBox" : "ScreenScraper" )
       onCommitted: ( aText ) => scrape.searchCandidates( aText )
       onClosed: pickList.forceActiveFocus( Qt.TabFocusReason )
    }
@@ -169,8 +188,10 @@ Page {
 
          Label {
             Layout.fillWidth: true
-            text: "ScreenScraper has no game for this ROM. Pick the closest one, or change the name "
-                  + "and search again (each search counts against your ScreenScraper quota)."
+            text: page.launchBox
+                  ? "No LaunchBox game has exactly this name. Pick the closest one, or change the search."
+                  : "ScreenScraper has no game for this ROM. Pick the closest one, or change the name "
+                    + "and search again (each search counts against your ScreenScraper quota)."
             wrapMode: Text.Wrap
             font.pixelSize: 13
          }
@@ -328,7 +349,15 @@ Page {
          ProgressBar {
             Layout.fillWidth: true
             visible: scrape.busy
-            indeterminate: true
+            indeterminate: scrape.dumpProgress < 0
+            value: scrape.dumpProgress / 100
+         }
+         Label {
+            Layout.fillWidth: true
+            Layout.margins: 8
+            visible: scrape.note.length > 0
+            text: scrape.note
+            wrapMode: Text.Wrap
          }
          Label {
             Layout.fillWidth: true
@@ -363,7 +392,9 @@ Page {
 
                readonly property bool isValue: modelData.type !== "scrape"
                readonly property string shown:
-                  modelData.type === "media" ? ( Object.keys( scrape.media ).filter( ( aKey ) => scrape.media[ aKey ] ).length + " selected" )
+                  modelData.type === "source" ? ( page.launchBox ? "LaunchBox" : "ScreenScraper" )
+                  : modelData.type === "refresh" ? ( scrape.launchBoxReady ? "Downloaded" : "Not downloaded yet" )
+                  : modelData.type === "media" ? ( page.fetchCount() + " selected" )
                   : modelData.type === "crc" ? scrape.manualCrc
                   : modelData.type === "save" ? ( scrape[ modelData.key ] ? "Yes" : "No" )
                   : ( scrape.values[ modelData.key ] || "" )
