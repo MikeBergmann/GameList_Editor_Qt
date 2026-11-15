@@ -104,16 +104,19 @@ Pitfalls:
 
 ### Android
 
-A touch and gamepad front end for phones and handhelds. It runs on a Retroid Pocket 5 (Android 13); a real-phone check is still open. It is an early version. CI only checks that it builds and keeps a debug APK as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
+A touch and gamepad front end for phones and handhelds. It is tested on a Retroid Pocket 5 (Android 13) and a Samsung Galaxy A72 (Android 14). It is an early version. CI builds a debug APK and keeps it as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
 
 - **Same core:** it uses the same `gle_core` and `gle_scraper` as the desktop app, with a new Qt Quick (QML) front end on top. The Widgets UI is not built on Android.
-- **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr, and add missing ROMs.
+- **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr or LaunchBox, and the review-based Actions: add missing ROMs, link and rename media, shrink large pictures, delete orphans and duplicates, clean up gamelist backups, and export the games list.
 - **Help and About:** Help is on the systems page, About at the end of Settings.
-- **Not yet:** the other Actions, LaunchBox scraping.
+- **Not yet:** Sync to another folder, case conversion, region removal and the advanced name editor.
 - **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
+- **LaunchBox:** the first scrape downloads LaunchBox's metadata dump (several hundred MB unpacked) into the app's cache. The first scrape for each platform then builds an index, which takes about 45 seconds on the Retroid Pocket 5 and **1 to 2 minutes on the Galaxy A72**. The index is kept until you scrape another platform or the dump changes. Android may clear the cache when it is short of space, which means downloading and indexing again. Memory use on weak phones has not been measured.
+- **Export:** the games list is written to `<system folder>/<system>.txt`.
+- **Pictures:** a scraped picture larger than 2048 px on its longest side is scaled down before it is shown or saved, to spare a phone's memory.
 - **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
 - **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.
-- **Install:** build the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
+- **Install:** download the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
 - Stop EmulationStation (or ES-DE) first, it rewrites its gamelists on exit.
 
 ### Features to add
@@ -123,7 +126,7 @@ A touch and gamepad front end for phones and handhelds. It runs on a Retroid Poc
 - [ ] Normalize media further, e.g. format
 - [ ] Remove unused media
 - [ ] Sync folder ROMs (ScummVM, etc.); adding them under Add missing ROMs works
-- [ ] Android: the remaining Actions and LaunchBox
+- [ ] Android: Sync, case conversion, region removal and the advanced name editor
 
 ## screenscraper.fr credentials
 

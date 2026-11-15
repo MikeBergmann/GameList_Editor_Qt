@@ -1,4 +1,4 @@
-name: CI Android
+name: CI (Android)
 
 # Build check only: a debug APK (debug-signed, installable) as a workflow artifact. No secrets,
 # so scraping reports "no developer credentials". Release signing is done locally.
