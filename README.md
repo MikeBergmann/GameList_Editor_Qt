@@ -30,23 +30,103 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 
 ## First Step
 
-- Target: Linux Mint 22.1 (Ubuntu 24.04), Qt6.4, cmake, gcc; also builds on Windows with Qt's MinGW kit (tested with Qt 6.12 / MinGW 13.1)
-- Build dependencies (Ubuntu/Mint): `qt6-base-dev qt6-multimedia-dev zlib1g-dev libgtest-dev`
-- Windows: install Qt 6 (MinGW kit, with Qt Multimedia, CMake and Ninja) via the Qt installer. zlib comes with the MinGW kit; GoogleTest is downloaded by CMake if not installed.
-
-  ```
-  set PATH=C:\Qt\Tools\CMake_64\bin;C:\Qt\Tools\Ninja;C:\Qt\Tools\mingw1310_64\bin;C:\Qt\6.12.0\mingw_64\bin;%PATH%
-  cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.12.0/mingw_64
-  cmake --build build
-  build\tests.exe
-  windeployqt dist\GameListEditor.exe   # only needed to run it without Qt on PATH (copy the exe to dist\ first, not next to tests.exe)
-  ```
-
+- Target: Linux Mint 22.1 (Ubuntu 24.04), Windows 11, Android 13+, MacOS 15 (untested). See [Building](#building).
 - Testing: Google Test
 - First drop will contain:
   - No SSH / no Pi remote control
   - English-only UI
   - No theming (default Qt widget style only)
+
+## Building
+
+![AI generated](https://img.shields.io/badge/build%20instructions-AI%20generated-orange)
+
+> [!NOTE]
+> These build instructions are AI generated from the source code, the CI workflows and my private build helper scripts. They have not been tried on fresh systems. If something is wrong or missing, please drop me a line (open an issue).
+
+### Requirements for all platforms
+
+- Qt 6.4 or newer: Core, Gui, Widgets, Xml, Network, Multimedia, MultimediaWidgets
+- CMake 3.21 or newer, Ninja, a C++17 compiler
+- zlib
+- GoogleTest (optional): CMake downloads v1.14.0 if it is not installed, which needs network access at configure time
+- Clone with git, including tags. The version shown in the app comes from `git describe` and reads `unknown` without it.
+- Scraping needs your own screenscraper.fr developer credentials, see [screenscraper.fr credentials](#screenscraperfr-credentials). Without them everything else works.
+
+### Linux (Ubuntu 24.04 / Mint 22, Qt 6.4)
+
+```
+sudo apt install build-essential cmake ninja-build git \
+     qt6-base-dev qt6-multimedia-dev zlib1g-dev libgtest-dev
+
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+./build/GameListEditor
+```
+
+On other distributions install the equivalent Qt 6 base and multimedia development packages, zlib and gcc or clang. The tests run headless (`QT_QPA_PLATFORM=offscreen`).
+
+### Windows (Qt's MinGW kit)
+
+The MinGW kit is the tested setup; MSVC is not covered.
+
+1. Install [Git for Windows](https://git-scm.com/download/win).
+2. Install Qt with the [Qt Online Installer](https://www.qt.io/download-qt-installer). Select, for your Qt version (6.8 or newer is what CI uses): **MinGW 64-bit**, **Qt Multimedia**, and under Developer and Designer Tools **MinGW** (the matching compiler), **CMake** and **Ninja**.
+3. zlib comes with the MinGW toolchain, and GoogleTest is downloaded by CMake.
+
+In a Command Prompt in the repository (adjust the Qt location and versions to your install):
+
+```
+set PATH=C:\Qt\Tools\CMake_64\bin;C:\Qt\Tools\Ninja;C:\Qt\Tools\mingw1310_64\bin;C:\Qt\6.8.3\mingw_64\bin;%PATH%
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/mingw_64
+cmake --build build
+build\tests.exe
+```
+
+- The MinGW and Qt `bin` directories must be on `PATH`, or the exe cannot find its DLLs.
+- To run the exe without Qt on `PATH`, copy `GameListEditor.exe` to a separate folder (e.g. `dist\`, not next to `tests.exe`) and run `windeployqt dist\GameListEditor.exe`.
+- Do not mix in another gcc (MSYS2, Chocolatey): its ABI does not match Qt's MinGW kit.
+
+### macOS
+
+CI builds and tests it, but nobody has run the app there.
+
+```
+xcode-select --install
+brew install cmake ninja qt
+
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+If CMake does not find Qt, add `-DCMAKE_PREFIX_PATH=$(brew --prefix qt)`, or `-DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/macos` for a Qt from the Qt installer (include the Qt Multimedia module). zlib comes from the macOS SDK.
+
+### Android (APK)
+
+Prerequisites:
+
+- Qt 6.8 or newer with the **Android arm64-v8a** kit and Qt Multimedia, plus the matching **desktop Qt** kit (needed for `moc`, `rcc` and `qmlcachegen`)
+- JDK 17
+- Android SDK with the command-line tools, and the NDK your Qt version is built against (Qt 6.8: NDK 26.1.10909125)
+- [KDAB `android_openssl`](https://github.com/KDAB/android_openssl) cloned into the SDK root (scraping needs it):
+  `git clone --depth 1 https://github.com/KDAB/android_openssl.git <SDK_ROOT>/android_openssl`
+- Network access: the last build step runs Gradle, which downloads its dependencies
+
+```
+cmake -S . -B build-android -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_TOOLCHAIN_FILE=<Qt>/6.8.3/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake \
+  -DQT_HOST_PATH=<Qt>/6.8.3/gcc_64 \
+  -DANDROID_SDK_ROOT=<SDK_ROOT> \
+  -DANDROID_NDK_ROOT=<SDK_ROOT>/ndk/26.1.10909125
+cmake --build build-android
+```
+
+- On Windows set `JAVA_HOME` and `ANDROID_SDK_ROOT`, and use the `mingw_64` kit as `QT_HOST_PATH`.
+- The debug APK is `build-android/android-build/GameListEditor.apk`. It is debug-signed and installable.
+- There are no desktop tests in this build.
+- A release APK needs your own keystore, passed through `QT_ANDROID_KEYSTORE_*` environment variables.
 
 ## Current Status
 
