@@ -16,11 +16,11 @@
   <img src="./Screenshot_Android_L.jpg" alt="Android, landscape: editing a game" width="600">
 </p>
 
-(Cover of Yokai Ninja is AI generated)
+(Cover of Yokai Ninja is AI-generated)
 
 ## The Why
 
-There are a lot of great ROMs for vintage computers/consoles or for their emulators on itch.io.
+There are a lot of great ROMs for vintage computers/consoles and their emulators on itch.io.
 
 To manage these ROMs, I used [GameList Editor](https://github.com/andresdelcampo/GameList_Editor) as my 'the' tool for editing/scraping my gamelist.xml.
 
@@ -32,17 +32,17 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 
 - Target: Linux Mint 22.1 (Ubuntu 24.04), Windows 11, Android 13+, MacOS 15 (untested). See [Building](#building).
 - Testing: Google Test
-- First drop will contain:
-  - No SSH / no Pi remote control
-  - English-only UI
-  - No theming (default Qt widget style only)
+- Out of scope:
+  - SSH / Pi remote control
+  - Translations: the UI is English-only
+  - Theming: default Qt widget style only (the Android app uses Qt Quick's Material style)
 
 ## Building
 
 ![AI generated](https://img.shields.io/badge/build%20instructions-AI%20generated-orange)
 
 > [!NOTE]
-> These build instructions are AI generated from the source code, the CI workflows and my private build helper scripts. They have not been tried on fresh systems. If something is wrong or missing, please drop me a line (open an issue).
+> These build instructions are AI-generated from the source code, the CI workflows, and my private build helper scripts. They have not been tried on fresh systems. If something is wrong or missing, please drop me a line (open an issue).
 
 ### Requirements for all platforms
 
@@ -50,8 +50,8 @@ So this repo contains my C++/Qt6 port of the GPLv3 `andresdelcampo/GameList_Edit
 - CMake 3.21 or newer, Ninja, a C++17 compiler
 - zlib
 - GoogleTest (optional): CMake downloads v1.14.0 if it is not installed, which needs network access at configure time
-- Clone with git, including tags. The version shown in the app comes from `git describe` and reads `unknown` without it.
-- Scraping needs your own screenscraper.fr developer credentials, see [screenscraper.fr credentials](#screenscraperfr-credentials). Without them everything else works.
+- Clone with git, including tags. The app's version information comes from `git describe` and will be `unknown` without it.
+- Scraping needs your own screenscraper.fr developer credentials; see [screenscraper.fr credentials](#screenscraperfr-credentials). Without them, screenscraper scraping is disabled.
 
 ### Linux (Ubuntu 24.04 / Mint 22, Qt 6.4)
 
@@ -65,14 +65,14 @@ ctest --test-dir build --output-on-failure
 ./build/GameListEditor
 ```
 
-On other distributions install the equivalent Qt 6 base and multimedia development packages, zlib and gcc or clang. The tests run headless (`QT_QPA_PLATFORM=offscreen`).
+On other distributions, install the equivalent Qt 6 base and multimedia development packages, zlib, and GCC or Clang. The tests run headless (`QT_QPA_PLATFORM=offscreen`).
 
 ### Windows (Qt's MinGW kit)
 
 The MinGW kit is the tested setup; MSVC is not covered.
 
 1. Install [Git for Windows](https://git-scm.com/download/win).
-2. Install Qt with the [Qt Online Installer](https://www.qt.io/download-qt-installer). Select, for your Qt version (6.8 or newer is what CI uses): **MinGW 64-bit**, **Qt Multimedia**, and under Developer and Designer Tools **MinGW** (the matching compiler), **CMake** and **Ninja**.
+2. Install Qt with the [Qt Online Installer](https://www.qt.io/download-qt-installer). Select, for your Qt version (6.8 or newer is what CI uses): **MinGW 64-bit**, **Qt Multimedia**, and under Developer and Designer Tools, MinGW (the matching compiler) and **Ninja**.
 3. zlib comes with the MinGW toolchain, and GoogleTest is downloaded by CMake.
 
 In a Command Prompt in the repository (adjust the Qt location and versions to your install):
@@ -86,11 +86,11 @@ build\tests.exe
 
 - The MinGW and Qt `bin` directories must be on `PATH`, or the exe cannot find its DLLs.
 - To run the exe without Qt on `PATH`, copy `GameListEditor.exe` to a separate folder (e.g. `dist\`, not next to `tests.exe`) and run `windeployqt dist\GameListEditor.exe`.
-- Do not mix in another gcc (MSYS2, Chocolatey): its ABI does not match Qt's MinGW kit.
+- Do not mix in another GCC (MSYS2, Chocolatey): its ABI does not match Qt's MinGW kit.
 
 ### macOS
 
-CI builds and tests it, but nobody has run the app there.
+CI builds and tests it, but nobody has run the app there. Unfortunately, my Mac no longer runs macOS, so there won't be an app bundle to download until someone volunteers to test.
 
 ```
 xcode-select --install
@@ -147,6 +147,10 @@ cmake --build build-android
 - [x] Sync to another folder, ES-DE or legacy in either direction (see below)
 - [x] Android version, early (see below)
 
+### LaunchBox
+
+Scraping from LaunchBox works offline against a LaunchBox metadata dump. Pick LaunchBox as the source and press **Refresh LaunchBox DB** once to download it into the app's cache (several hundred MB unpacked); pressing it again only downloads when the dump has changed. The first scrape for each platform builds an index, which takes a while. Unlike screenscraper.fr it gives no video and has no CRC lookup.
+
 ### ES-DE
 
 Choose the ES-DE folder (the one holding `gamelists` and `settings`) instead of a ROM folder:
@@ -184,20 +188,26 @@ Pitfalls:
 
 ### Android
 
-A touch and gamepad front end for phones and handhelds. It is tested on a Retroid Pocket 5 (Android 13) and a Samsung Galaxy A72 (Android 14). It is an early version. CI builds a debug APK and keeps it as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
+A touch and gamepad front end for phones and handhelds. It has been tried on a Retroid Pocket 5 (Android 13) and a Samsung Galaxy A72 (Android 14). It is an early version. CI builds a debug APK and keeps it as a workflow artifact (`GameListEditor-apk`, no scraping credentials). Release APKs are signed and published by hand, or build it yourself.
 
 - **Same core:** it uses the same `gle_core` and `gle_scraper` as the desktop app, with a new Qt Quick (QML) front end on top. The Widgets UI is not built on Android.
 - **Works today:** browse systems and games, search and filter, edit and save a game, change or remove its picture and video, play the video, previous/next game, scrape from screenscraper.fr or LaunchBox, and the review-based Actions: add missing ROMs, link and rename media, shrink large pictures, delete orphans and duplicates, clean up gamelist backups, and export the games list.
 - **Help and About:** Help is on the systems page, About at the end of Settings.
 - **Not yet:** Sync to another folder, case conversion, region removal and the advanced name editor.
 - **Gamepad:** the D-pad moves the focus, A activates, B goes back, L1/R1 switch to the previous/next game. Touch works as well.
-- **LaunchBox:** the first scrape downloads LaunchBox's metadata dump (several hundred MB unpacked) into the app's cache. The first scrape for each platform then builds an index, which takes about 45 seconds on the Retroid Pocket 5 and **1 to 2 minutes on the Galaxy A72**. The index is kept until you scrape another platform or the dump changes. Android may clear the cache when it is short of space, which means downloading and indexing again. Memory use on weak phones has not been measured.
+- **LaunchBox:** works as described in [LaunchBox](#launchbox). Building a platform's index takes about 45 seconds on the Retroid Pocket 5 and **1 to 2 minutes on the Galaxy A72**. The index is kept until you scrape another platform or the dump changes. Android may clear the cache when it is short of space, which means downloading and indexing again. I did not measure Memory on weak phones.
 - **Export:** the games list is written to `<system folder>/<system>.txt`.
 - **Pictures:** a scraped picture larger than 2048 px on its longest side is scaled down before it is shown or saved, to spare a phone's memory.
 - **Storage:** plain file paths with the "All files access" permission, so it is sideloaded, not on Google Play. The app asks for the permission on first start. It needs Android 13 or newer.
-- **Build:** Qt 6.8 or newer with the Android kit (arm64-v8a), the Android SDK/NDK and the `android_openssl` package (scraping needs it). Configure with the Qt Android toolchain file; CMake then builds the QML app instead of the Widgets one. The developer credentials work as above.
+- **Build:** see [Android (APK)](#android-apk) above. The developer credentials work as for the desktop build.
 - **Install:** download the APK, allow "Install unknown apps" for the browser or file manager you opened it with, and install. On first start grant "All files access". Updates install over the old version as long as both are release builds; switching between a debug and a release build needs an uninstall first.
 - Stop EmulationStation (or ES-DE) first, it rewrites its gamelists on exit.
+
+Known limitations:
+
+- Some long actions (rename and link media, delete orphans and duplicates, the ROM scans) run on the UI thread. On a big library Android may report the app as not responding.
+- Unsaved edits are lost if Android kills the app while it is in the background.
+- A scrape cannot be cancelled once started.
 
 ### Features to add
 
@@ -219,10 +229,6 @@ Scraping needs two separate sets of credentials:
   ```
   or export `GLE_SS_DEVID` / `GLE_SS_DEVPWD` before running cmake. Without them the app builds and runs, but scraping reports "no developer credentials". They are baked into the binary, so don't distribute a build made with your own credentials unless you intend to share them.
 - **User credentials** (`SSUser` / `SSPwd`) are your personal screenscraper.fr account, entered in the app and stored in your ini.
-
-## Still undecided
-
-Unfortunately, my Mac no longer runs MacOS, so there won't be a MacOS app bundle to download until someone volunteers to test. Nevertheless, I added a CI runner to make sure it builds on MacOS. 
 
 ## Third-party components
 
